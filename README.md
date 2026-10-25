@@ -48,6 +48,23 @@ builder.AddProject<Projects.AspirePulumiPackages_Api>("api")
 
 `.WithReference(cosmos)` on a project is enough to get data access — no separate role-assignment call is needed. Any compute environment (e.g. `AddPulumiAzureContainerAppEnvironment`) hosting a resource that references the Cosmos DB account automatically gets a Pulumi `SqlResourceSqlRoleAssignment` granting its shared managed identity the built-in **Cosmos DB Built-in Data Contributor** role, scoped to the account — the data-plane equivalent of the ACR pull role assignment described above. `ConnectionStrings__cosmos` (the account's document endpoint, consumed by `Microsoft.Azure.Cosmos`/`Aspire.Microsoft.Azure.Cosmos` with `DefaultAzureCredential`) is read from the stack's outputs the same way `AzureAd__ClientId` is above, so it's subject to the same "deploy once to create the account, deploy again to pick up the endpoint" caveat on the first deploy.
 
+## Key Vault
+
+`builder.AddPulumiAzureKeyVault("vault")` (project `AspirePulumiPackages.Pulumi.Azure.KeyVault`) is the Pulumi equivalent of `AddAzureKeyVault`: a standard-SKU, RBAC-authorized vault (same shape as the official Bicep: `tenantId`, SKU `A/standard`, `enableRbacAuthorization`, `aspire-resource-name` tag) with outputs `vaultUri`, `name`, `id`. The vault URI is the connection string, so `.WithReference(vault)` yields `ConnectionStrings__vault`.
+
+```csharp
+var vault = builder.AddPulumiAzureKeyVault("vault")
+    .WithPulumiStack(azureStack)
+    .AddSecret("api-key", builder.AddParameter("api-key", secret: true));
+
+builder.AddProject<Projects.AspirePulumiPackages_Api>("api")
+    .WithComputeEnvironment(acaEnv)
+    .WithRoleAssignments(vault, AzureKeyVaultRole.KeyVaultSecretsUser)  // optional; default is Key Vault Administrator, as in the official package
+    .WithReference(vault);
+```
+
+Secret parameters become secret Pulumi config entries (`pulumi config set --secret apiKey ...`). Also supported: `PublishAsExisting`/`AsExisting`, `GetSecret(name)` (the secret URI, not a platform-resolved Key Vault reference) and the Pulumi-specific `WithDeployerRoleAssignments(...)` which grants the deploying principal roles (e.g. Secrets Officer) so Pulumi can write secrets under RBAC; secrets depend on that assignment. Not ported: `ReferenceExpression` secrets, `RunAsExisting`.
+
 ## Multiple stacks
 
 Resources can be split across separate Pulumi stacks (own project, own ESC environment) by adding more than one `AddPulumiStack` and binding each resource to the stack it belongs to with `.WithPulumiStack(...)`:
