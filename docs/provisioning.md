@@ -22,3 +22,37 @@ Pulumi YAML already is the expression language: `${res.prop}` is member access/O
 - Typed `BicepValue<T>`: values are `object?` YAML nodes; type safety comes from the per-resource overlays built on this project.
 
 Existing integrations (`.Azure`, `.Entra`) can migrate their hand-written `"${...}"` strings to these helpers incrementally.
+
+# ConfigureInfrastructure overlays (issue #38 pattern, reused by #28-#51)
+
+Upstream `Aspire.Hosting.Azure.Provisioning.<X>` overlays let users edit the typed `Azure.Provisioning` resources inside
+`ConfigureInfrastructure`. The Pulumi pipeline emits YAML, so azure-native's generated .NET args classes (`Pulumi.AzureNative.*`)
+cannot be used. The tradeoff: a **typed-ish property bag**, addressed by azure-native schema names, instead of compile-time types.
+
+## Shared pieces (`AspirePulumiPackages.Pulumi.Provisioning`, `PulumiInfrastructure.cs`)
+
+- `PulumiInfrastructure` - wraps the `PulumiProgram`: `GetResource(id)`, `GetResources(type)`, `GetSingleResource(type)`,
+  `AddResource(id, type)`, `AddOutput`. Equivalent of the overlay's identifier lookup.
+- `PulumiResourceNode` - editable resource: `Set("a.b.c", value)` (dotted path inside the resource's `properties`, creating maps; null removes),
+  `Get`, `Remove`, `SetOption`, `DependsOn`, `Ref(path)`. Values may be literals, `PulumiExpr` results or `${res.prop}` strings
+  (that is how `Output<T>` references/expressions are expressed).
+- `ConfigureInfrastructure<T>(Action<PulumiInfrastructure>)` on any `IResourceBuilder<T>` stores a `PulumiInfrastructureCallbackAnnotation`.
+- `resource.ApplyInfrastructureCallbacks(program)` runs the callbacks (registration order).
+
+## Adding an overlay for resource X (steps)
+
+1. In the hosting resource's `ContributeResourcesAsync`, call `Provisioning.PulumiInfrastructureExtensions.ApplyInfrastructureCallbacks(this, program)` as the **last** statement.
+2. Add `Pulumi<X>Infrastructure : PulumiInfrastructure` exposing the upstream "lookup roots" as properties returning `PulumiResourceNode`
+   (see `PulumiKeyVaultInfrastructure.KeyVaultService`), plus a typed `ConfigureInfrastructure(this IResourceBuilder<Pulumi...Resource>, Action<Pulumi<X>Infrastructure>)`
+   extension that wraps the generic one. Guard roots that do not exist (e.g. `PublishAsExisting`).
+3. Property paths follow the azure-native schema (`pulumi package get-schema azure-native`): the first segment is the resource's input
+   property, e.g. a Vault's settings live under `properties.` (so `Set("properties.enableSoftDelete", true)` emits `properties: { properties: { enableSoftDelete: true } }`).
+4. Demo it in `AppHost.cs` and check `aspire publish` output.
+
+Overlay lives in the same project as the hosting port (no separate opt-in package; upstream's `ASPIREAZUREPROVISIONING001` experimental gate is not replicated).
+
+## Key Vault specifics
+
+Root `KeyVaultService` -> `azure-native:keyvault:Vault`; additionally `Secrets`. Unsupported/excluded: polyglot (ATS) projection of types
+(no Pulumi equivalent; the callback is C#-only), typed models of `KeyVaultService` sub-types (`KeyVaultAccessPolicy` etc. are plain maps), and
+BicepValue operators (see above). Existing vaults (`PublishAsExisting`) have no `KeyVaultService`; other resources remain reachable via `GetResource(id)`.

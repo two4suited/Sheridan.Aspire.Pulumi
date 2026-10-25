@@ -47,7 +47,11 @@ storage.AddQueues("queues").AddQueue("jobs");
 var apiKey = builder.AddParameter("api-key", secret: true);
 var keyVault = builder.AddPulumiAzureKeyVault("vault")
     .WithPulumiStack(azureStack)
-    .AddSecret("api-key", apiKey);
+    .AddSecret("api-key", apiKey)
+    .ConfigureInfrastructure(infra => infra.KeyVaultService
+        .Set("properties.enableSoftDelete", true)
+        .Set("properties.enablePurgeProtection", true)
+        .Set("properties.softDeleteRetentionInDays", 30));
 
 builder.AddProject<Projects.AspirePulumiPackages_Api>("api")
     .WithReference(blobs)
