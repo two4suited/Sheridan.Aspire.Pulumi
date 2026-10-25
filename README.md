@@ -102,6 +102,18 @@ builder.AddProject<Projects.AspirePulumiPackages_Api>("api")
 
 Secret parameters become secret Pulumi config entries (`pulumi config set --secret apiKey ...`). Also supported: `PublishAsExisting`/`AsExisting`, `GetSecret(name)` (the secret URI, not a platform-resolved Key Vault reference) and the Pulumi-specific `WithDeployerRoleAssignments(...)` which grants the deploying principal roles (e.g. Secrets Officer) so Pulumi can write secrets under RBAC; secrets depend on that assignment. Not ported: `ReferenceExpression` secrets, `RunAsExisting`.
 
+## Redis
+
+`AspirePulumiPackages.Pulumi.Azure.Redis` ports `Aspire.Hosting.Azure.Redis`. `builder.AddPulumiAzureRedis("cache")` (alias `AddPulumiRedis`) provisions Azure Cache for Redis (`azure-native:redis:Redis`, Basic C1, TLS 1.2, non-SSL port off) and `builder.AddPulumiAzureManagedRedis("cache")` (alias `AddPulumiManagedRedis`) provisions Azure Managed Redis (`redisenterprise:RedisEnterprise` Balanced_B0 plus a `default` database on port 10000), matching the Bicep the official package generates. Both default to Microsoft Entra authentication (access keys disabled): `.WithReference(cache)` yields `ConnectionStrings__cache` (`host,ssl=true` / `host:10000,ssl=true`) and the hosting compute environment's identity gets the `Data Contributor` access policy.
+
+```csharp
+var cache = builder.AddPulumiAzureRedis("cache").WithPulumiStack(azureStack).RunAsContainer();
+var managed = builder.AddPulumiAzureManagedRedis("managed").WithPulumiStack(azureStack)
+    .WithAccessKeyAuthentication();                 // or .WithAccessKeyAuthentication(vault) with an AddPulumiAzureKeyVault resource
+```
+
+`WithAccessKeyAuthentication()` stores `connectionstrings--<name>` (and `primaryaccesskey--<name>` for Managed Redis) in a Key Vault created next to the cache (or the vault you pass, which needs `WithDeployerRoleAssignments(AzureKeyVaultRole.KeyVaultSecretsOfficer)`), and gives referencing environments *Key Vault Secrets User*. Also: `RunAsContainer` (local Redis container), `PublishAsExisting`/`AsExisting`, `WithSku` (Managed Redis). Differences: with access keys the connection string seen by a referencing app is the Key Vault secret **URI** (keys must not appear in stack outputs; Container Apps secret references are not generated), and `AsAzureRedis`/`PublishAsAzureRedis` (converting a stock `AddRedis`) and the polyglot variant are not ported.
+
 ## Application Insights
 
 `builder.AddPulumiApplicationInsights("appinsights")` (project `AspirePulumiPackages.Pulumi.Azure.ApplicationInsights`) ports `AddAzureApplicationInsights`: a `web` Application Insights component (`azure-native:applicationinsights:Component`) backed by a Log Analytics workspace, with outputs `appInsightsConnectionString`, `name`, `id`. Without a workspace, a PerGB2018 workspace is created in the same resource group (as the official Bicep does). Link an existing one with `.WithLogAnalyticsWorkspace(law)` (a `AddPulumiLogAnalyticsWorkspace` resource bound to the same stack). The connection string is the resource's connection string, so `.WithReference(appInsights)` yields `ConnectionStrings__appinsights`.
