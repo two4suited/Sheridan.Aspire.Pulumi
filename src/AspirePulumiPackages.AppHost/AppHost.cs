@@ -46,7 +46,7 @@ var acaEnv = builder.AddPulumiAzureContainerAppEnvironment("aca-env")
     .WithPulumiStack(azureStack)
     .WithAzureContainerRegistry(acr);
 
-var cosmos =builder.AddPulumiAzureCosmosDB("cosmos")
+var cosmos =builder.AddPulumiCosmosDB("cosmos")
     .WithPulumiStack(azureStack)
     .RunAsEmulator();
 cosmos.AddCosmosDatabase("appdb").AddContainer("items", "/id");

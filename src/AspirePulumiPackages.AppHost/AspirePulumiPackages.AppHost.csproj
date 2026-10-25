@@ -17,6 +17,7 @@
     <ProjectReference Include="..\AspirePulumiPackages.Pulumi.Azure.AppContainers\AspirePulumiPackages.Pulumi.Azure.AppContainers.csproj" IsAspireProjectResource="false" />
     <ProjectReference Include="..\AspirePulumiPackages.Pulumi.Azure.Base\AspirePulumiPackages.Pulumi.Azure.Base.csproj" IsAspireProjectResource="false" />
     <ProjectReference Include="..\AspirePulumiPackages.Pulumi.Azure.ContainerRegistry\AspirePulumiPackages.Pulumi.Azure.ContainerRegistry.csproj" IsAspireProjectResource="false" />
+    <ProjectReference Include="..\AspirePulumiPackages.Pulumi.Azure.CosmosDB\AspirePulumiPackages.Pulumi.Azure.CosmosDB.csproj" IsAspireProjectResource="false" />
     <ProjectReference Include="..\AspirePulumiPackages.Pulumi.Azure.EntraId\AspirePulumiPackages.Pulumi.Azure.EntraId.csproj" IsAspireProjectResource="false" />
     <ProjectReference Include="..\AspirePulumiPackages.Pulumi.Azure.ServiceBus\AspirePulumiPackages.Pulumi.Azure.ServiceBus.csproj" IsAspireProjectResource="false" />
     <ProjectReference Include="..\AspirePulumiPackages.Pulumi.Azure.EventHubs\AspirePulumiPackages.Pulumi.Azure.EventHubs.csproj" IsAspireProjectResource="false" />
