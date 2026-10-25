@@ -14,7 +14,7 @@ Both can also be passed at the command line, overriding the code: `aspire deploy
 
 Use `.WithEscEnvironment("project/env1", "project/env2")` to import one or more existing ESC environments (later ones override earlier ones); with none specified, `<name>/<stack>` is used and created on deploy if missing.
 
-The code is split across three class libraries under `src/`: `AspirePulumiPackages.Pulumi` (the stack/pipeline/YAML-generation core — `PulumiStackResource`, `PulumiProgram`, `PulumiCli`, `PulumiOutputReference`, `AddPulumiStack`/`DependsOnStack`/etc.), `AspirePulumiPackages.Pulumi.Azure` (Cosmos DB and the shared managed-identity interface); the Container Apps environment lives in `AspirePulumiPackages.Pulumi.Azure.AppContainers` (port of `Aspire.Hosting.Azure.AppContainers`: `WithAzureContainerRegistry`, `WithAzureLogAnalyticsWorkspace`, `WithAcrPullIdentity`, `WithDashboard`, VNet via `WithDelegatedSubnet`, and `PublishAsPulumiContainerAppJob`/`PublishAsScheduledPulumiContainerAppJob`), and `AspirePulumiPackages.Pulumi.Entra` (the Azure AD app registration). Azure and Entra both depend on the core project; `AspirePulumiPackages.AppHost` references all three.
+The code is split across three class libraries under `src/`: `AspirePulumiPackages.Pulumi` (the stack/pipeline/YAML-generation core — `PulumiStackResource`, `PulumiProgram`, `PulumiCli`, `PulumiOutputReference`, `AddPulumiStack`/`DependsOnStack`/etc.), `AspirePulumiPackages.Pulumi.Azure` (the shared managed-identity interface); Cosmos DB lives in `AspirePulumiPackages.Pulumi.Azure.CosmosDB`; the Container Apps environment lives in `AspirePulumiPackages.Pulumi.Azure.AppContainers` (port of `Aspire.Hosting.Azure.AppContainers`: `WithAzureContainerRegistry`, `WithAzureLogAnalyticsWorkspace`, `WithAcrPullIdentity`, `WithDashboard`, VNet via `WithDelegatedSubnet`, and `PublishAsPulumiContainerAppJob`/`PublishAsScheduledPulumiContainerAppJob`), and `AspirePulumiPackages.Pulumi.Entra` (the Azure AD app registration). Azure and Entra both depend on the core project; `AspirePulumiPackages.AppHost` references all three.
 
 ## Container Apps environment
 
@@ -31,10 +31,10 @@ builder.AddProject<Projects.AspirePulumiPackages_Api>("api")
 
 ## Cosmos DB
 
-`builder.AddPulumiAzureCosmosDB("cosmos")` is the Pulumi equivalent of Aspire's `AddAzureCosmosDB`: a serverless NoSQL API account with Entra-only auth (`disableLocalAuth: true` — no connection-string keys in the cloud). Databases and containers are added the same way as the official integration:
+`builder.AddPulumiCosmosDB("cosmos")` is the Pulumi equivalent of Aspire's `AddAzureCosmosDB`: a serverless NoSQL API account with Entra-only auth (`disableLocalAuth: true` — no connection-string keys in the cloud). Databases and containers are added the same way as the official integration:
 
 ```csharp
-var cosmos = builder.AddPulumiAzureCosmosDB("cosmos")
+var cosmos = builder.AddPulumiCosmosDB("cosmos")
     .WithPulumiStack(azureStack)
     .RunAsEmulator();
 cosmos.AddCosmosDatabase("appdb").AddContainer("items", "/id");
@@ -43,6 +43,8 @@ builder.AddProject<Projects.AspirePulumiPackages_Api>("api")
     .WithComputeEnvironment(acaEnv)
     .WithReference(cosmos);
 ```
+
+Package: `AspirePulumiPackages.Pulumi.Azure.CosmosDB` (port of `Aspire.Hosting.Azure.CosmosDB`; `AddPulumiAzureCosmosDB` remains as an alias). Also supported: `AddCosmosDatabase(name, databaseName?)`/`AddContainer(name, partitionKeyPath(s), containerName?)` with per-database/container connection strings, `WithDefaultAzureSku()` (non-serverless), `RunAsEmulator`/`RunAsPreviewEmulator`/`RunAsClassicEmulator` (+ `WithDataVolume`, `WithGatewayPort`, `WithPartitionCount`, `WithDataExplorer`), `ConfigureInfrastructure(i => i.CosmosDBAccount.Set(...))`, and `WithAccessKeyAuthentication()`, which keeps local auth on and stores the account/database/container connection strings and primary key as secrets in a Key Vault created for the account (consumers get Key Vault Secrets User; the connection string expression resolves to the secret URI, as with `AddPulumiAzureKeyVault(...).GetSecret`).
 
 `.RunAsEmulator()` runs the Cosmos DB NoSQL API emulator container locally (no effect in publish mode) so `aspire run` works without any Azure resources. `aspire publish`/`aspire deploy` provision the real account, database(s) and container(s) instead.
 
@@ -68,6 +70,20 @@ builder.AddPulumiAzureFunctionsProject("func", "../MyFunctions/MyFunctions.cspro
 ```
 
 By default an implicit `funcstorage<hash>` storage account is created (Azurite in run mode; dropped from the model if every project uses `WithHostStorage`). Deployed through `AddPulumiAzureContainerAppEnvironment`, the container app gets `kind: functionapp` (KEDA scale rules follow the triggers), `http` ingress and no 1-replica cap; the environment identity is granted Storage Blob/Queue/Table Data Contributor (via the Storage integration) plus Storage Account Contributor on the host storage, matching the official Bicep. The compute environment hook is `PulumiContainerAppCustomizationAnnotation` in `AspirePulumiPackages.Pulumi.Azure`. Not ported: launch-profile port discovery in run mode, `AZURE_CLIENT_ID` injection (the shared environment identity is not exposed with a client id yet), the Durable Task scheduler APIs. Like the other integrations, storage endpoints are read from stack outputs, so the very first deploy needs a second `aspire deploy`.
+
+## Service Bus
+
+`AspirePulumiPackages.Pulumi.Azure.ServiceBus` ports `Aspire.Hosting.Azure.ServiceBus`. `builder.AddPulumiServiceBus("messaging")` (alias `AddPulumiAzureServiceBus`) provisions a Standard-SKU namespace with local auth disabled, matching the official Bicep (outputs `serviceBusEndpoint`, `serviceBusHostName`, `name`, `id`). `AddServiceBusQueue`/`AddServiceBusTopic`/`AddServiceBusSubscription` (plus the `AddQueue`/`AddTopic`/`AddSubscription` forms) and `WithProperties(...)` on queues, topics and subscriptions mirror the official API, including `Rules` (correlation filters) on subscriptions.
+
+```csharp
+var sb = builder.AddPulumiServiceBus("messaging").WithPulumiStack(azureStack);
+sb.AddServiceBusQueue("orders").WithProperties(q => q.MaxDeliveryCount = 5);
+sb.AddServiceBusTopic("events").AddServiceBusSubscription("audit");
+
+builder.AddProject<Projects.AspirePulumiPackages_Api>("api").WithReference(sb).WithComputeEnvironment(acaEnv);
+```
+
+`WithReference` of the namespace, a queue, a topic or a subscription grants the hosting compute environment's identity *Azure Service Bus Data Owner* on the namespace (the official default); `WithRoleAssignments(sb, AzureServiceBusRole.AzureServiceBusDataSender, ...)` replaces it. The namespace name is auto-generated by the azure-native provider. Not ported: `RunAsEmulator` (the Service Bus emulator) and its configuration APIs.
 
 ## Key Vault
 

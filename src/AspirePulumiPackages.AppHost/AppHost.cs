@@ -5,8 +5,12 @@ using AspirePulumiPackages.Pulumi.Azure.ApplicationInsights;
 using AspirePulumiPackages.Pulumi.Azure.Base;
 using AspirePulumiPackages.Pulumi.Azure.ContainerRegistry;
 using AspirePulumiPackages.Pulumi.Azure.EntraId;
+using AspirePulumiPackages.Pulumi.Azure.EventHubs;
 using AspirePulumiPackages.Pulumi.Azure.KeyVault;
 using AspirePulumiPackages.Pulumi.Azure.Redis;
+using AspirePulumiPackages.Pulumi.Azure.ServiceBus;
+using AspirePulumiPackages.Pulumi.Azure.PostgreSQL;
+using AspirePulumiPackages.Pulumi.Azure.Sql;
 using AspirePulumiPackages.Pulumi.Azure.Storage;
 
 var builder = DistributedApplication.CreateBuilder(args);
@@ -43,7 +47,7 @@ var acaEnv = builder.AddPulumiAzureContainerAppEnvironment("aca-env")
     .WithPulumiStack(azureStack)
     .WithAzureContainerRegistry(acr);
 
-var cosmos =builder.AddPulumiAzureCosmosDB("cosmos")
+var cosmos =builder.AddPulumiCosmosDB("cosmos")
     .WithPulumiStack(azureStack)
     .RunAsEmulator();
 cosmos.AddCosmosDatabase("appdb").AddContainer("items", "/id");
@@ -55,7 +59,18 @@ var blobs = storage.AddBlobs("blobs");
 blobs.AddBlobContainer("uploads");
 storage.AddQueues("queues").AddQueue("jobs");
 
-var apiKey = builder.AddParameter("api-key", secret: true);
+var serviceBus = builder.AddPulumiServiceBus("messaging")
+    .WithPulumiStack(azureStack);
+serviceBus.AddServiceBusQueue("sb-orders", "orders").WithProperties(q => { q.MaxDeliveryCount = 5; q.DeadLetteringOnMessageExpiration = true; });
+serviceBus.AddServiceBusTopic("events").AddServiceBusSubscription("audit")
+    .WithProperties(s => s.Rules.Add(new AzureServiceBusRule("audit-only") { FilterType = AzureServiceBusFilterType.CorrelationFilter, CorrelationFilter = { Subject = "audit" } }));
+
+var eventHubs = builder.AddPulumiEventHubs("eventhubs")
+    .WithPulumiStack(azureStack);
+var ordersHub = eventHubs.AddHub("orders", "orders-hub");
+ordersHub.AddConsumerGroup("orders-processor", "processor");
+
+var apiKey =builder.AddParameter("api-key", secret: true);
 var keyVault = builder.AddPulumiAzureKeyVault("vault")
     .WithPulumiStack(azureStack)
     .AddSecret("api-key", apiKey)
@@ -71,12 +86,21 @@ var redis = builder.AddPulumiAzureRedis("cache")
 var managedRedis = builder.AddPulumiAzureManagedRedis("managed-cache")
     .WithPulumiStack(azureStack)
     .WithAccessKeyAuthentication();
+var postgres = builder.AddPulumiAzurePostgresFlexibleServer("postgres")
+    .WithPulumiStack(azureStack)
+    .RunAsContainer();
+var appDb = postgres.AddDatabase("pgdb");
+
+var sql = builder.AddPulumiAzureSqlServer("sql")
+    .WithPulumiStack(azureStack);
+var sqlDb = sql.AddDatabase("appsql");
 
 var appInsights = builder.AddPulumiApplicationInsights("appinsights")
     .WithPulumiStack(azureStack);
 
 builder.AddProject<Projects.AspirePulumiPackages_Api>("api")
     .WithReference(blobs)
+    .WithReference(ordersHub)
     .WithExternalHttpEndpoints()
     .WithComputeEnvironment(acaEnv)
     .WithReference(appRegistration)
@@ -86,6 +110,9 @@ builder.AddProject<Projects.AspirePulumiPackages_Api>("api")
     .WithReference(keyVault)
     .WithReference(redis)
     .WithReference(managedRedis)
-    .WithReference(appInsights);
+    .WithReference(serviceBus)
+    .WithReference(appDb)
+    .WithReference(appInsights)
+    .WithReference(sqlDb);
 
 builder.Build().Run();
