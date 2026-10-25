@@ -23,9 +23,15 @@ var azureStack = builder.AddPulumiStack(appName, "azure-test")
 var acaEnv = builder.AddPulumiAzureContainerAppEnvironment("aca-env")
     .WithPulumiStack(azureStack);
 
+var cosmos = builder.AddPulumiAzureCosmosDB("cosmos")
+    .WithPulumiStack(azureStack)
+    .RunAsEmulator();
+cosmos.AddCosmosDatabase("appdb").AddContainer("items", "/id");
+
 builder.AddProject<Projects.AspirePulumiPackages_Api>("api")
     .WithExternalHttpEndpoints()
     .WithComputeEnvironment(acaEnv)
-    .WithReference(appRegistration);
+    .WithReference(appRegistration)
+    .WithReference(cosmos);
 
 builder.Build().Run();

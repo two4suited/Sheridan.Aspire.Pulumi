@@ -11,7 +11,7 @@ namespace AspirePulumiPackages.Pulumi.Azure;
 /// are built, pushed to the registry and deployed as container apps.
 /// </summary>
 #pragma warning disable ASPIRECOMPUTE002
-public sealed class AzureContainerAppEnvironmentResource : Resource, IComputeEnvironmentResource, IContainerRegistry, IPulumiProgramContributor
+public sealed class AzureContainerAppEnvironmentResource : Resource, IComputeEnvironmentResource, IContainerRegistry, IPulumiProgramContributor, IPulumiManagedIdentityResource
 {
     private const string AcrLoginTag = "acr-login";
     private const string AcrPullRoleId = "7f951dda-4ed3-4680-a7ca-43fe172d538d";
@@ -79,6 +79,9 @@ public sealed class AzureContainerAppEnvironmentResource : Resource, IComputeEnv
 
     private PulumiOutputReference Output(string suffix) =>
         new(_resolvedStack ?? throw new InvalidOperationException($"'{Name}' has not been bound to a Pulumi stack yet."), $"{Id}{suffix}");
+
+    /// <summary>Pulumi expression for this environment's shared managed identity's principal id; every app targeting it uses this one identity.</summary>
+    public string PrincipalIdExpression => $"${{{Id}Identity.principalId}}";
 
     ReferenceExpression IContainerRegistry.Name => ReferenceExpression.Create($"{Output("RegistryName")}");
 

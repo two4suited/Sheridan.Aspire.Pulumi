@@ -14,7 +14,7 @@ Both can also be passed at the command line, overriding the code: `aspire deploy
 
 Use `.WithEscEnvironment("project/env1", "project/env2")` to import one or more existing ESC environments (later ones override earlier ones); with none specified, `<name>/<stack>` is used and created on deploy if missing.
 
-The code is split across three class libraries under `src/`: `AspirePulumiPackages.Pulumi` (the stack/pipeline/YAML-generation core — `PulumiStackResource`, `PulumiProgram`, `PulumiCli`, `PulumiOutputReference`, `AddPulumiStack`/`DependsOnStack`/etc.), `AspirePulumiPackages.Pulumi.Azure` (the Container Apps environment), and `AspirePulumiPackages.Pulumi.Entra` (the Azure AD app registration). Azure and Entra both depend on the core project; `AspirePulumiPackages.AppHost` references all three.
+The code is split across three class libraries under `src/`: `AspirePulumiPackages.Pulumi` (the stack/pipeline/YAML-generation core — `PulumiStackResource`, `PulumiProgram`, `PulumiCli`, `PulumiOutputReference`, `AddPulumiStack`/`DependsOnStack`/etc.), `AspirePulumiPackages.Pulumi.Azure` (the Container Apps environment and Cosmos DB), and `AspirePulumiPackages.Pulumi.Entra` (the Azure AD app registration). Azure and Entra both depend on the core project; `AspirePulumiPackages.AppHost` references all three.
 
 ## Container Apps environment
 
@@ -28,6 +28,25 @@ builder.AddProject<Projects.AspirePulumiPackages_Api>("api")
 ```
 
 `aspire publish` writes the resource group, Log Analytics workspace, container registry, pull identity (AcrPull) and managed environment, plus a `ContainerApp` per targeted resource. `aspire deploy` runs: `pulumi-provision` (login, ESC, `pulumi up --target` for the infrastructure incl. the registry) → `build-<resource>` → `push-<resource>` → `pulumi-deploy` (full `pulumi up`). Images are tagged with a per-deploy timestamp so each deploy creates a new revision.
+
+## Cosmos DB
+
+`builder.AddPulumiAzureCosmosDB("cosmos")` is the Pulumi equivalent of Aspire's `AddAzureCosmosDB`: a serverless NoSQL API account with Entra-only auth (`disableLocalAuth: true` — no connection-string keys in the cloud). Databases and containers are added the same way as the official integration:
+
+```csharp
+var cosmos = builder.AddPulumiAzureCosmosDB("cosmos")
+    .WithPulumiStack(azureStack)
+    .RunAsEmulator();
+cosmos.AddCosmosDatabase("appdb").AddContainer("items", "/id");
+
+builder.AddProject<Projects.AspirePulumiPackages_Api>("api")
+    .WithComputeEnvironment(acaEnv)
+    .WithReference(cosmos);
+```
+
+`.RunAsEmulator()` runs the Cosmos DB NoSQL API emulator container locally (no effect in publish mode) so `aspire run` works without any Azure resources. `aspire publish`/`aspire deploy` provision the real account, database(s) and container(s) instead.
+
+`.WithReference(cosmos)` on a project is enough to get data access — no separate role-assignment call is needed. Any compute environment (e.g. `AddPulumiAzureContainerAppEnvironment`) hosting a resource that references the Cosmos DB account automatically gets a Pulumi `SqlResourceSqlRoleAssignment` granting its shared managed identity the built-in **Cosmos DB Built-in Data Contributor** role, scoped to the account — the data-plane equivalent of the ACR pull role assignment described above. `ConnectionStrings__cosmos` (the account's document endpoint, consumed by `Microsoft.Azure.Cosmos`/`Aspire.Microsoft.Azure.Cosmos` with `DefaultAzureCredential`) is read from the stack's outputs the same way `AzureAd__ClientId` is above, so it's subject to the same "deploy once to create the account, deploy again to pick up the endpoint" caveat on the first deploy.
 
 ## Multiple stacks
 
