@@ -1,5 +1,6 @@
 using AspirePulumiPackages.Pulumi;
 using AspirePulumiPackages.Pulumi.Azure;
+using AspirePulumiPackages.Pulumi.Azure.ApplicationInsights;
 using AspirePulumiPackages.Pulumi.Azure.Base;
 using AspirePulumiPackages.Pulumi.Azure.ContainerRegistry;
 using AspirePulumiPackages.Pulumi.Azure.EntraId;
@@ -49,6 +50,9 @@ var keyVault = builder.AddPulumiAzureKeyVault("vault")
     .WithPulumiStack(azureStack)
     .AddSecret("api-key", apiKey);
 
+var appInsights = builder.AddPulumiApplicationInsights("appinsights")
+    .WithPulumiStack(azureStack);
+
 builder.AddProject<Projects.AspirePulumiPackages_Api>("api")
     .WithReference(blobs)
     .WithExternalHttpEndpoints()
@@ -56,6 +60,7 @@ builder.AddProject<Projects.AspirePulumiPackages_Api>("api")
     .WithReference(appRegistration)
     .WithReference(cosmos)
     .WithRoleAssignments(keyVault, AzureKeyVaultRole.KeyVaultSecretsUser)
-    .WithReference(keyVault);
+    .WithReference(keyVault)
+    .WithReference(appInsights);
 
 builder.Build().Run();
