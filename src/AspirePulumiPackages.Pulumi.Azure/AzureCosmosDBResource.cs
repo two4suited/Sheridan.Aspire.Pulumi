@@ -127,19 +127,9 @@ public sealed class AzureCosmosDBAccountResource(string name) : Resource(name), 
 
         if (environments.Count == 0) return;
 
-        program.Variables[$"{Id}DataContributorRole"] = new Dictionary<string, object?>
-        {
-            ["fn::invoke"] = new Dictionary<string, object?>
-            {
-                ["function"] = "azure-native:cosmosdb:getSqlResourceSqlRoleDefinition",
-                ["arguments"] = new Dictionary<string, object?>
-                {
-                    ["resourceGroupName"] = rg,
-                    ["accountName"] = $"${{{Id}.name}}",
-                    ["roleDefinitionId"] = DataContributorRoleId,
-                },
-            },
-        };
+        // The built-in role definition's id is deterministic (no live lookup needed): every Cosmos DB account
+        // exposes it as a child resource at this fixed path the moment the account exists.
+        var dataContributorRoleId = $"${{{Id}.id}}/sqlRoleDefinitions/{DataContributorRoleId}";
 
         foreach (var env in environments)
         {
@@ -155,7 +145,7 @@ public sealed class AzureCosmosDBAccountResource(string name) : Resource(name), 
                     ["resourceGroupName"] = rg,
                     ["accountName"] = $"${{{Id}.name}}",
                     ["principalId"] = env.PrincipalIdExpression,
-                    ["roleDefinitionId"] = $"${{{Id}DataContributorRole.id}}",
+                    ["roleDefinitionId"] = dataContributorRoleId,
                 },
             };
         }
