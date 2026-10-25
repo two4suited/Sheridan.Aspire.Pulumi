@@ -1,5 +1,5 @@
 {
   "appHost": {
-    "path": "../../../../../../../private/tmp/claude-501/-Users-brian-Source-aspire-pulumi-packages--claude-worktrees-aspire-pulumi-milestone-4034ef/58feea01-e3ad-454f-be17-c7fc95e54a9d/scratchpad/pg/pg.csproj"
+    "path": "src/AspirePulumiPackages.AppHost/AspirePulumiPackages.AppHost.csproj"
   }
 }
