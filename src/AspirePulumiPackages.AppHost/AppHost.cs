@@ -8,6 +8,7 @@ using AspirePulumiPackages.Pulumi.Azure.EntraId;
 using AspirePulumiPackages.Pulumi.Azure.EventHubs;
 using AspirePulumiPackages.Pulumi.Azure.KeyVault;
 using AspirePulumiPackages.Pulumi.Azure.ServiceBus;
+using AspirePulumiPackages.Pulumi.Azure.Sql;
 using AspirePulumiPackages.Pulumi.Azure.Storage;
 
 var builder = DistributedApplication.CreateBuilder(args);
@@ -76,6 +77,10 @@ var keyVault = builder.AddPulumiAzureKeyVault("vault")
         .Set("properties.enablePurgeProtection", true)
         .Set("properties.softDeleteRetentionInDays", 30));
 
+var sql = builder.AddPulumiAzureSqlServer("sql")
+    .WithPulumiStack(azureStack);
+var sqlDb = sql.AddDatabase("appsql");
+
 var appInsights = builder.AddPulumiApplicationInsights("appinsights")
     .WithPulumiStack(azureStack);
 
@@ -90,6 +95,7 @@ builder.AddProject<Projects.AspirePulumiPackages_Api>("api")
     .WithRoleAssignments(keyVault, AzureKeyVaultRole.KeyVaultSecretsUser)
     .WithReference(keyVault)
     .WithReference(serviceBus)
-    .WithReference(appInsights);
+    .WithReference(appInsights)
+    .WithReference(sqlDb);
 
 builder.Build().Run();

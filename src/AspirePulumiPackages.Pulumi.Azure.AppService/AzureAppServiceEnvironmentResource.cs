@@ -84,6 +84,10 @@ public sealed class AzureAppServiceEnvironmentResource : PulumiAzureResource, IC
     /// <summary>The shared pull identity; every web app uses it and is granted data-plane roles through it.</summary>
     public string PrincipalIdExpression => $"${{{Identity}.principalId}}";
 
+    public string? PrincipalNameExpression => $"${{{Identity}.name}}";
+
+    public string? ClientIdExpression => $"${{{Identity}.clientId}}";
+
     public PulumiOutputReference NameOutputReference => OutputRef("RegistryName");
     public PulumiOutputReference RegistryEndpoint => OutputRef("RegistryLoginServer");
     public PulumiOutputReference PlanId => OutputRef("PlanId");

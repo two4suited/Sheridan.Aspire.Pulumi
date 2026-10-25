@@ -94,6 +94,10 @@ public sealed class AzureContainerAppEnvironmentResource : PulumiAzureResource, 
     /// <summary>Pulumi expression for this environment's shared managed identity's principal id; every app targeting it uses this one identity.</summary>
     public string PrincipalIdExpression => $"${{{IdentityRef}.principalId}}";
 
+    public string? PrincipalNameExpression => $"${{{IdentityRef}.name}}";
+
+    public string? ClientIdExpression => $"${{{IdentityRef}.clientId}}";
+
     ReferenceExpression IContainerRegistry.Name => ReferenceExpression.Create($"{EnvOutput("RegistryName")}");
 
     ReferenceExpression IContainerRegistry.Endpoint => ReferenceExpression.Create($"{EnvOutput("RegistryLoginServer")}");
