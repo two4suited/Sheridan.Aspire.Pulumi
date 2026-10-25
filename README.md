@@ -8,4 +8,8 @@
 - `aspire deploy` then checks `pulumi whoami` (run `pulumi login` first), creates the ESC environment and stack if missing, and runs `pulumi up`. State lives in Pulumi Cloud.
 - `aspire do pulumi-destroy-<name>` / `aspire destroy` runs `pulumi destroy`.
 
-Use `.WithEscEnvironment("project/env")` to point at a different ESC environment. The code is in `src/AspirePulumiPackages.AppHost/Pulumi`.
+The stack name defaults to the lower-cased Aspire environment, so `aspire deploy -e test` targets stack `test` and `aspire deploy -e prod` targets `prod` (pass a second argument to `AddPulumiStack` to pin it).
+
+Both can also be passed at the command line, overriding the code: `aspire deploy -- --Pulumi:Stack=qa --Pulumi:Esc=shared/qa,myproj/qa` (comma-separated list; also settable via config or the `Pulumi__Stack` / `Pulumi__Esc` environment variables).
+
+Use `.WithEscEnvironment("project/env1", "project/env2")` to import one or more existing ESC environments (later ones override earlier ones); with none specified, `<name>/<stack>` is used and created on deploy if missing. The code is in `src/AspirePulumiPackages.AppHost/Pulumi`.

@@ -10,9 +10,20 @@ public static class PulumiExtensions
     public static IResourceBuilder<PulumiStackResource> AddPulumiStack(
         this IDistributedApplicationBuilder builder,
         string name,
-        string stackName = "dev")
+        string? stackName = null)
     {
+        stackName = builder.Configuration["Pulumi:Stack"]
+            ?? stackName
+            ?? builder.Environment.EnvironmentName.ToLowerInvariant();
         var resource = new PulumiStackResource(name, stackName);
+
+        var esc = builder.Configuration["Pulumi:Esc"]?
+            .Split([',', ';'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        if (esc is { Length: > 0 })
+        {
+            resource.EscEnvironments.AddRange(esc);
+            resource.EscFromConfiguration = true;
+        }
 
         return builder.AddResource(resource)
             .ExcludeFromManifest()
@@ -27,9 +38,10 @@ public static class PulumiExtensions
     }
 
     public static IResourceBuilder<PulumiStackResource> WithEscEnvironment(
-        this IResourceBuilder<PulumiStackResource> builder, string environment)
+        this IResourceBuilder<PulumiStackResource> builder, params string[] environments)
     {
-        builder.Resource.EscEnvironment = environment;
+        if (!builder.Resource.EscFromConfiguration)
+            builder.Resource.EscEnvironments.AddRange(environments);
         return builder;
     }
 
@@ -85,11 +97,9 @@ public static class PulumiExtensions
             "runtime: yaml\n" +
             "resources: {}\n", ctx.CancellationToken);
 
+        var imports = string.Concat(resource.StackEscReferences.Select(e => $"  - {e}\n"));
         await File.WriteAllTextAsync(Path.Combine(dir, $"Pulumi.{resource.StackName}.yaml"),
-            $"""
-            environment:
-              - {resource.StackEscReference}
-            """ + "\n", ctx.CancellationToken);
+            "environment:\n" + imports, ctx.CancellationToken);
 
         ctx.Logger.LogInformation("Wrote Pulumi project to {Directory}", dir);
     }
@@ -103,10 +113,11 @@ public static class PulumiExtensions
         if (await PulumiCli.RunAsync(dir, ["whoami"], log, ct) != 0)
             throw new InvalidOperationException("Not logged in to a Pulumi backend. Run 'pulumi login' (or set PULUMI_ACCESS_TOKEN) and retry.");
 
-        if (await PulumiCli.RunAsync(dir, ["env", "get", resource.QualifiedEscEnvironment], log, ct) != 0)
+        if (resource.UsesDefaultEscEnvironment
+            && await PulumiCli.RunAsync(dir, ["env", "get", resource.QualifiedDefaultEscEnvironment], log, ct) != 0)
         {
-            log.LogInformation("Creating ESC environment {Environment}", resource.QualifiedEscEnvironment);
-            await PulumiCli.RunOrThrowAsync(dir, ["env", "init", resource.QualifiedEscEnvironment, "--file", "-"], log, ct,
+            log.LogInformation("Creating ESC environment {Environment}", resource.QualifiedDefaultEscEnvironment);
+            await PulumiCli.RunOrThrowAsync(dir, ["env", "init", resource.QualifiedDefaultEscEnvironment, "--file", "-"], log, ct,
                 stdin: "values:\n  pulumiConfig: {}\n");
         }
 
