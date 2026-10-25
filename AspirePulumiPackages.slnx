@@ -8,8 +8,10 @@
     <Project Path="src/AspirePulumiPackages.Api/AspirePulumiPackages.Api.csproj" />
     <Project Path="src/AspirePulumiPackages.AppHost/AspirePulumiPackages.AppHost.csproj" />
     <Project Path="src/AspirePulumiPackages.Pulumi.Azure.EntraId/AspirePulumiPackages.Pulumi.Azure.EntraId.csproj" />
+    <Project Path="src/AspirePulumiPackages.Pulumi.Azure.Base/AspirePulumiPackages.Pulumi.Azure.Base.csproj" />
     <Project Path="src/AspirePulumiPackages.Pulumi.Azure/AspirePulumiPackages.Pulumi.Azure.csproj" />
     <Project Path="src/AspirePulumiPackages.Pulumi.Entra/AspirePulumiPackages.Pulumi.Entra.csproj" />
+    <Project Path="src/AspirePulumiPackages.Pulumi.Provisioning/AspirePulumiPackages.Pulumi.Provisioning.csproj" />
     <Project Path="src/AspirePulumiPackages.Pulumi/AspirePulumiPackages.Pulumi.csproj" />
   </Folder>
 </Solution>
