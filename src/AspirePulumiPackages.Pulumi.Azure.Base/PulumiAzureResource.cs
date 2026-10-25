@@ -28,6 +28,9 @@ public abstract class PulumiAzureResource(string name) : Resource(name), IPulumi
     /// <summary>The name of an existing resource group to use instead of creating one (see <c>AsExisting</c>-style reuse).</summary>
     public string? ExistingResourceGroup { get; set; }
 
+    /// <summary>A Pulumi-provisioned resource group (see <see cref="PulumiAzureExtensions.WithResourceGroup{T}"/>) to use instead of creating one.</summary>
+    public PulumiAzureResourceGroupResource? ResourceGroup { get; set; }
+
     /// <summary>Pulumi YAML identifier derived from the resource name.</summary>
     public string Id => PulumiAzureProgramExtensions.ToPulumiId(Name);
 
@@ -42,7 +45,15 @@ public abstract class PulumiAzureResource(string name) : Resource(name), IPulumi
     {
         var location = program.AddLocation(Location);
         string rg;
-        if (ExistingResourceGroup is not null) rg = ExistingResourceGroup;
+        if (ResourceGroup is { } group)
+        {
+            var stack = ResolveStack(context);
+            if (group.Stack != stack)
+                throw new InvalidOperationException(
+                    $"'{Name}' and its resource group '{group.Name}' must be bound to the same Pulumi stack (call WithPulumiStack on both).");
+            rg = group.NameExpression;
+        }
+        else if (ExistingResourceGroup is not null) rg = ExistingResourceGroup;
         else rg = program.AddResourceGroup(Id, location);
 
         await ContributeResourcesAsync(program, context, rg, location);

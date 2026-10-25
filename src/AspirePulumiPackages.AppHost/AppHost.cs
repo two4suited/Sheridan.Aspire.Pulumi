@@ -25,6 +25,13 @@ var azureStack = builder.AddPulumiStack(appName, "azure-test")
     .WithEscEnvironment("azure/test")
     .DependsOnStack(entraStack);
 
+var sharedRg = builder.AddPulumiAzureResourceGroup("shared-rg")
+    .WithPulumiStack(azureStack);
+
+var workloadIdentity = builder.AddPulumiAzureUserAssignedIdentity("workload-identity")
+    .WithPulumiStack(azureStack)
+    .WithResourceGroup(sharedRg);
+
 var acaEnv = builder.AddPulumiAzureContainerAppEnvironment("aca-env")
     .WithPulumiStack(azureStack);
 
@@ -48,7 +55,11 @@ storage.AddQueues("queues").AddQueue("jobs");
 var apiKey = builder.AddParameter("api-key", secret: true);
 var keyVault = builder.AddPulumiAzureKeyVault("vault")
     .WithPulumiStack(azureStack)
-    .AddSecret("api-key", apiKey);
+    .AddSecret("api-key", apiKey)
+    .ConfigureInfrastructure(infra => infra.KeyVaultService
+        .Set("properties.enableSoftDelete", true)
+        .Set("properties.enablePurgeProtection", true)
+        .Set("properties.softDeleteRetentionInDays", 30));
 
 var appInsights = builder.AddPulumiApplicationInsights("appinsights")
     .WithPulumiStack(azureStack);
@@ -59,6 +70,7 @@ builder.AddProject<Projects.AspirePulumiPackages_Api>("api")
     .WithComputeEnvironment(acaEnv)
     .WithReference(appRegistration)
     .WithReference(cosmos)
+    .WithEnvironment("WorkloadIdentity__ClientId", workloadIdentity.Resource.ClientId)
     .WithRoleAssignments(keyVault, AzureKeyVaultRole.KeyVaultSecretsUser)
     .WithReference(keyVault)
     .WithReference(appInsights);
