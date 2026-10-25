@@ -12,7 +12,9 @@ The stack name defaults to the lower-cased Aspire environment, so `aspire deploy
 
 Both can also be passed at the command line, overriding the code: `aspire deploy -- --Pulumi:Stack=qa --Pulumi:Esc=shared/qa,myproj/qa` (comma-separated list; also settable via config or the `Pulumi__Stack` / `Pulumi__Esc` environment variables).
 
-Use `.WithEscEnvironment("project/env1", "project/env2")` to import one or more existing ESC environments (later ones override earlier ones); with none specified, `<name>/<stack>` is used and created on deploy if missing. The code is in `src/AspirePulumiPackages.AppHost/Pulumi`.
+Use `.WithEscEnvironment("project/env1", "project/env2")` to import one or more existing ESC environments (later ones override earlier ones); with none specified, `<name>/<stack>` is used and created on deploy if missing.
+
+The code is split across three class libraries under `src/`: `AspirePulumiPackages.Pulumi` (the stack/pipeline/YAML-generation core — `PulumiStackResource`, `PulumiProgram`, `PulumiCli`, `PulumiOutputReference`, `AddPulumiStack`/`DependsOnStack`/etc.), `AspirePulumiPackages.Pulumi.Azure` (the Container Apps environment), and `AspirePulumiPackages.Pulumi.Entra` (the Azure AD app registration). Azure and Entra both depend on the core project; `AspirePulumiPackages.AppHost` references all three.
 
 ## Container Apps environment
 
@@ -32,14 +34,18 @@ builder.AddProject<Projects.AspirePulumiPackages_Api>("api")
 Resources can be split across separate Pulumi stacks (own project, own ESC environment) by adding more than one `AddPulumiStack` and binding each resource to the stack it belongs to with `.WithPulumiStack(...)`:
 
 ```csharp
-var entraStack = builder.AddPulumiStack("entra-app", "test")
+var appName = "aspire-pulumi-packages";
+
+var entraStack = builder.AddPulumiStack($"{appName}-entra", "entra-test")
+    .WithProjectName(appName)
     .WithOrganization("two4suited")
     .WithEscEnvironment("entra/test");
 
 builder.AddPulumiAzureAdAppRegistration("app-registration")
     .WithPulumiStack(entraStack);
 
-var azureStack = builder.AddPulumiStack("aspire-pulumi-packages", "test")
+var azureStack = builder.AddPulumiStack(appName, "azure-test")
+    .WithProjectName(appName)
     .WithOrganization("two4suited")
     .WithEscEnvironment("azure/test")
     .DependsOnStack(entraStack);
@@ -49,6 +55,8 @@ var acaEnv = builder.AddPulumiAzureContainerAppEnvironment("aca-env")
 ```
 
 Once there is more than one `PulumiStackResource` in the model, every stack-bound resource must call `.WithPulumiStack(...)` explicitly — the "only stack in the model" fallback used for a single-stack app no longer applies.
+
+`.WithProjectName(...)` overrides the Pulumi project name (which otherwise defaults to the Aspire resource name), so several stacks — each still its own Aspire resource, own generated Pulumi project directory, own stack name — can be grouped under one shared Pulumi project in the backend. Above, both stacks declare `name: "aspire-pulumi-packages"` in their generated `Pulumi.yaml`, differing only by stack: `two4suited/aspire-pulumi-packages/azure-test` and `two4suited/aspire-pulumi-packages/entra-test`.
 
 Chain `.DependsOnStack(...)` onto a stack (as above) to order two stacks' deploys — it makes `aspire deploy` fully deploy the dependency before provisioning this stack's infrastructure. It only wires the two stacks' provision/deploy pipeline steps together (tagged `ProvisionInfrastructure`/`DeployCompute`), so it has no effect on `aspire publish` (which never touches those steps). It does **not** by itself fix the two-deploy caveat below — each stack's Pulumi project (and any output values baked into it, like `AzureAd__ClientId`) is still generated independently during its own publish step, which isn't affected by this ordering.
 

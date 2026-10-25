@@ -1,15 +1,21 @@
-using AspirePulumiPackages.AppHost.Pulumi;
+using AspirePulumiPackages.Pulumi;
+using AspirePulumiPackages.Pulumi.Azure;
+using AspirePulumiPackages.Pulumi.Entra;
 
 var builder = DistributedApplication.CreateBuilder(args);
 
-var entraStack = builder.AddPulumiStack("entra-app", "test")
+var appName = "aspire-pulumi-packages";
+
+var entraStack = builder.AddPulumiStack($"{appName}-entra", "entra-test")
+    .WithProjectName(appName)
     .WithOrganization("two4suited")
     .WithEscEnvironment("entra/test");
 
 var appRegistration = builder.AddPulumiAzureAdAppRegistration("app-registration")
     .WithPulumiStack(entraStack);
 
-var azureStack = builder.AddPulumiStack("aspire-pulumi-packages", "test")
+var azureStack = builder.AddPulumiStack(appName, "azure-test")
+    .WithProjectName(appName)
     .WithOrganization("two4suited")
     .WithEscEnvironment("azure/test")
     .DependsOnStack(entraStack);

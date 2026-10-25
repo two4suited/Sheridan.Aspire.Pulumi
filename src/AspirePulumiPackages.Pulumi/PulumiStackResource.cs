@@ -1,6 +1,6 @@
 using Aspire.Hosting.ApplicationModel;
 
-namespace AspirePulumiPackages.AppHost.Pulumi;
+namespace AspirePulumiPackages.Pulumi;
 
 public sealed class PulumiStackResource(string name, string stackName) : Resource(name)
 {
@@ -21,7 +21,10 @@ public sealed class PulumiStackResource(string name, string stackName) : Resourc
     /// <summary>Image tag shared by every image pushed in this deployment.</summary>
     public string DeployTag { get; } = DateTime.UtcNow.ToString("yyyyMMddHHmmss");
 
-    public string ProjectName => Name;
+    /// <summary>Pulumi project name; defaults to the resource name, but can be overridden so multiple stacks share one project.</summary>
+    public string? ProjectNameOverride { get; set; }
+
+    public string ProjectName => ProjectNameOverride ?? Name;
 
     public string QualifiedStack => Organization is null ? StackName : $"{Organization}/{ProjectName}/{StackName}";
 

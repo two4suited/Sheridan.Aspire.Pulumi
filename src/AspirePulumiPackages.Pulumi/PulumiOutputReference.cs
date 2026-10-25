@@ -1,6 +1,6 @@
 using Aspire.Hosting.ApplicationModel;
 
-namespace AspirePulumiPackages.AppHost.Pulumi;
+namespace AspirePulumiPackages.Pulumi;
 
 /// <summary>A value that is read from a Pulumi stack output once the stack has been (partially) deployed.</summary>
 public sealed class PulumiOutputReference(PulumiStackResource stack, string outputName) : IValueProvider, IManifestExpressionProvider

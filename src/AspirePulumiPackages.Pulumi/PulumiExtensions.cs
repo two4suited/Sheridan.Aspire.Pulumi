@@ -1,9 +1,10 @@
+using Aspire.Hosting;
 using Aspire.Hosting.ApplicationModel;
 using Aspire.Hosting.Pipelines;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
-namespace AspirePulumiPackages.AppHost.Pulumi;
+namespace AspirePulumiPackages.Pulumi;
 
 public static class PulumiExtensions
 {
@@ -34,6 +35,14 @@ public static class PulumiExtensions
         this IResourceBuilder<PulumiStackResource> builder, string organization)
     {
         builder.Resource.Organization = organization;
+        return builder;
+    }
+
+    /// <summary>Sets the Pulumi project name, overriding the Aspire resource name. Lets several stacks (each with a distinct stack name) share one Pulumi project.</summary>
+    public static IResourceBuilder<PulumiStackResource> WithProjectName(
+        this IResourceBuilder<PulumiStackResource> builder, string projectName)
+    {
+        builder.Resource.ProjectNameOverride = projectName;
         return builder;
     }
 
@@ -174,49 +183,5 @@ public static class PulumiExtensions
         var dir = ProjectDirectory(ctx, resource);
         await PulumiCli.RunOrThrowAsync(dir, ["stack", "select", resource.QualifiedStack], ctx.Logger, ctx.CancellationToken);
         await PulumiCli.RunOrThrowAsync(dir, ["destroy", "--yes", "--non-interactive"], ctx.Logger, ctx.CancellationToken);
-    }
-}
-
-public static class AzureContainerAppEnvironmentExtensions
-{
-    /// <summary>Adds an Azure Container Apps environment that the Pulumi stack provisions.</summary>
-    public static IResourceBuilder<AzureContainerAppEnvironmentResource> AddPulumiAzureContainerAppEnvironment(
-        this IDistributedApplicationBuilder builder, string name) =>
-        builder.AddResource(new AzureContainerAppEnvironmentResource(name)).ExcludeFromManifest();
-
-    public static IResourceBuilder<AzureContainerAppEnvironmentResource> WithLocation(
-        this IResourceBuilder<AzureContainerAppEnvironmentResource> builder, string location)
-    {
-        builder.Resource.Location = location;
-        return builder;
-    }
-
-    public static IResourceBuilder<AzureContainerAppEnvironmentResource> WithPulumiStack(
-        this IResourceBuilder<AzureContainerAppEnvironmentResource> builder, IResourceBuilder<PulumiStackResource> stack)
-    {
-        builder.Resource.Stack = stack.Resource;
-        return builder;
-    }
-}
-
-public static class AzureAdAppRegistrationExtensions
-{
-    /// <summary>Adds an Azure AD (Entra ID) app registration and service principal that the Pulumi stack provisions.</summary>
-    public static IResourceBuilder<AzureAdAppRegistrationResource> AddPulumiAzureAdAppRegistration(
-        this IDistributedApplicationBuilder builder, string name) =>
-        builder.AddResource(new AzureAdAppRegistrationResource(name)).ExcludeFromManifest();
-
-    public static IResourceBuilder<AzureAdAppRegistrationResource> WithDisplayName(
-        this IResourceBuilder<AzureAdAppRegistrationResource> builder, string displayName)
-    {
-        builder.Resource.DisplayName = displayName;
-        return builder;
-    }
-
-    public static IResourceBuilder<AzureAdAppRegistrationResource> WithPulumiStack(
-        this IResourceBuilder<AzureAdAppRegistrationResource> builder, IResourceBuilder<PulumiStackResource> stack)
-    {
-        builder.Resource.Stack = stack.Resource;
-        return builder;
     }
 }

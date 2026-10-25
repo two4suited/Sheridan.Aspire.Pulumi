@@ -1,8 +1,9 @@
 using Aspire.Hosting.ApplicationModel;
 using Aspire.Hosting.Pipelines;
+using AspirePulumiPackages.Pulumi;
 using Microsoft.Extensions.Logging;
 
-namespace AspirePulumiPackages.AppHost.Pulumi;
+namespace AspirePulumiPackages.Pulumi.Azure;
 
 /// <summary>
 /// An Azure Container Apps environment provisioned by Pulumi (azure-native): resource group, Log Analytics

@@ -3,7 +3,7 @@ using System.Text.Json;
 using Aspire.Hosting.ApplicationModel;
 using Aspire.Hosting.Pipelines;
 
-namespace AspirePulumiPackages.AppHost.Pulumi;
+namespace AspirePulumiPackages.Pulumi;
 
 /// <summary>A resource that adds Pulumi YAML resources to a stack's generated program.</summary>
 public interface IPulumiProgramContributor : IResource

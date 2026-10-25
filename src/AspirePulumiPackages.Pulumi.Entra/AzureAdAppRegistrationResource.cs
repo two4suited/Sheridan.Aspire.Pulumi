@@ -1,7 +1,8 @@
 using Aspire.Hosting.ApplicationModel;
 using Aspire.Hosting.Pipelines;
+using AspirePulumiPackages.Pulumi;
 
-namespace AspirePulumiPackages.AppHost.Pulumi;
+namespace AspirePulumiPackages.Pulumi.Entra;
 
 /// <summary>An Azure AD (Entra ID) app registration and service principal provisioned by Pulumi (azuread).</summary>
 public sealed class AzureAdAppRegistrationResource(string name) : Resource(name), IPulumiProgramContributor
