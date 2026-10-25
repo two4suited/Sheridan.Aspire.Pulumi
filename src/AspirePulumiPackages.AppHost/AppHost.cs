@@ -1,5 +1,6 @@
 using AspirePulumiPackages.Pulumi;
 using AspirePulumiPackages.Pulumi.Azure;
+using AspirePulumiPackages.Pulumi.Azure.AppContainers;
 using AspirePulumiPackages.Pulumi.Azure.Base;
 using AspirePulumiPackages.Pulumi.Azure.ContainerRegistry;
 using AspirePulumiPackages.Pulumi.Azure.EntraId;
@@ -24,13 +25,14 @@ var azureStack = builder.AddPulumiStack(appName, "azure-test")
     .WithEscEnvironment("azure/test")
     .DependsOnStack(entraStack);
 
-var acaEnv = builder.AddPulumiAzureContainerAppEnvironment("aca-env")
-    .WithPulumiStack(azureStack);
-
 var acr = builder.AddPulumiAzureContainerRegistry("acr")
     .WithPulumiStack(azureStack)
     .WithPurgeTask("0 1 * * *", ago: TimeSpan.FromDays(7), keep: 5);
-acaEnv.WithRoleAssignments(acr, AzureContainerRegistryRole.AcrPull);
+
+// The environment pulls from (and the API image is pushed to) the shared registry; it is granted AcrPull on it.
+var acaEnv = builder.AddPulumiAzureContainerAppEnvironment("aca-env")
+    .WithPulumiStack(azureStack)
+    .WithAzureContainerRegistry(acr);
 
 var cosmos =builder.AddPulumiAzureCosmosDB("cosmos")
     .WithPulumiStack(azureStack)
