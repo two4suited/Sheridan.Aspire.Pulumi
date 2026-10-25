@@ -5,8 +5,10 @@ using AspirePulumiPackages.Pulumi.Azure.ApplicationInsights;
 using AspirePulumiPackages.Pulumi.Azure.Base;
 using AspirePulumiPackages.Pulumi.Azure.ContainerRegistry;
 using AspirePulumiPackages.Pulumi.Azure.EntraId;
+using AspirePulumiPackages.Pulumi.Azure.EventHubs;
 using AspirePulumiPackages.Pulumi.Azure.KeyVault;
 using AspirePulumiPackages.Pulumi.Azure.PostgreSQL;
+using AspirePulumiPackages.Pulumi.Azure.Sql;
 using AspirePulumiPackages.Pulumi.Azure.Storage;
 
 var builder = DistributedApplication.CreateBuilder(args);
@@ -55,7 +57,12 @@ var blobs = storage.AddBlobs("blobs");
 blobs.AddBlobContainer("uploads");
 storage.AddQueues("queues").AddQueue("jobs");
 
-var apiKey = builder.AddParameter("api-key", secret: true);
+var eventHubs = builder.AddPulumiEventHubs("eventhubs")
+    .WithPulumiStack(azureStack);
+var ordersHub = eventHubs.AddHub("orders", "orders-hub");
+ordersHub.AddConsumerGroup("orders-processor", "processor");
+
+var apiKey =builder.AddParameter("api-key", secret: true);
 var keyVault = builder.AddPulumiAzureKeyVault("vault")
     .WithPulumiStack(azureStack)
     .AddSecret("api-key", apiKey)
@@ -69,11 +76,16 @@ var postgres = builder.AddPulumiAzurePostgresFlexibleServer("postgres")
     .RunAsContainer();
 var appDb = postgres.AddDatabase("pgdb");
 
-var appInsights =builder.AddPulumiApplicationInsights("appinsights")
+var sql = builder.AddPulumiAzureSqlServer("sql")
+    .WithPulumiStack(azureStack);
+var sqlDb = sql.AddDatabase("appsql");
+
+var appInsights = builder.AddPulumiApplicationInsights("appinsights")
     .WithPulumiStack(azureStack);
 
 builder.AddProject<Projects.AspirePulumiPackages_Api>("api")
     .WithReference(blobs)
+    .WithReference(ordersHub)
     .WithExternalHttpEndpoints()
     .WithComputeEnvironment(acaEnv)
     .WithReference(appRegistration)
@@ -82,6 +94,7 @@ builder.AddProject<Projects.AspirePulumiPackages_Api>("api")
     .WithRoleAssignments(keyVault, AzureKeyVaultRole.KeyVaultSecretsUser)
     .WithReference(keyVault)
     .WithReference(appDb)
-    .WithReference(appInsights);
+    .WithReference(appInsights)
+    .WithReference(sqlDb);
 
 builder.Build().Run();
