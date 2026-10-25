@@ -7,6 +7,7 @@
   <Folder Name="/src/">
     <Project Path="src/AspirePulumiPackages.Api/AspirePulumiPackages.Api.csproj" />
     <Project Path="src/AspirePulumiPackages.AppHost/AspirePulumiPackages.AppHost.csproj" />
+    <Project Path="src/AspirePulumiPackages.Pulumi.Azure.OperationalInsights/AspirePulumiPackages.Pulumi.Azure.OperationalInsights.csproj" />
     <Project Path="src/AspirePulumiPackages.Pulumi.Azure.EntraId/AspirePulumiPackages.Pulumi.Azure.EntraId.csproj" />
     <Project Path="src/AspirePulumiPackages.Pulumi.Azure.Base/AspirePulumiPackages.Pulumi.Azure.Base.csproj" />
     <Project Path="src/AspirePulumiPackages.Pulumi.Azure/AspirePulumiPackages.Pulumi.Azure.csproj" />
