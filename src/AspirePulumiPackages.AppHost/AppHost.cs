@@ -5,6 +5,7 @@ using AspirePulumiPackages.Pulumi.Azure.ApplicationInsights;
 using AspirePulumiPackages.Pulumi.Azure.Base;
 using AspirePulumiPackages.Pulumi.Azure.ContainerRegistry;
 using AspirePulumiPackages.Pulumi.Azure.EntraId;
+using AspirePulumiPackages.Pulumi.Azure.EventHubs;
 using AspirePulumiPackages.Pulumi.Azure.KeyVault;
 using AspirePulumiPackages.Pulumi.Azure.ServiceBus;
 using AspirePulumiPackages.Pulumi.Azure.Storage;
@@ -57,11 +58,16 @@ storage.AddQueues("queues").AddQueue("jobs");
 
 var serviceBus = builder.AddPulumiServiceBus("messaging")
     .WithPulumiStack(azureStack);
-serviceBus.AddServiceBusQueue("orders").WithProperties(q => { q.MaxDeliveryCount = 5; q.DeadLetteringOnMessageExpiration = true; });
+serviceBus.AddServiceBusQueue("sb-orders", "orders").WithProperties(q => { q.MaxDeliveryCount = 5; q.DeadLetteringOnMessageExpiration = true; });
 serviceBus.AddServiceBusTopic("events").AddServiceBusSubscription("audit")
     .WithProperties(s => s.Rules.Add(new AzureServiceBusRule("audit-only") { FilterType = AzureServiceBusFilterType.CorrelationFilter, CorrelationFilter = { Subject = "audit" } }));
 
-var apiKey = builder.AddParameter("api-key", secret: true);
+var eventHubs = builder.AddPulumiEventHubs("eventhubs")
+    .WithPulumiStack(azureStack);
+var ordersHub = eventHubs.AddHub("orders", "orders-hub");
+ordersHub.AddConsumerGroup("orders-processor", "processor");
+
+var apiKey =builder.AddParameter("api-key", secret: true);
 var keyVault = builder.AddPulumiAzureKeyVault("vault")
     .WithPulumiStack(azureStack)
     .AddSecret("api-key", apiKey)
@@ -75,6 +81,7 @@ var appInsights = builder.AddPulumiApplicationInsights("appinsights")
 
 builder.AddProject<Projects.AspirePulumiPackages_Api>("api")
     .WithReference(blobs)
+    .WithReference(ordersHub)
     .WithExternalHttpEndpoints()
     .WithComputeEnvironment(acaEnv)
     .WithReference(appRegistration)
