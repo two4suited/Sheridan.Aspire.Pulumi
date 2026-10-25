@@ -6,7 +6,7 @@ builder.AddPulumiStack("aspire-pulumi-packages", "test")
     .WithOrganization("two4suited")
     .WithEscEnvironment("azure/test");
 
-var acaEnv = builder.PulumiAddAzureContainerAppEnvironment("aca-env");
+var acaEnv = builder.AddPulumiAzureContainerAppEnvironment("aca-env");
 
 builder.AddProject<Projects.AspirePulumiPackages_Api>("api")
     .WithExternalHttpEndpoints()

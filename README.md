@@ -16,10 +16,10 @@ Use `.WithEscEnvironment("project/env1", "project/env2")` to import one or more 
 
 ## Container Apps environment
 
-`builder.PulumiAddAzureContainerAppEnvironment("aca-env")` is the Pulumi equivalent of Aspire's `AddAzureContainerAppEnvironment`. It is a compute environment, so resources opt in the usual way:
+`builder.AddPulumiAzureContainerAppEnvironment("aca-env")` is the Pulumi equivalent of Aspire's `AddAzureContainerAppEnvironment`. It is a compute environment, so resources opt in the usual way:
 
 ```csharp
-var acaEnv = builder.PulumiAddAzureContainerAppEnvironment("aca-env");
+var acaEnv = builder.AddPulumiAzureContainerAppEnvironment("aca-env");
 builder.AddProject<Projects.AspirePulumiPackages_Api>("api")
     .WithExternalHttpEndpoints()
     .WithComputeEnvironment(acaEnv);

@@ -162,7 +162,7 @@ public static class PulumiExtensions
 public static class AzureContainerAppEnvironmentExtensions
 {
     /// <summary>Adds an Azure Container Apps environment that the Pulumi stack provisions.</summary>
-    public static IResourceBuilder<AzureContainerAppEnvironmentResource> PulumiAddAzureContainerAppEnvironment(
+    public static IResourceBuilder<AzureContainerAppEnvironmentResource> AddPulumiAzureContainerAppEnvironment(
         this IDistributedApplicationBuilder builder, string name) =>
         builder.AddResource(new AzureContainerAppEnvironmentResource(name)).ExcludeFromManifest();
 
