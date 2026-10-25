@@ -13,3 +13,16 @@ The stack name defaults to the lower-cased Aspire environment, so `aspire deploy
 Both can also be passed at the command line, overriding the code: `aspire deploy -- --Pulumi:Stack=qa --Pulumi:Esc=shared/qa,myproj/qa` (comma-separated list; also settable via config or the `Pulumi__Stack` / `Pulumi__Esc` environment variables).
 
 Use `.WithEscEnvironment("project/env1", "project/env2")` to import one or more existing ESC environments (later ones override earlier ones); with none specified, `<name>/<stack>` is used and created on deploy if missing. The code is in `src/AspirePulumiPackages.AppHost/Pulumi`.
+
+## Container Apps environment
+
+`builder.PulumiAddAzureContainerAppEnvironment("aca-env")` is the Pulumi equivalent of Aspire's `AddAzureContainerAppEnvironment`. It is a compute environment, so resources opt in the usual way:
+
+```csharp
+var acaEnv = builder.PulumiAddAzureContainerAppEnvironment("aca-env");
+builder.AddProject<Projects.AspirePulumiPackages_Api>("api")
+    .WithExternalHttpEndpoints()
+    .WithComputeEnvironment(acaEnv);
+```
+
+`aspire publish` writes the resource group, Log Analytics workspace, container registry, pull identity (AcrPull) and managed environment, plus a `ContainerApp` per targeted resource. `aspire deploy` runs: `pulumi-provision` (login, ESC, `pulumi up --target` for the infrastructure incl. the registry) → `build-<resource>` → `push-<resource>` → `pulumi-deploy` (full `pulumi up`). Images are tagged with a per-deploy timestamp so each deploy creates a new revision.

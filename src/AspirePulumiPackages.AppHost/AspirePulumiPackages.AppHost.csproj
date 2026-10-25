@@ -16,4 +16,8 @@
     <PackageReference Include="Aspire.Hosting.AppHost" Version="13.5.4" />
   </ItemGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\AspirePulumiPackages.Api\AspirePulumiPackages.Api.csproj" />
+  </ItemGroup>
+
 </Project>

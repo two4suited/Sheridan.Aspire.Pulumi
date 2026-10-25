@@ -50,4 +50,24 @@ internal static class PulumiCli
         if (code != 0)
             throw new InvalidOperationException($"'pulumi {string.Join(' ', list)}' failed with exit code {code}.");
     }
+
+    public static async Task<string> CaptureAsync(string workingDirectory, IEnumerable<string> args, CancellationToken cancellationToken)
+    {
+        var psi = new ProcessStartInfo("pulumi")
+        {
+            WorkingDirectory = workingDirectory,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+        };
+        foreach (var a in args) psi.ArgumentList.Add(a);
+        psi.Environment["PULUMI_SKIP_UPDATE_CHECK"] = "true";
+
+        using var process = Process.Start(psi) ?? throw new InvalidOperationException("Failed to start the pulumi CLI.");
+        var stdout = process.StandardOutput.ReadToEndAsync(cancellationToken);
+        var stderr = process.StandardError.ReadToEndAsync(cancellationToken);
+        await process.WaitForExitAsync(cancellationToken);
+        if (process.ExitCode != 0)
+            throw new InvalidOperationException($"'pulumi {string.Join(' ', args)}' failed: {await stderr}");
+        return (await stdout).Trim();
+    }
 }

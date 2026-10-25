@@ -8,4 +8,8 @@ builder.AddPulumiStack("aspire-pulumi-packages", "test")
 
 var acaEnv = builder.PulumiAddAzureContainerAppEnvironment("aca-env");
 
+builder.AddProject<Projects.AspirePulumiPackages_Api>("api")
+    .WithExternalHttpEndpoints()
+    .WithComputeEnvironment(acaEnv);
+
 builder.Build().Run();

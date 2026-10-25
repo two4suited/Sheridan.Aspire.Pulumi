@@ -10,6 +10,17 @@ public sealed class PulumiStackResource(string name, string stackName) : Resourc
 
     public bool EscFromConfiguration { get; set; }
 
+    /// <summary>Set when the project is written; used to read stack outputs.</summary>
+    public string? ProjectDirectory { get; set; }
+
+    /// <summary>Logical names/types of the resources that must exist before images can be pushed.</summary>
+    public List<(string Type, string Name)> InfraTargets { get; } = [];
+
+    public bool HasApps { get; set; }
+
+    /// <summary>Image tag shared by every image pushed in this deployment.</summary>
+    public string DeployTag { get; } = DateTime.UtcNow.ToString("yyyyMMddHHmmss");
+
     public string ProjectName => Name;
 
     public string QualifiedStack => Organization is null ? StackName : $"{Organization}/{ProjectName}/{StackName}";

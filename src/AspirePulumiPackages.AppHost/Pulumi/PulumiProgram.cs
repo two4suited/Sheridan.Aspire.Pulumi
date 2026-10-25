@@ -1,6 +1,7 @@
 using System.Text;
 using System.Text.Json;
 using Aspire.Hosting.ApplicationModel;
+using Aspire.Hosting.Pipelines;
 
 namespace AspirePulumiPackages.AppHost.Pulumi;
 
@@ -10,7 +11,7 @@ public interface IPulumiProgramContributor : IResource
     /// <summary>The stack this contributes to; null means every stack in the AppHost.</summary>
     PulumiStackResource? Stack { get; }
 
-    void Contribute(PulumiProgram program);
+    Task ContributeAsync(PulumiProgram program, PipelineStepContext context);
 }
 
 public sealed class PulumiProgram
@@ -19,6 +20,17 @@ public sealed class PulumiProgram
     public Dictionary<string, object?> Variables { get; } = [];
     public Dictionary<string, object?> Resources { get; } = [];
     public Dictionary<string, object?> Outputs { get; } = [];
+
+    /// <summary>Resources that must be created before container images can be pushed (e.g. the registry).</summary>
+    public List<(string Type, string Name)> InfraTargets { get; } = [];
+
+    public bool HasApps { get; set; }
+
+    public void AddInfraResource(string name, string type, Dictionary<string, object?> definition)
+    {
+        Resources[name] = definition;
+        InfraTargets.Add((type, name));
+    }
 
     public string ToYaml(string name, string description)
     {
