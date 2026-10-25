@@ -8,6 +8,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <AspireUseCliBundle>true</AspireUseCliBundle>
+    <NoWarn>$(NoWarn);ASPIREPIPELINES001;ASPIREPIPELINES004</NoWarn>
     <UserSecretsId>67354aed-d5f8-4d77-8112-1600dbc5ef5b</UserSecretsId>
   </PropertyGroup>
 
