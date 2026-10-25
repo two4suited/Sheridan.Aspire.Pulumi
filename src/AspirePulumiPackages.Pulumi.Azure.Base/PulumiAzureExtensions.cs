@@ -30,6 +30,19 @@ public static class PulumiAzureExtensions
         return builder;
     }
 
+    /// <summary>Places the resource in a Pulumi-provisioned resource group (see <see cref="AddPulumiAzureResourceGroup"/>) instead of creating its own.</summary>
+    public static IResourceBuilder<T> WithResourceGroup<T>(this IResourceBuilder<T> builder, IResourceBuilder<PulumiAzureResourceGroupResource> resourceGroup)
+        where T : PulumiAzureResource
+    {
+        builder.Resource.ResourceGroup = resourceGroup.Resource;
+        return builder;
+    }
+
+    /// <summary>Adds a standalone Azure resource group provisioned by Pulumi, for grouping several resources together with <see cref="WithResourceGroup{T}"/>.</summary>
+    public static IResourceBuilder<PulumiAzureResourceGroupResource> AddPulumiAzureResourceGroup(
+        this IDistributedApplicationBuilder builder, string name) =>
+        builder.AddResource(new PulumiAzureResourceGroupResource(name)).ExcludeFromManifest();
+
     /// <summary>Adds a user-assigned managed identity provisioned by Pulumi (the equivalent of AddAzureUserAssignedIdentity).</summary>
     public static IResourceBuilder<PulumiAzureUserAssignedIdentityResource> AddPulumiAzureUserAssignedIdentity(
         this IDistributedApplicationBuilder builder, string name) =>

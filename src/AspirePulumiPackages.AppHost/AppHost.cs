@@ -1,5 +1,6 @@
 using AspirePulumiPackages.Pulumi;
 using AspirePulumiPackages.Pulumi.Azure;
+using AspirePulumiPackages.Pulumi.Azure.Base;
 using AspirePulumiPackages.Pulumi.Azure.EntraId;
 
 var builder = DistributedApplication.CreateBuilder(args);
@@ -20,6 +21,13 @@ var azureStack = builder.AddPulumiStack(appName, "azure-test")
     .WithEscEnvironment("azure/test")
     .DependsOnStack(entraStack);
 
+var sharedRg = builder.AddPulumiAzureResourceGroup("shared-rg")
+    .WithPulumiStack(azureStack);
+
+var workloadIdentity = builder.AddPulumiAzureUserAssignedIdentity("workload-identity")
+    .WithPulumiStack(azureStack)
+    .WithResourceGroup(sharedRg);
+
 var acaEnv = builder.AddPulumiAzureContainerAppEnvironment("aca-env")
     .WithPulumiStack(azureStack);
 
@@ -32,6 +40,7 @@ builder.AddProject<Projects.AspirePulumiPackages_Api>("api")
     .WithExternalHttpEndpoints()
     .WithComputeEnvironment(acaEnv)
     .WithReference(appRegistration)
-    .WithReference(cosmos);
+    .WithReference(cosmos)
+    .WithEnvironment("WorkloadIdentity__ClientId", workloadIdentity.Resource.ClientId);
 
 builder.Build().Run();

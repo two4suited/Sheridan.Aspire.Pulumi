@@ -48,6 +48,21 @@ builder.AddProject<Projects.AspirePulumiPackages_Api>("api")
 
 `.WithReference(cosmos)` on a project is enough to get data access — no separate role-assignment call is needed. Any compute environment (e.g. `AddPulumiAzureContainerAppEnvironment`) hosting a resource that references the Cosmos DB account automatically gets a Pulumi `SqlResourceSqlRoleAssignment` granting its shared managed identity the built-in **Cosmos DB Built-in Data Contributor** role, scoped to the account — the data-plane equivalent of the ACR pull role assignment described above. `ConnectionStrings__cosmos` (the account's document endpoint, consumed by `Microsoft.Azure.Cosmos`/`Aspire.Microsoft.Azure.Cosmos` with `DefaultAzureCredential`) is read from the stack's outputs the same way `AzureAd__ClientId` is above, so it's subject to the same "deploy once to create the account, deploy again to pick up the endpoint" caveat on the first deploy.
 
+## Resource groups
+
+Resources built on the shared `AspirePulumiPackages.Pulumi.Azure.Base` layer (e.g. `AddPulumiAzureUserAssignedIdentity`) create their own resource group by default. To put several of them in one shared resource group instead, provision it explicitly and point each resource at it with `WithResourceGroup`:
+
+```csharp
+var sharedRg = builder.AddPulumiAzureResourceGroup("shared-rg")
+    .WithPulumiStack(azureStack);
+
+var workloadIdentity = builder.AddPulumiAzureUserAssignedIdentity("workload-identity")
+    .WithPulumiStack(azureStack)
+    .WithResourceGroup(sharedRg);
+```
+
+Both resources must be bound to the same Pulumi stack — `WithResourceGroup` is a same-program `${sharedRg.name}` reference, not a cross-stack output lookup — and binding them to different stacks throws a clear error instead of generating broken YAML. `WithExistingResourceGroup("name")` is still available for pointing at a resource group Pulumi doesn't manage at all.
+
 ## Multiple stacks
 
 Resources can be split across separate Pulumi stacks (own project, own ESC environment) by adding more than one `AddPulumiStack` and binding each resource to the stack it belongs to with `.WithPulumiStack(...)`:
