@@ -69,6 +69,21 @@ builder.AddProject<Projects.AspirePulumiPackages_Api>("api")
 
 Secret parameters become secret Pulumi config entries (`pulumi config set --secret apiKey ...`). Also supported: `PublishAsExisting`/`AsExisting`, `GetSecret(name)` (the secret URI, not a platform-resolved Key Vault reference) and the Pulumi-specific `WithDeployerRoleAssignments(...)` which grants the deploying principal roles (e.g. Secrets Officer) so Pulumi can write secrets under RBAC; secrets depend on that assignment. Not ported: `ReferenceExpression` secrets, `RunAsExisting`.
 
+## Resource groups
+
+Resources built on the shared `AspirePulumiPackages.Pulumi.Azure.Base` layer (e.g. `AddPulumiAzureUserAssignedIdentity`) create their own resource group by default. To put several of them in one shared resource group instead, provision it explicitly and point each resource at it with `WithResourceGroup`:
+
+```csharp
+var sharedRg = builder.AddPulumiAzureResourceGroup("shared-rg")
+    .WithPulumiStack(azureStack);
+
+var workloadIdentity = builder.AddPulumiAzureUserAssignedIdentity("workload-identity")
+    .WithPulumiStack(azureStack)
+    .WithResourceGroup(sharedRg);
+```
+
+Both resources must be bound to the same Pulumi stack — `WithResourceGroup` is a same-program `${sharedRg.name}` reference, not a cross-stack output lookup — and binding them to different stacks throws a clear error instead of generating broken YAML. `WithExistingResourceGroup("name")` is still available for pointing at a resource group Pulumi doesn't manage at all.
+
 ## Multiple stacks
 
 Resources can be split across separate Pulumi stacks (own project, own ESC environment) by adding more than one `AddPulumiStack` and binding each resource to the stack it belongs to with `.WithPulumiStack(...)`:
