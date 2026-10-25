@@ -45,6 +45,24 @@ public static class PulumiExtensions
         return builder;
     }
 
+    /// <summary>
+    /// Deploys <paramref name="dependency"/> to completion before this stack's infrastructure is provisioned.
+    /// Only orders the two stacks' provision/deploy steps; each stack's Pulumi project is still generated
+    /// independently during the publish step, so a value read from <paramref name="dependency"/>'s outputs
+    /// (e.g. via <see cref="PulumiOutputReference"/>) still needs a prior successful deploy to resolve.
+    /// </summary>
+    public static IResourceBuilder<PulumiStackResource> DependsOnStack(
+        this IResourceBuilder<PulumiStackResource> builder, IResourceBuilder<PulumiStackResource> dependency)
+    {
+        var dependencyResource = dependency.Resource;
+        return builder.WithPipelineConfiguration(context =>
+        {
+            var dependencyDeploy = context.GetSteps(dependencyResource, WellKnownPipelineTags.DeployCompute);
+            var provision = context.GetSteps(builder.Resource, WellKnownPipelineTags.ProvisionInfrastructure);
+            provision.DependsOn(dependencyDeploy);
+        });
+    }
+
     private static IEnumerable<PipelineStep> CreateSteps(PulumiStackResource resource)
     {
         var publish = new PipelineStep
@@ -175,6 +193,28 @@ public static class AzureContainerAppEnvironmentExtensions
 
     public static IResourceBuilder<AzureContainerAppEnvironmentResource> WithPulumiStack(
         this IResourceBuilder<AzureContainerAppEnvironmentResource> builder, IResourceBuilder<PulumiStackResource> stack)
+    {
+        builder.Resource.Stack = stack.Resource;
+        return builder;
+    }
+}
+
+public static class AzureAdAppRegistrationExtensions
+{
+    /// <summary>Adds an Azure AD (Entra ID) app registration and service principal that the Pulumi stack provisions.</summary>
+    public static IResourceBuilder<AzureAdAppRegistrationResource> AddPulumiAzureAdAppRegistration(
+        this IDistributedApplicationBuilder builder, string name) =>
+        builder.AddResource(new AzureAdAppRegistrationResource(name)).ExcludeFromManifest();
+
+    public static IResourceBuilder<AzureAdAppRegistrationResource> WithDisplayName(
+        this IResourceBuilder<AzureAdAppRegistrationResource> builder, string displayName)
+    {
+        builder.Resource.DisplayName = displayName;
+        return builder;
+    }
+
+    public static IResourceBuilder<AzureAdAppRegistrationResource> WithPulumiStack(
+        this IResourceBuilder<AzureAdAppRegistrationResource> builder, IResourceBuilder<PulumiStackResource> stack)
     {
         builder.Resource.Stack = stack.Resource;
         return builder;

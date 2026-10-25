@@ -26,3 +26,45 @@ builder.AddProject<Projects.AspirePulumiPackages_Api>("api")
 ```
 
 `aspire publish` writes the resource group, Log Analytics workspace, container registry, pull identity (AcrPull) and managed environment, plus a `ContainerApp` per targeted resource. `aspire deploy` runs: `pulumi-provision` (login, ESC, `pulumi up --target` for the infrastructure incl. the registry) → `build-<resource>` → `push-<resource>` → `pulumi-deploy` (full `pulumi up`). Images are tagged with a per-deploy timestamp so each deploy creates a new revision.
+
+## Multiple stacks
+
+Resources can be split across separate Pulumi stacks (own project, own ESC environment) by adding more than one `AddPulumiStack` and binding each resource to the stack it belongs to with `.WithPulumiStack(...)`:
+
+```csharp
+var entraStack = builder.AddPulumiStack("entra-app", "test")
+    .WithOrganization("two4suited")
+    .WithEscEnvironment("entra/test");
+
+builder.AddPulumiAzureAdAppRegistration("app-registration")
+    .WithPulumiStack(entraStack);
+
+var azureStack = builder.AddPulumiStack("aspire-pulumi-packages", "test")
+    .WithOrganization("two4suited")
+    .WithEscEnvironment("azure/test")
+    .DependsOnStack(entraStack);
+
+var acaEnv = builder.AddPulumiAzureContainerAppEnvironment("aca-env")
+    .WithPulumiStack(azureStack);
+```
+
+Once there is more than one `PulumiStackResource` in the model, every stack-bound resource must call `.WithPulumiStack(...)` explicitly — the "only stack in the model" fallback used for a single-stack app no longer applies.
+
+Chain `.DependsOnStack(...)` onto a stack (as above) to order two stacks' deploys — it makes `aspire deploy` fully deploy the dependency before provisioning this stack's infrastructure. It only wires the two stacks' provision/deploy pipeline steps together (tagged `ProvisionInfrastructure`/`DeployCompute`), so it has no effect on `aspire publish` (which never touches those steps). It does **not** by itself fix the two-deploy caveat below — each stack's Pulumi project (and any output values baked into it, like `AzureAd__ClientId`) is still generated independently during its own publish step, which isn't affected by this ordering.
+
+## Azure AD app registration
+
+`builder.AddPulumiAzureAdAppRegistration("app-registration")` provisions an `azuread:Application` plus a `azuread:ServicePrincipal` (via the `azuread` Pulumi provider) in whichever stack it's bound to with `.WithPulumiStack(...)`. Use `.WithDisplayName(...)` to override the display name (defaults to the resource name). The ESC environment bound to that stack must supply the `azuread` provider's credentials (tenant, client id/secret or OIDC), the same way `azure/test` supplies `azure-native`'s.
+
+The resource exposes `ClientId`, `ObjectId` and `ServicePrincipalObjectId` as `PulumiOutputReference`s, so they can be fed into another resource's config the same way any Aspire reference is:
+
+```csharp
+var appRegistration = builder.AddPulumiAzureAdAppRegistration("app-registration")
+    .WithPulumiStack(entraStack);
+
+builder.AddProject<Projects.AspirePulumiPackages_Api>("api")
+    .WithComputeEnvironment(acaEnv)
+    .WithEnvironment("AzureAd__ClientId", appRegistration.Resource.ClientId);
+```
+
+These outputs are read with `pulumi stack output` from the **already-deployed** `entra-app` stack, not resolved as a live Pulumi cross-stack reference. On the first `aspire deploy`, before `entra-app` has ever been deployed, the lookup fails and the env var is skipped (logged as a warning) — deploy once, then deploy again to pick up the client id.
