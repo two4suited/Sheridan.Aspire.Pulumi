@@ -14,7 +14,7 @@ Both can also be passed at the command line, overriding the code: `aspire deploy
 
 Use `.WithEscEnvironment("project/env1", "project/env2")` to import one or more existing ESC environments (later ones override earlier ones); with none specified, `<name>/<stack>` is used and created on deploy if missing.
 
-The code is split across three class libraries under `src/`: `AspirePulumiPackages.Pulumi` (the stack/pipeline/YAML-generation core — `PulumiStackResource`, `PulumiProgram`, `PulumiCli`, `PulumiOutputReference`, `AddPulumiStack`/`DependsOnStack`/etc.), `AspirePulumiPackages.Pulumi.Azure` (the Container Apps environment and Cosmos DB), and `AspirePulumiPackages.Pulumi.Entra` (the Azure AD app registration). Azure and Entra both depend on the core project; `AspirePulumiPackages.AppHost` references all three.
+The code is split across three class libraries under `src/`: `AspirePulumiPackages.Pulumi` (the stack/pipeline/YAML-generation core — `PulumiStackResource`, `PulumiProgram`, `PulumiCli`, `PulumiOutputReference`, `AddPulumiStack`/`DependsOnStack`/etc.), `AspirePulumiPackages.Pulumi.Azure` (Cosmos DB and the shared managed-identity interface); the Container Apps environment lives in `AspirePulumiPackages.Pulumi.Azure.AppContainers` (port of `Aspire.Hosting.Azure.AppContainers`: `WithAzureContainerRegistry`, `WithAzureLogAnalyticsWorkspace`, `WithAcrPullIdentity`, `WithDashboard`, VNet via `WithDelegatedSubnet`, and `PublishAsPulumiContainerAppJob`/`PublishAsScheduledPulumiContainerAppJob`), and `AspirePulumiPackages.Pulumi.Entra` (the Azure AD app registration). Azure and Entra both depend on the core project; `AspirePulumiPackages.AppHost` references all three.
 
 ## Container Apps environment
 
