@@ -1,6 +1,6 @@
 using AspirePulumiPackages.Pulumi;
 using AspirePulumiPackages.Pulumi.Azure;
-using AspirePulumiPackages.Pulumi.Entra;
+using AspirePulumiPackages.Pulumi.Azure.EntraId;
 
 var builder = DistributedApplication.CreateBuilder(args);
 
@@ -11,7 +11,7 @@ var entraStack = builder.AddPulumiStack($"{appName}-entra", "entra-test")
     .WithOrganization("two4suited")
     .WithEscEnvironment("entra/test");
 
-var appRegistration = builder.AddPulumiAzureAdAppRegistration("app-registration")
+var appRegistration = builder.AddPulumiEntraId("app-registration")
     .WithPulumiStack(entraStack);
 
 var azureStack = builder.AddPulumiStack(appName, "azure-test")
@@ -31,7 +31,7 @@ cosmos.AddCosmosDatabase("appdb").AddContainer("items", "/id");
 builder.AddProject<Projects.AspirePulumiPackages_Api>("api")
     .WithExternalHttpEndpoints()
     .WithComputeEnvironment(acaEnv)
-    .WithEnvironment("AzureAd__ClientId", appRegistration.Resource.ClientId)
+    .WithReference(appRegistration)
     .WithReference(cosmos);
 
 builder.Build().Run();
