@@ -442,7 +442,7 @@ public sealed class AzureContainerAppEnvironmentResource : PulumiAzureResource, 
             };
         }
 
-        return new()
+        var app = new Dictionary<string, object?>
         {
             ["type"] = "azure-native:app:ContainerApp",
             ["properties"] = new Dictionary<string, object?>
@@ -460,6 +460,11 @@ public sealed class AzureContainerAppEnvironmentResource : PulumiAzureResource, 
             },
             ["options"] = options,
         };
+
+        // Integrations (e.g. Azure Functions: kind=functionapp) tailor the generated container app.
+        foreach (var customize in r.Annotations.OfType<PulumiContainerAppCustomizationAnnotation>())
+            customize.Configure(app);
+        return app;
     }
 }
 
