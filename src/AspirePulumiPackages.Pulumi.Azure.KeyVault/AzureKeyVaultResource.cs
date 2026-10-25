@@ -85,6 +85,7 @@ public sealed class PulumiAzureKeyVaultResource(string name) : PulumiAzureResour
         }
 
         AddComputeRoleAssignments(program, context, scope);
+        Provisioning.PulumiInfrastructureExtensions.ApplyInfrastructureCallbacks(this, program);
         return Task.CompletedTask;
     }
 
