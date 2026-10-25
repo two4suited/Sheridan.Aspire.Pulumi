@@ -1,6 +1,8 @@
 using AspirePulumiPackages.Pulumi;
 using AspirePulumiPackages.Pulumi.Azure;
+using AspirePulumiPackages.Pulumi.Azure.Base;
 using AspirePulumiPackages.Pulumi.Azure.EntraId;
+using AspirePulumiPackages.Pulumi.Azure.KeyVault;
 
 var builder = DistributedApplication.CreateBuilder(args);
 
@@ -28,10 +30,17 @@ var cosmos = builder.AddPulumiAzureCosmosDB("cosmos")
     .RunAsEmulator();
 cosmos.AddCosmosDatabase("appdb").AddContainer("items", "/id");
 
+var apiKey = builder.AddParameter("api-key", secret: true);
+var keyVault = builder.AddPulumiAzureKeyVault("vault")
+    .WithPulumiStack(azureStack)
+    .AddSecret("api-key", apiKey);
+
 builder.AddProject<Projects.AspirePulumiPackages_Api>("api")
     .WithExternalHttpEndpoints()
     .WithComputeEnvironment(acaEnv)
     .WithReference(appRegistration)
-    .WithReference(cosmos);
+    .WithReference(cosmos)
+    .WithRoleAssignments(keyVault, AzureKeyVaultRole.KeyVaultSecretsUser)
+    .WithReference(keyVault);
 
 builder.Build().Run();
