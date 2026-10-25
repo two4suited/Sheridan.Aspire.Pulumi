@@ -7,6 +7,7 @@ using AspirePulumiPackages.Pulumi.Azure.ContainerRegistry;
 using AspirePulumiPackages.Pulumi.Azure.EntraId;
 using AspirePulumiPackages.Pulumi.Azure.EventHubs;
 using AspirePulumiPackages.Pulumi.Azure.KeyVault;
+using AspirePulumiPackages.Pulumi.Azure.PostgreSQL;
 using AspirePulumiPackages.Pulumi.Azure.Sql;
 using AspirePulumiPackages.Pulumi.Azure.Storage;
 
@@ -70,6 +71,11 @@ var keyVault = builder.AddPulumiAzureKeyVault("vault")
         .Set("properties.enablePurgeProtection", true)
         .Set("properties.softDeleteRetentionInDays", 30));
 
+var postgres = builder.AddPulumiAzurePostgresFlexibleServer("postgres")
+    .WithPulumiStack(azureStack)
+    .RunAsContainer();
+var appDb = postgres.AddDatabase("pgdb");
+
 var sql = builder.AddPulumiAzureSqlServer("sql")
     .WithPulumiStack(azureStack);
 var sqlDb = sql.AddDatabase("appsql");
@@ -87,6 +93,7 @@ builder.AddProject<Projects.AspirePulumiPackages_Api>("api")
     .WithEnvironment("WorkloadIdentity__ClientId", workloadIdentity.Resource.ClientId)
     .WithRoleAssignments(keyVault, AzureKeyVaultRole.KeyVaultSecretsUser)
     .WithReference(keyVault)
+    .WithReference(appDb)
     .WithReference(appInsights)
     .WithReference(sqlDb);
 
