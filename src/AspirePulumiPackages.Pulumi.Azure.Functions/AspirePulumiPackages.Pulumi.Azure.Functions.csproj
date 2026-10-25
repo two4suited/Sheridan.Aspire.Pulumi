@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>AspirePulumiPackages.Pulumi.Azure.Functions</RootNamespace>
+    <NoWarn>$(NoWarn);ASPIREPIPELINES001;ASPIREPIPELINES004;ASPIRECOMMAND001</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Aspire.Hosting" Version="13.6.4" />
+    <!-- Only for AzureFunctionsAnnotation, the marker Aspire uses to recognise a project as an Azure Functions app. -->
+    <PackageReference Include="Aspire.Hosting.Azure" Version="13.6.4" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\AspirePulumiPackages.Pulumi\AspirePulumiPackages.Pulumi.csproj" />
+    <ProjectReference Include="..\AspirePulumiPackages.Pulumi.Azure.Base\AspirePulumiPackages.Pulumi.Azure.Base.csproj" />
+    <ProjectReference Include="..\AspirePulumiPackages.Pulumi.Azure.Storage\AspirePulumiPackages.Pulumi.Azure.Storage.csproj" />
+    <!-- The compute environment (Container Apps today) hosting the function app: IPulumiManagedIdentityResource and container app customization. -->
+    <ProjectReference Include="..\AspirePulumiPackages.Pulumi.Azure\AspirePulumiPackages.Pulumi.Azure.csproj" />
+  </ItemGroup>
+
+</Project>

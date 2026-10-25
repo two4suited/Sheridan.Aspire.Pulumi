@@ -326,7 +326,7 @@ public sealed class AzureContainerAppEnvironmentResource : Resource, IComputeEnv
             };
         }
 
-        return new()
+        var app = new Dictionary<string, object?>
         {
             ["type"] = "azure-native:app:ContainerApp",
             ["properties"] = new Dictionary<string, object?>
@@ -359,6 +359,11 @@ public sealed class AzureContainerAppEnvironmentResource : Resource, IComputeEnv
                 ["dependsOn"] = new List<object?> { $"${{{Id}AcrPull}}" },
             },
         };
+
+        // Integrations (e.g. Azure Functions: kind=functionapp) tailor the generated container app.
+        foreach (var customize in r.Annotations.OfType<PulumiContainerAppCustomizationAnnotation>())
+            customize.Configure(app);
+        return app;
     }
 }
 
