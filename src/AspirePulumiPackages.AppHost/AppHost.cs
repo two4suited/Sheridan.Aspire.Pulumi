@@ -6,6 +6,7 @@ using AspirePulumiPackages.Pulumi.Azure.Base;
 using AspirePulumiPackages.Pulumi.Azure.ContainerRegistry;
 using AspirePulumiPackages.Pulumi.Azure.EntraId;
 using AspirePulumiPackages.Pulumi.Azure.KeyVault;
+using AspirePulumiPackages.Pulumi.Azure.Redis;
 using AspirePulumiPackages.Pulumi.Azure.Storage;
 
 var builder = DistributedApplication.CreateBuilder(args);
@@ -63,6 +64,14 @@ var keyVault = builder.AddPulumiAzureKeyVault("vault")
         .Set("properties.enablePurgeProtection", true)
         .Set("properties.softDeleteRetentionInDays", 30));
 
+var redis = builder.AddPulumiAzureRedis("cache")
+    .WithPulumiStack(azureStack)
+    .RunAsContainer();
+
+var managedRedis = builder.AddPulumiAzureManagedRedis("managed-cache")
+    .WithPulumiStack(azureStack)
+    .WithAccessKeyAuthentication();
+
 var appInsights = builder.AddPulumiApplicationInsights("appinsights")
     .WithPulumiStack(azureStack);
 
@@ -75,6 +84,8 @@ builder.AddProject<Projects.AspirePulumiPackages_Api>("api")
     .WithEnvironment("WorkloadIdentity__ClientId", workloadIdentity.Resource.ClientId)
     .WithRoleAssignments(keyVault, AzureKeyVaultRole.KeyVaultSecretsUser)
     .WithReference(keyVault)
+    .WithReference(redis)
+    .WithReference(managedRedis)
     .WithReference(appInsights);
 
 builder.Build().Run();
