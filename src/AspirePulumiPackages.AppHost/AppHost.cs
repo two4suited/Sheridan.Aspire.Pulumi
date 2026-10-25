@@ -1,5 +1,6 @@
 using AspirePulumiPackages.Pulumi;
 using AspirePulumiPackages.Pulumi.Azure;
+using AspirePulumiPackages.Pulumi.Azure.ApplicationInsights;
 using AspirePulumiPackages.Pulumi.Azure.Base;
 using AspirePulumiPackages.Pulumi.Azure.ContainerRegistry;
 using AspirePulumiPackages.Pulumi.Azure.EntraId;
@@ -60,6 +61,9 @@ var keyVault = builder.AddPulumiAzureKeyVault("vault")
         .Set("properties.enablePurgeProtection", true)
         .Set("properties.softDeleteRetentionInDays", 30));
 
+var appInsights = builder.AddPulumiApplicationInsights("appinsights")
+    .WithPulumiStack(azureStack);
+
 builder.AddProject<Projects.AspirePulumiPackages_Api>("api")
     .WithReference(blobs)
     .WithExternalHttpEndpoints()
@@ -68,6 +72,7 @@ builder.AddProject<Projects.AspirePulumiPackages_Api>("api")
     .WithReference(cosmos)
     .WithEnvironment("WorkloadIdentity__ClientId", workloadIdentity.Resource.ClientId)
     .WithRoleAssignments(keyVault, AzureKeyVaultRole.KeyVaultSecretsUser)
-    .WithReference(keyVault);
+    .WithReference(keyVault)
+    .WithReference(appInsights);
 
 builder.Build().Run();

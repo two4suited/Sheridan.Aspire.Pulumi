@@ -69,6 +69,10 @@ builder.AddProject<Projects.AspirePulumiPackages_Api>("api")
 
 Secret parameters become secret Pulumi config entries (`pulumi config set --secret apiKey ...`). Also supported: `PublishAsExisting`/`AsExisting`, `GetSecret(name)` (the secret URI, not a platform-resolved Key Vault reference) and the Pulumi-specific `WithDeployerRoleAssignments(...)` which grants the deploying principal roles (e.g. Secrets Officer) so Pulumi can write secrets under RBAC; secrets depend on that assignment. Not ported: `ReferenceExpression` secrets, `RunAsExisting`.
 
+## Application Insights
+
+`builder.AddPulumiApplicationInsights("appinsights")` (project `AspirePulumiPackages.Pulumi.Azure.ApplicationInsights`) ports `AddAzureApplicationInsights`: a `web` Application Insights component (`azure-native:applicationinsights:Component`) backed by a Log Analytics workspace, with outputs `appInsightsConnectionString`, `name`, `id`. Without a workspace, a PerGB2018 workspace is created in the same resource group (as the official Bicep does). Link an existing one with `.WithLogAnalyticsWorkspace(law)` (a `AddPulumiLogAnalyticsWorkspace` resource bound to the same stack). The connection string is the resource's connection string, so `.WithReference(appInsights)` yields `ConnectionStrings__appinsights`.
+
 ## Resource groups
 
 Resources built on the shared `AspirePulumiPackages.Pulumi.Azure.Base` layer (e.g. `AddPulumiAzureUserAssignedIdentity`) create their own resource group by default. To put several of them in one shared resource group instead, provision it explicitly and point each resource at it with `WithResourceGroup`:
