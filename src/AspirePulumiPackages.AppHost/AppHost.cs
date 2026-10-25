@@ -1,7 +1,10 @@
 using AspirePulumiPackages.Pulumi;
 using AspirePulumiPackages.Pulumi.Azure;
 using AspirePulumiPackages.Pulumi.Azure.Base;
+using AspirePulumiPackages.Pulumi.Azure.ContainerRegistry;
 using AspirePulumiPackages.Pulumi.Azure.EntraId;
+using AspirePulumiPackages.Pulumi.Azure.KeyVault;
+using AspirePulumiPackages.Pulumi.Azure.Storage;
 
 var builder = DistributedApplication.CreateBuilder(args);
 
@@ -31,16 +34,36 @@ var workloadIdentity = builder.AddPulumiAzureUserAssignedIdentity("workload-iden
 var acaEnv = builder.AddPulumiAzureContainerAppEnvironment("aca-env")
     .WithPulumiStack(azureStack);
 
-var cosmos = builder.AddPulumiAzureCosmosDB("cosmos")
+var acr = builder.AddPulumiAzureContainerRegistry("acr")
+    .WithPulumiStack(azureStack)
+    .WithPurgeTask("0 1 * * *", ago: TimeSpan.FromDays(7), keep: 5);
+acaEnv.WithRoleAssignments(acr, AzureContainerRegistryRole.AcrPull);
+
+var cosmos =builder.AddPulumiAzureCosmosDB("cosmos")
     .WithPulumiStack(azureStack)
     .RunAsEmulator();
 cosmos.AddCosmosDatabase("appdb").AddContainer("items", "/id");
 
+var storage = builder.AddPulumiStorage("storage")
+    .WithPulumiStack(azureStack)
+    .RunAsEmulator();
+var blobs = storage.AddBlobs("blobs");
+blobs.AddBlobContainer("uploads");
+storage.AddQueues("queues").AddQueue("jobs");
+
+var apiKey = builder.AddParameter("api-key", secret: true);
+var keyVault = builder.AddPulumiAzureKeyVault("vault")
+    .WithPulumiStack(azureStack)
+    .AddSecret("api-key", apiKey);
+
 builder.AddProject<Projects.AspirePulumiPackages_Api>("api")
+    .WithReference(blobs)
     .WithExternalHttpEndpoints()
     .WithComputeEnvironment(acaEnv)
     .WithReference(appRegistration)
     .WithReference(cosmos)
-    .WithEnvironment("WorkloadIdentity__ClientId", workloadIdentity.Resource.ClientId);
+    .WithEnvironment("WorkloadIdentity__ClientId", workloadIdentity.Resource.ClientId)
+    .WithRoleAssignments(keyVault, AzureKeyVaultRole.KeyVaultSecretsUser)
+    .WithReference(keyVault);
 
 builder.Build().Run();
