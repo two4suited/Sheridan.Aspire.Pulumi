@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>AspirePulumiPackages.Pulumi.Azure.PostgreSQL</RootNamespace>
+    <NoWarn>$(NoWarn);ASPIREPIPELINES001;ASPIREPIPELINES004</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Aspire.Hosting" Version="13.6.4" />
+    <!-- RunAsContainer runs a local postgres container in place of the Azure server, as the official integration does. -->
+    <PackageReference Include="Aspire.Hosting.PostgreSQL" Version="13.6.4" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\AspirePulumiPackages.Pulumi\AspirePulumiPackages.Pulumi.csproj" />
+    <ProjectReference Include="..\AspirePulumiPackages.Pulumi.Azure.Base\AspirePulumiPackages.Pulumi.Azure.Base.csproj" />
+    <ProjectReference Include="..\AspirePulumiPackages.Pulumi.Provisioning\AspirePulumiPackages.Pulumi.Provisioning.csproj" />
+    <!-- Only for IPulumiManagedIdentityResource (compute environments' shared identity); the root project is not extended. -->
+    <ProjectReference Include="..\AspirePulumiPackages.Pulumi.Azure\AspirePulumiPackages.Pulumi.Azure.csproj" />
+  </ItemGroup>
+
+</Project>
