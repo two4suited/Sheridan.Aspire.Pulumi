@@ -6,6 +6,7 @@ using AspirePulumiPackages.Pulumi.Azure.Base;
 using AspirePulumiPackages.Pulumi.Azure.ContainerRegistry;
 using AspirePulumiPackages.Pulumi.Azure.EntraId;
 using AspirePulumiPackages.Pulumi.Azure.KeyVault;
+using AspirePulumiPackages.Pulumi.Azure.ServiceBus;
 using AspirePulumiPackages.Pulumi.Azure.Storage;
 
 var builder = DistributedApplication.CreateBuilder(args);
@@ -54,6 +55,12 @@ var blobs = storage.AddBlobs("blobs");
 blobs.AddBlobContainer("uploads");
 storage.AddQueues("queues").AddQueue("jobs");
 
+var serviceBus = builder.AddPulumiServiceBus("messaging")
+    .WithPulumiStack(azureStack);
+serviceBus.AddServiceBusQueue("orders").WithProperties(q => { q.MaxDeliveryCount = 5; q.DeadLetteringOnMessageExpiration = true; });
+serviceBus.AddServiceBusTopic("events").AddServiceBusSubscription("audit")
+    .WithProperties(s => s.Rules.Add(new AzureServiceBusRule("audit-only") { FilterType = AzureServiceBusFilterType.CorrelationFilter, CorrelationFilter = { Subject = "audit" } }));
+
 var apiKey = builder.AddParameter("api-key", secret: true);
 var keyVault = builder.AddPulumiAzureKeyVault("vault")
     .WithPulumiStack(azureStack)
@@ -75,6 +82,7 @@ builder.AddProject<Projects.AspirePulumiPackages_Api>("api")
     .WithEnvironment("WorkloadIdentity__ClientId", workloadIdentity.Resource.ClientId)
     .WithRoleAssignments(keyVault, AzureKeyVaultRole.KeyVaultSecretsUser)
     .WithReference(keyVault)
+    .WithReference(serviceBus)
     .WithReference(appInsights);
 
 builder.Build().Run();
