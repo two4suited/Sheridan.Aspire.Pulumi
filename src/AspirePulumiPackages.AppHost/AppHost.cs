@@ -3,6 +3,7 @@ using AspirePulumiPackages.Pulumi.Azure;
 using AspirePulumiPackages.Pulumi.Azure.AppContainers;
 using AspirePulumiPackages.Pulumi.Azure.Base;
 using AspirePulumiPackages.Pulumi.Azure.EntraId;
+using AspirePulumiPackages.Pulumi.Azure.Kusto;
 using AspirePulumiPackages.Pulumi.Azure.Storage;
 
 var builder = DistributedApplication.CreateBuilder(args);
@@ -43,11 +44,18 @@ var storage = builder.AddPulumiStorage("storage")
 var blobs = storage.AddBlobs("blobs");
 blobs.AddBlobContainer("documents");
 
+var kusto = builder.AddPulumiKustoCluster("kusto")
+    .WithPulumiStack(azureStack)
+    .WithResourceGroup(sharedRg)
+    .ConfigureInfrastructure(infra => infra.KustoCluster.Set("enableStreamingIngest", true));
+var telemetry = kusto.AddReadWriteDatabase("telemetry");
+
 builder.AddProject<Projects.AspirePulumiPackages_Api>("api")
     .WithExternalHttpEndpoints()
     .WithComputeEnvironment(acaEnv)
     .WithReference(appRegistration)
     .WithReference(cosmos)
-    .WithReference(blobs);
+    .WithReference(blobs)
+    .WithReference(telemetry);
 
 builder.Build().Run();
