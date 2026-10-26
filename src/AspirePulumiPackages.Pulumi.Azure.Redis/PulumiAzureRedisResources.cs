@@ -80,7 +80,7 @@ public abstract class PulumiAzureRedisResourceBase(string name) : PulumiAzureRes
         else
         {
             vault = $"{Id}Kv";
-            program.AddKeyVault(vault, resourceGroup, location);
+            program.AddKeyVault(vault, resourceGroup, location, name: NameFor(AzureNameKind.KeyVault, "kv"));
             ((Dictionary<string, object?>)((Dictionary<string, object?>)program.Resources[vault]!)["properties"]!)["tags"] =
                 new Dictionary<string, object?> { ["aspire-resource-name"] = $"{Name}-kv" };
             // RBAC vault: the principal running Pulumi must be able to write the secrets.

@@ -148,7 +148,7 @@ public sealed class AzureCosmosDBResource(string name) : PulumiAzureResource(nam
     private void AddKeyVaultSecrets(PulumiProgram program, string rg, string location)
     {
         var kv = KeyVaultId;
-        program.AddKeyVault(kv, rg, location);
+        program.AddKeyVault(kv, rg, location, name: NameFor(AzureNameKind.KeyVault, "kv"));
         ((Dictionary<string, object?>)((Dictionary<string, object?>)program.Resources[kv]!)["properties"]!)["tags"] =
             new Dictionary<string, object?> { ["aspire-resource-name"] = $"{Name}-kv" };
 

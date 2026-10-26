@@ -185,7 +185,7 @@ public sealed class AzurePostgresFlexibleServerResource(string name) : PulumiAzu
     private void AddKeyVaultAndSecrets(PulumiProgram program, string rg, string location, List<IPulumiManagedIdentityResource> environments)
     {
         var kv = $"{Id}Kv";
-        program.AddKeyVault(kv, rg, location);
+        program.AddKeyVault(kv, rg, location, name: NameFor(AzureNameKind.KeyVault, "kv"));
         ((Dictionary<string, object?>)((Dictionary<string, object?>)program.Resources[kv]!)["properties"]!)["tags"] =
             new Dictionary<string, object?> { ["aspire-resource-name"] = $"{Name}-kv" };
         program.Outputs[$"{Id}KeyVaultUri"] = $"${{{kv}.properties.vaultUri}}";

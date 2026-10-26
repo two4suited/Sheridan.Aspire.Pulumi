@@ -9,7 +9,7 @@ public sealed class PulumiAzureUserAssignedIdentityResource(string name) : Pulum
 {
     protected override Task ContributeResourcesAsync(PulumiProgram program, PipelineStepContext context, string resourceGroup, string location)
     {
-        program.AddUserAssignedIdentity(Id, resourceGroup, location);
+        program.AddUserAssignedIdentity(Id, resourceGroup, location, NameFor(AzureNameKind.UserAssignedIdentity));
         program.Outputs[$"{Id}Id"] = $"${{{Id}.id}}";
         program.Outputs[$"{Id}ClientId"] = $"${{{Id}.clientId}}";
         program.Outputs[$"{Id}PrincipalId"] = $"${{{Id}.principalId}}";
