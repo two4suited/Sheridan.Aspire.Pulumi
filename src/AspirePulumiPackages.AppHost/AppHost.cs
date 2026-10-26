@@ -3,6 +3,7 @@ using AspirePulumiPackages.Pulumi.Azure;
 using AspirePulumiPackages.Pulumi.Azure.AppContainers;
 using AspirePulumiPackages.Pulumi.Azure.Base;
 using AspirePulumiPackages.Pulumi.Azure.EntraId;
+using AspirePulumiPackages.Pulumi.Azure.Kusto;
 using AspirePulumiPackages.Pulumi.Azure.Search;
 using AspirePulumiPackages.Pulumi.Azure.SignalR;
 using AspirePulumiPackages.Pulumi.Azure.Storage;
@@ -50,6 +51,12 @@ var signalr = builder.AddPulumiSignalR("signalr")
     .WithResourceGroup(sharedRg)
     .ConfigureInfrastructure(infra => infra.SignalRService.Set("cors.allowedOrigins", new[] { "*" }));
 
+var kusto = builder.AddPulumiKustoCluster("kusto")
+    .WithPulumiStack(azureStack)
+    .WithResourceGroup(sharedRg)
+    .ConfigureInfrastructure(infra => infra.KustoCluster.Set("enableStreamingIngest", true));
+var telemetry = kusto.AddReadWriteDatabase("telemetry");
+
 var search = builder.AddPulumiSearch("search")
     .WithPulumiStack(azureStack)
     .WithResourceGroup(sharedRg)
@@ -62,6 +69,7 @@ builder.AddProject<Projects.AspirePulumiPackages_Api>("api")
     .WithReference(appRegistration)
     .WithReference(cosmos)
     .WithReference(blobs)
+    .WithReference(telemetry)
     .WithReference(search);
 
 builder.Build().Run();
