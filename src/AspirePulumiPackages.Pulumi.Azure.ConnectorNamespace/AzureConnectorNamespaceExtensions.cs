@@ -21,6 +21,28 @@ public static class AzureConnectorNamespaceExtensions
     public static IResourceBuilder<AzureConnectorNamespaceResource> AddPulumiAzureConnectorNamespace(
         this IDistributedApplicationBuilder builder, string name) => builder.AddPulumiConnectorNamespace(name);
 
+    /// <summary>
+    /// Uses an existing gateway instead of creating one: the ARM template drops the <c>Microsoft.Web/connectorGateways</c>
+    /// resource and the connections, MCP server configurations and access policies are deployed as children of the
+    /// existing gateway in <paramref name="resourceGroupName"/>. Outputs (id, name, principal id, tenant id) read the existing gateway.
+    /// Mirrors <c>PublishAsExisting</c>.
+    /// </summary>
+    public static IResourceBuilder<AzureConnectorNamespaceResource> PublishAsExisting(
+        this IResourceBuilder<AzureConnectorNamespaceResource> builder, string existingResourceName, string? resourceGroupName)
+    {
+        ArgumentNullException.ThrowIfNull(builder);
+        ArgumentException.ThrowIfNullOrWhiteSpace(existingResourceName);
+        ArgumentException.ThrowIfNullOrWhiteSpace(resourceGroupName);
+        builder.Resource.ExistingGatewayName = existingResourceName;
+        builder.Resource.ExistingResourceGroup = resourceGroupName;
+        return builder;
+    }
+
+    /// <summary>Alias of <see cref="PublishAsExisting"/>. Mirrors <c>AsExisting</c>.</summary>
+    public static IResourceBuilder<AzureConnectorNamespaceResource> AsExisting(
+        this IResourceBuilder<AzureConnectorNamespaceResource> builder, string existingResourceName, string? resourceGroupName) =>
+        builder.PublishAsExisting(existingResourceName, resourceGroupName);
+
     /// <summary>Adds a connection to a connector (e.g. <c>office365</c>) on the namespace.</summary>
     public static IResourceBuilder<AzureConnectorNamespaceConnectionResource> AddConnection(
         this IResourceBuilder<AzureConnectorNamespaceResource> builder, string name, string connectorName,
