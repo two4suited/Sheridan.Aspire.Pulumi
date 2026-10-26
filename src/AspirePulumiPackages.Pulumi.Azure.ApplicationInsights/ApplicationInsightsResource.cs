@@ -76,6 +76,7 @@ public sealed class PulumiApplicationInsightsResource(string name) : PulumiAzure
         program.Outputs[$"{Id}AppInsightsConnectionString"] = $"${{{Id}.connectionString}}";
         program.Outputs[$"{Id}Name"] = $"${{{Id}.name}}";
         program.Outputs[$"{Id}Id"] = $"${{{Id}.id}}";
+        Provisioning.PulumiInfrastructureExtensions.ApplyInfrastructureCallbacks(this, program);
         return Task.CompletedTask;
     }
 }
