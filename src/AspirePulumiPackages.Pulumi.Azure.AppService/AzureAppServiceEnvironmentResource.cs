@@ -342,7 +342,8 @@ public sealed class AzureAppServiceEnvironmentResource : PulumiAzureResource, IC
             }
             catch (Exception e) when (e is not OperationCanceledException || !ctx.CancellationToken.IsCancellationRequested)
             {
-                ctx.Logger.LogWarning("Skipping environment variable {Key} for {Resource}: {Message}", key, r.Name, e.Message);
+                // Outputs of infrastructure that doesn't exist yet resolve after the provision pass, when deploy regenerates the program.
+                ctx.Logger.LogInformation("Deferring environment variable {Key} for {Resource} until the stack is provisioned: {Message}", key, r.Name, e.Message);
                 continue;
             }
 
