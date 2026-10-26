@@ -3,6 +3,7 @@ using AspirePulumiPackages.Pulumi.Azure;
 using AspirePulumiPackages.Pulumi.Azure.AppContainers;
 using AspirePulumiPackages.Pulumi.Azure.Base;
 using AspirePulumiPackages.Pulumi.Azure.EntraId;
+using AspirePulumiPackages.Pulumi.Azure.Search;
 using AspirePulumiPackages.Pulumi.Azure.Storage;
 
 var builder = DistributedApplication.CreateBuilder(args);
@@ -43,11 +44,17 @@ var storage = builder.AddPulumiStorage("storage")
 var blobs = storage.AddBlobs("blobs");
 blobs.AddBlobContainer("documents");
 
+var search = builder.AddPulumiSearch("search")
+    .WithPulumiStack(azureStack)
+    .WithResourceGroup(sharedRg)
+    .ConfigureInfrastructure(infra => infra.SearchService.Set("semanticSearch", "free"));
+
 builder.AddProject<Projects.AspirePulumiPackages_Api>("api")
     .WithExternalHttpEndpoints()
     .WithComputeEnvironment(acaEnv)
     .WithReference(appRegistration)
     .WithReference(cosmos)
-    .WithReference(blobs);
+    .WithReference(blobs)
+    .WithReference(search);
 
 builder.Build().Run();
