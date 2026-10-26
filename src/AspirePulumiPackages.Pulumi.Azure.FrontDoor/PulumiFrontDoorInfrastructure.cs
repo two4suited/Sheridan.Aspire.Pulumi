@@ -12,6 +12,9 @@ public sealed class PulumiFrontDoorInfrastructure(PulumiInfrastructure inner, Az
     /// <summary>The <c>azure-native:cdn:Profile</c> resource.</summary>
     public PulumiResourceNode Profile => GetResource(owner.Id);
 
+    /// <summary>The <c>azure-native:cdn:Profile</c> resource; the upstream overlay's <c>CdnProfile</c> root name (same node as <see cref="Profile"/>).</summary>
+    public PulumiResourceNode CdnProfile => Profile;
+
     /// <summary>The <c>azure-native:cdn:AFDEndpoint</c> for the named origin resource (its Aspire resource name).</summary>
     public PulumiResourceNode GetEndpoint(string originName) => GetResource(owner.EndpointId(originName));
 
