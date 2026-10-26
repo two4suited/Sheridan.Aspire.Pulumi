@@ -57,7 +57,7 @@ public sealed partial class AzureKubernetesEnvironmentResource
 
         if (useIdentity)
         {
-            program.AddUserAssignedIdentity(IdentityRef, rg, location);
+            program.AddUserAssignedIdentity(IdentityRef, rg, location, NameFor(AzureNameKind.UserAssignedIdentity, "mi"));
             program.Outputs[$"{IdentityRef}Id"] = $"${{{IdentityRef}.id}}";
             program.Outputs[$"{IdentityRef}ClientId"] = $"${{{IdentityRef}.clientId}}";
             program.Outputs[$"{IdentityRef}PrincipalId"] = $"${{{IdentityRef}.principalId}}";
@@ -76,7 +76,7 @@ public sealed partial class AzureKubernetesEnvironmentResource
                     {
                         ["resourceGroupName"] = rg,
                         ["resourceName"] = $"${{{IdentityRef}.name}}",
-                        ["federatedIdentityCredentialResourceName"] = $"{r.Name}-fedcred",
+                        ["federatedIdentityCredentialResourceName"] = AzureNaming.ComposeScoped(AzureNameKind.FederatedIdentityCredential, r.Name + "-fedcred"),
                         ["issuer"] = $"${{{Id}.oidcIssuerProfile.issuerURL}}",
                         ["subject"] = $"system:serviceaccount:{KubernetesNamespace}:{ToKubernetesName(r.Name)}-sa",
                         ["audiences"] = new List<object?> { WorkloadIdentityAudience },

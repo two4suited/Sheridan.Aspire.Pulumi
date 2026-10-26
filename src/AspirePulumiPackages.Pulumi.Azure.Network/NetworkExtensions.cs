@@ -26,7 +26,11 @@ public static class NetworkExtensions
     public static IResourceBuilder<PulumiSubnetResource> AddSubnet(
         this IResourceBuilder<PulumiVirtualNetworkResource> builder, string name, string addressPrefix, string? subnetName = null)
     {
-        var subnet = new PulumiSubnetResource(name, subnetName ?? name, addressPrefix, builder.Resource);
+        // An explicit subnet name is validated; otherwise it is the Aspire resource name, shortened with a hash only if it does not conform.
+        var azureName = subnetName is null
+            ? AzureNaming.ComposeScoped(AzureNameKind.Subnet, name)
+            : AzureNaming.ValidateOverride(AzureNameKind.Subnet, subnetName, nameof(subnetName));
+        var subnet = new PulumiSubnetResource(name, azureName, addressPrefix, builder.Resource);
         builder.Resource.Subnets.Add(subnet);
         return builder.ApplicationBuilder.AddResource(subnet)
             .WithParentRelationship(builder)
@@ -103,8 +107,9 @@ public static class NetworkExtensions
         }
 
         var rules = subnet.NetworkSecurityGroup.SecurityRules;
-        var ruleName = name ?? string.Join('-',
-            new[] { access.ToString().ToLowerInvariant(), direction.ToString().ToLowerInvariant(), port, from, to }.Where(p => !string.IsNullOrEmpty(p)));
+        // Generated names embed ports and CIDRs ('*', '10.0.0.0/24'), which are not legal in rule names: sanitize (hashing when lossy).
+        var ruleName = name ?? AzureNaming.ComposeScoped(AzureNameKind.NetworkSecurityRule, string.Join('-',
+            new[] { access.ToString().ToLowerInvariant(), direction.ToString().ToLowerInvariant(), port, from, to }.Where(p => !string.IsNullOrEmpty(p))));
 
         rules.Add(new AzureSecurityRule
         {

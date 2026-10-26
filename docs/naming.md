@@ -92,6 +92,22 @@ names). Container-apps environment and Search are not on Microsoft's page and us
 | `KustoCluster` | `Microsoft.Kusto/clusters` | 4-22 | Region | lowercase letters, digits | letter | letter/digit | no | `adx` |  |
 | `VirtualNetwork` | `Microsoft.Network/virtualNetworks` | 2-64 | ResourceGroup | letters, digits, hyphen, underscore, period | letter/digit | letter/digit | no | `vnet` |  |
 | `FrontDoorProfile` | `Microsoft.Cdn/profiles` | 1-260 | ResourceGroup | letters, digits, hyphen | letter/digit | letter/digit | no | `afd` |  |
+| `ContainerAppJob` | `Microsoft.App/jobs` | 2-32 | ResourceGroup | lowercase letters, digits, hyphen | letter | letter/digit | yes | `job` | Not on Microsoft's rules page; same conservative rule as container apps. |
+| `SandboxGroup` | `Microsoft.App/sandboxGroups` | 1-63 | ResourceGroup | lowercase letters, digits, hyphen | letter | letter/digit | yes | `sbx` | Preview type, not on Microsoft's rules page; conservative DNS-label rule. |
+| `NetworkSecurityGroup` | `Microsoft.Network/networkSecurityGroups` | 1-80 | ResourceGroup | letters, digits, hyphen, underscore, period | letter/digit | letter/digit | no | `nsg` |  |
+| `NatGateway` | `Microsoft.Network/natGateways` | 1-80 | ResourceGroup | letters, digits, hyphen, underscore, period | letter/digit | letter/digit | no | `ng` | Not on Microsoft's rules page; common Microsoft.Network 1-80 rule. |
+| `PublicIpAddress` | `Microsoft.Network/publicIPAddresses` | 1-80 | ResourceGroup | letters, digits, hyphen, underscore, period | letter/digit | letter/digit | no | `pip` |  |
+| `Subnet` | `Microsoft.Network/virtualNetworks/subnets` | 1-80 | Parent | letters, digits, hyphen, underscore, period | letter/digit | letter/digit | no | `snet` | Unique within the virtual network. |
+| `PrivateEndpoint` | `Microsoft.Network/privateEndpoints` | 2-64 | ResourceGroup | letters, digits, hyphen, underscore, period | letter/digit | letter/digit | no | `pe` |  |
+| `PrivateDnsVirtualNetworkLink` | `Microsoft.Network/privateDnsZones/virtualNetworkLinks` | 1-80 | Parent | letters, digits, hyphen, underscore, period | letter/digit | letter/digit | no | `link` |  |
+| `NetworkSecurityPerimeter` | `Microsoft.Network/networkSecurityPerimeters` | 1-80 | ResourceGroup | letters, digits, hyphen, underscore, period | letter/digit | letter/digit | no | `nsp` | Not on Microsoft's rules page; common Microsoft.Network 1-80 rule. |
+| `NetworkSecurityRule` | `Microsoft.Network/networkSecurityGroups/securityRules` | 1-80 | Parent | letters, digits, hyphen, underscore, period | letter/digit | letter/digit | no | `rule` |  |
+| `FrontDoorEndpoint` | `Microsoft.Cdn/profiles/afdEndpoints` | 1-50 | Global | letters, digits, hyphen | letter/digit | letter/digit | no | `fde` | Part of the endpoint host name. |
+| `FrontDoorOriginGroup` | `Microsoft.Cdn/profiles/originGroups` | 1-50 | Parent | letters, digits, hyphen | letter/digit | letter/digit | no | `og` |  |
+| `FrontDoorOrigin` | `Microsoft.Cdn/profiles/originGroups/origins` | 1-50 | Parent | letters, digits, hyphen | letter/digit | letter/digit | no | `origin` |  |
+| `FrontDoorRoute` | `Microsoft.Cdn/profiles/afdEndpoints/routes` | 1-50 | Parent | letters, digits, hyphen | letter/digit | letter/digit | no | `route` |  |
+| `AksDnsPrefix` | `Microsoft.ContainerService/managedClusters (dnsPrefix)` | 1-54 | Global | letters, digits, hyphen | letter/digit | letter/digit | no | `aks` | Part of the cluster FQDN. |
+| `FederatedIdentityCredential` | `Microsoft.ManagedIdentity/userAssignedIdentities/federatedIdentityCredentials` | 3-120 | Parent | letters, digits, hyphen, underscore | letter/digit | letter/digit | no | `fic` |  |
 
 Generated names are always lowercase even where Azure accepts upper case.
 
@@ -107,6 +123,26 @@ Generated names are always lowercase even where Azure accepts upper case.
 Not yet applied (still provider autonaming or their own scheme; follow-ups): all other integrations, the compute environments'
 identities/registries/workspaces, and role assignment names (azure-native requires a GUID, which the provider already generates
 and keeps in state; changing it would replace every assignment).
+
+### Compute and platform integrations
+
+| Resource | Name composed from | Property | Example (project `aspire-pulumi-packages`, stack `azure-test`, resource `aca-env`) |
+| --- | --- | --- | --- |
+| ACA environment / its registry, workspace, identity | `NameFor(ContainerAppsEnvironment)`, `(ContainerRegistry,"acr")`, `(LogAnalyticsWorkspace,"law")`, `(UserAssignedIdentity,"mi")` | `environmentName`, `registryName`, `workspaceName`, `resourceName` | `aspire-pulumi-packages-aca-env-azure-test`, `aspirepulumipackagesacaenvacrazuretest`, `...-aca-env-law-azure-test`, `...-aca-env-mi-azure-test` |
+| Container app / job | Aspire compute resource name only (`ComposeScoped`; unique per environment), also used for service discovery host names | `containerAppName`, `jobName` | `api` (hashed to 32 chars only when it does not fit) |
+| App Service environment: registry, identities, plan, workspace, App Insights, dashboard app | `NameFor(..., "acr"/"mi"/"contributor-mi"/"plan"/"law"/"appi"/"dashboard")` | `registryName`, `resourceName`, `name`, `workspaceName`, `resourceName`, `name` | `aspire-pulumi-packages-ase-plan-azure-test` |
+| App Service web app | `{project}-{compute resource}-{stack}` (global `azurewebsites.net` host) | `name` | `aspire-pulumi-packages-api-azure-test` |
+| Functions implicit host storage | `{project}{functions project or "functions"}host{stack}` (the Aspire resource name `funcstorage<hash>` is only the Pulumi logical id) | `accountName` | `aspifuncshostazuretestXXXXXX` (hashed, 24 chars) |
+| AKS: cluster, DNS prefix, registry, workload / control-plane identities, federated credentials | `NameFor(KubernetesCluster)`, `(AksDnsPrefix)`, `(ContainerRegistry,"acr")`, `(UserAssignedIdentity,"mi"/"cp-mi")`, `{app}-fedcred` | `resourceName`, `dnsPrefix`, `registryName`, `resourceName`, `federatedIdentityCredentialResourceName` | |
+| Kubernetes object names (DNS-1123, 63) | Aspire resource name; more than 63 characters is trimmed with a 6-character hash (`-service` is accounted for) | `metadata.name` | |
+| Sandbox group, registry, identity | `NameFor(SandboxGroup)`, `(ContainerRegistry,"acr")`, `(UserAssignedIdentity,"mi")` | `resourceName`, `registryName`, `resourceName` | |
+| `AddPulumiAzureContainerRegistry` | `NameFor(ContainerRegistry)` | `registryName` | |
+| Log Analytics workspace; Application Insights (+ implicit workspace) | `NameFor(LogAnalyticsWorkspace[,"law"])`, `NameFor(ApplicationInsights)` | `workspaceName`, `resourceName` | |
+| Front Door profile, endpoint, origin group, origin, route | `NameFor(FrontDoorProfile)`; endpoint `{project}-{origin}-{stack}`; others scoped to the origin name | `profileName`, `endpointName`, `originGroupName`, `originName`, `routeName` | |
+| Network: vnet, subnet, NSG (+rules), NAT, public IP, private endpoint (+connection), DNS vnet link, NSP | `NameFor(...)`; subnets and generated rule names are scoped (Aspire name, sanitized); the DNS zone name itself is fixed by the service (`privatelink.*`) | `virtualNetworkName`, `subnetName`, `networkSecurityGroupName`, `securityRuleName`, `natGatewayName`, `publicIpAddressName`, `privateEndpointName`, `virtualNetworkLinkName`, `networkSecurityPerimeterName` | `aspire-pulumi-packages-vnet-azure-test` |
+
+An explicit subnet name passed to `AddSubnet(..., subnetName)` and explicit security rule names are validated against the rules above. Not touched: node pool names (fixed `system`/`workload` or caller supplied),
+the Front Door/NSP profile constants (`defaultProfile`), private DNS zone group name (`default`), and data-plane sandbox names (which carry a deploy id).
 
 ## Replacement implications
 

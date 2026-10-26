@@ -34,6 +34,22 @@ public enum AzureNameKind
     KustoCluster,
     VirtualNetwork,
     FrontDoorProfile,
+    ContainerAppJob,
+    SandboxGroup,
+    NetworkSecurityGroup,
+    NatGateway,
+    PublicIpAddress,
+    Subnet,
+    PrivateEndpoint,
+    PrivateDnsVirtualNetworkLink,
+    NetworkSecurityPerimeter,
+    FrontDoorEndpoint,
+    FrontDoorOriginGroup,
+    FrontDoorOrigin,
+    FrontDoorRoute,
+    AksDnsPrefix,
+    FederatedIdentityCredential,
+    NetworkSecurityRule,
 }
 
 /// <summary>Where an Azure resource name must be unique.</summary>
@@ -120,6 +136,22 @@ public static class AzureNaming
         R(AzureNameKind.KustoCluster, "Microsoft.Kusto/clusters", 4, 22, AzureNameScope.Region, "adx", hyphen: false, lower: true, letterStart: true),
         R(AzureNameKind.VirtualNetwork, "Microsoft.Network/virtualNetworks", 2, 64, AzureNameScope.ResourceGroup, "vnet", underscore: true, period: true),
         R(AzureNameKind.FrontDoorProfile, "Microsoft.Cdn/profiles", 1, 260, AzureNameScope.ResourceGroup, "afd"),
+        R(AzureNameKind.ContainerAppJob, "Microsoft.App/jobs", 2, 32, AzureNameScope.ResourceGroup, "job", lower: true, letterStart: true, noDoubleHyphen: true, note: "Not on Microsoft's rules page; same conservative rule as container apps."),
+        R(AzureNameKind.SandboxGroup, "Microsoft.App/sandboxGroups", 1, 63, AzureNameScope.ResourceGroup, "sbx", lower: true, letterStart: true, noDoubleHyphen: true, note: "Preview type, not on Microsoft's rules page; a conservative DNS-label rule."),
+        R(AzureNameKind.NetworkSecurityGroup, "Microsoft.Network/networkSecurityGroups", 1, 80, AzureNameScope.ResourceGroup, "nsg", underscore: true, period: true),
+        R(AzureNameKind.NatGateway, "Microsoft.Network/natGateways", 1, 80, AzureNameScope.ResourceGroup, "ng", underscore: true, period: true, note: "Not on Microsoft's rules page; the common Microsoft.Network 1-80 rule."),
+        R(AzureNameKind.PublicIpAddress, "Microsoft.Network/publicIPAddresses", 1, 80, AzureNameScope.ResourceGroup, "pip", underscore: true, period: true),
+        R(AzureNameKind.Subnet, "Microsoft.Network/virtualNetworks/subnets", 1, 80, AzureNameScope.Parent, "snet", underscore: true, period: true, note: "Unique within the virtual network."),
+        R(AzureNameKind.PrivateEndpoint, "Microsoft.Network/privateEndpoints", 2, 64, AzureNameScope.ResourceGroup, "pe", underscore: true, period: true),
+        R(AzureNameKind.PrivateDnsVirtualNetworkLink, "Microsoft.Network/privateDnsZones/virtualNetworkLinks", 1, 80, AzureNameScope.Parent, "link", underscore: true, period: true),
+        R(AzureNameKind.NetworkSecurityPerimeter, "Microsoft.Network/networkSecurityPerimeters", 1, 80, AzureNameScope.ResourceGroup, "nsp", underscore: true, period: true, note: "Not on Microsoft's rules page; the common Microsoft.Network 1-80 rule."),
+        R(AzureNameKind.FrontDoorEndpoint, "Microsoft.Cdn/profiles/afdEndpoints", 1, 50, AzureNameScope.Global, "fde", note: "Becomes part of the <name>-<hash>.z01.azurefd.net host name."),
+        R(AzureNameKind.FrontDoorOriginGroup, "Microsoft.Cdn/profiles/originGroups", 1, 50, AzureNameScope.Parent, "og"),
+        R(AzureNameKind.FrontDoorOrigin, "Microsoft.Cdn/profiles/originGroups/origins", 1, 50, AzureNameScope.Parent, "origin"),
+        R(AzureNameKind.AksDnsPrefix, "Microsoft.ContainerService/managedClusters (dnsPrefix)", 1, 54, AzureNameScope.Global, "aks", note: "The DNS prefix becomes part of the cluster FQDN (<prefix>-<hash>.hcp.<region>.azmk8s.io); AKS limits it to 54 characters."),
+        R(AzureNameKind.FederatedIdentityCredential, "Microsoft.ManagedIdentity/userAssignedIdentities/federatedIdentityCredentials", 3, 120, AzureNameScope.Parent, "fic", underscore: true),
+        R(AzureNameKind.NetworkSecurityRule, "Microsoft.Network/networkSecurityGroups/securityRules", 1, 80, AzureNameScope.Parent, "rule", underscore: true, period: true),
+        R(AzureNameKind.FrontDoorRoute, "Microsoft.Cdn/profiles/afdEndpoints/routes", 1, 50, AzureNameScope.Parent, "route"),
     }.ToDictionary(r => r.Kind);
 
     public static AzureNamingRule RuleFor(AzureNameKind kind) => Rules[kind];
@@ -164,6 +196,12 @@ public static class AzureNaming
         }
         return name;
     }
+
+    /// <summary>
+    /// Composes a name from the Aspire resource name alone, for resources whose names are only unique within their parent
+    /// (container apps, subnets, ...). Unchanged (lowercased) when it already conforms, otherwise shortened with a hash.
+    /// </summary>
+    public static string ComposeScoped(AzureNameKind kind, string resourceName) => Compose(kind, null, resourceName, null);
 
     /// <summary>Hex hash (lowercase) of the full, un-shortened composed name; stable across runs and platforms.</summary>
     public static string StableHash(IEnumerable<string?> segments, AzureNameKind kind)

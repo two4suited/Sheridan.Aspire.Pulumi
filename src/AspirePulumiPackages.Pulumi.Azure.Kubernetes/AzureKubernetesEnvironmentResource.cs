@@ -369,6 +369,7 @@ public sealed partial class AzureKubernetesEnvironmentResource : PulumiAzureReso
                 ["type"] = "azure-native:containerregistry:Registry",
                 ["properties"] = new Dictionary<string, object?>
                 {
+                    ["registryName"] = NameFor(AzureNameKind.ContainerRegistry, "acr"),
                     ["resourceGroupName"] = rg,
                     ["location"] = location,
                     ["sku"] = new Dictionary<string, object?> { ["name"] = "Basic" },
@@ -386,7 +387,7 @@ public sealed partial class AzureKubernetesEnvironmentResource : PulumiAzureReso
         if (IsPrivateCluster && PrivateDnsZone is { } zone)
         {
             var cp = $"{Id}ControlPlaneIdentity";
-            program.AddUserAssignedIdentity(cp, rg, location);
+            program.AddUserAssignedIdentity(cp, rg, location, NameFor(AzureNameKind.UserAssignedIdentity, "cp-mi"));
             clusterDependsOn.Add($"${{{program.AddRoleAssignment($"{Id}DnsZoneContributor", $"${{{cp}.principalId}}", PrivateDnsZoneContributorRoleId, zone.IdExpression)}}}");
             clusterDependsOn.Add($"${{{program.AddRoleAssignment($"{Id}VnetNetworkContributor", $"${{{cp}.principalId}}", NetworkContributorRoleId, zone.VirtualNetwork.IdExpression)}}}");
             identity = new Dictionary<string, object?>
@@ -399,9 +400,10 @@ public sealed partial class AzureKubernetesEnvironmentResource : PulumiAzureReso
         var pools = EffectivePools().Select(p => (object?)PoolProfile(p.Config, p.Subnet ?? Subnet)).ToList();
         var properties = new Dictionary<string, object?>
         {
+            ["resourceName"] = NameFor(AzureNameKind.KubernetesCluster),
             ["resourceGroupName"] = rg,
             ["location"] = location,
-            ["dnsPrefix"] = $"{Name}-dns",
+            ["dnsPrefix"] = NameFor(AzureNameKind.AksDnsPrefix),
             ["agentPoolProfiles"] = pools,
             ["sku"] = new Dictionary<string, object?> { ["name"] = "Base", ["tier"] = "Free" },
             ["identity"] = identity,
@@ -523,15 +525,21 @@ public sealed partial class AzureKubernetesEnvironmentResource : PulumiAzureReso
     }
 
     /// <summary>Converts an Aspire resource name to a DNS-1123 label (lower case, <c>[a-z0-9-]</c>, at most 63 characters).</summary>
-    internal static string ToKubernetesName(string name)
+    internal static string ToKubernetesName(string name, int reserve = 0)
     {
+        var max = 63 - reserve;
         var chars = name.ToLowerInvariant().Select(c => char.IsAsciiLetterOrDigit(c) ? c : '-').ToArray();
         var s = new string(chars).Trim('-');
-        if (s.Length > 63) s = s[..63].TrimEnd('-');
-        return s.Length == 0 ? "res" : s;
+        if (s.Length == 0) return "res";
+        if (s.Length <= max) return s;
+        // Too long: trim and append a short deterministic hash of the full name so different long names never collide.
+        var hash = AzureNaming.StableHash([name], AzureNameKind.KubernetesCluster);
+        return s[..(max - hash.Length - 1)].TrimEnd('-') + "-" + hash;
     }
 
-    internal static string ServiceName(string resourceName) => ToKubernetesName(resourceName) + "-service";
+    private const string ServiceSuffix = "-service";
+
+    internal static string ServiceName(string resourceName) => ToKubernetesName(resourceName, ServiceSuffix.Length) + ServiceSuffix;
 
     /// <summary>The container (and Service) port of an endpoint.</summary>
     internal static int ContainerPort(EndpointAnnotation e) => e.TargetPort ?? e.Port ?? 8080;

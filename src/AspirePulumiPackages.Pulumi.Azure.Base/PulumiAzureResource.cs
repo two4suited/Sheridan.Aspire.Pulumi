@@ -50,9 +50,20 @@ public abstract class PulumiAzureResource(string name) : Resource(name), IPulumi
     /// (<see cref="PulumiAzureExtensions.WithAzureName{T}"/>) or one composed from the stack's project name, this resource's
     /// name, the stack name and <paramref name="suffix"/>. Valid while the program is generated, or once the resource is bound with WithPulumiStack.
     /// </summary>
-    public string NameFor(AzureNameKind kind, string? suffix = null) =>
-        this.NameFor(_namingStack ?? Stack ?? throw new InvalidOperationException(
-            $"NameFor can only be used once '{Name}' is bound to a Pulumi stack (WithPulumiStack) or while its program is generated."), kind, suffix);
+    public string NameFor(AzureNameKind kind, string? suffix = null) => this.NameFor(NamingStack(), kind, suffix);
+
+    /// <summary>
+    /// Like <see cref="NameFor(AzureNameKind, string?)"/> but built from another Aspire resource's name (for Azure resources that
+    /// belong to a compute resource deployed by this environment, such as its web app or Front Door endpoint). Overrides do not apply.
+    /// </summary>
+    public string NameForChild(AzureNameKind kind, string childResourceName, string? suffix = null)
+    {
+        var stack = NamingStack();
+        return AzureNaming.Compose(kind, stack.ProjectName, childResourceName, stack.StackName, suffix);
+    }
+
+    private PulumiStackResource NamingStack() => _namingStack ?? Stack ?? throw new InvalidOperationException(
+        $"NameFor can only be used once '{Name}' is bound to a Pulumi stack (WithPulumiStack) or while its program is generated.");
 
     public async Task ContributeAsync(PulumiProgram program, PipelineStepContext context)
     {

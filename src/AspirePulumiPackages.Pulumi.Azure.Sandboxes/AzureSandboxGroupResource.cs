@@ -52,7 +52,7 @@ public sealed class AzureSandboxGroupResource : PulumiAzureResource, IComputeEnv
     internal string GroupRef => IsExisting ? $"{Id}Existing" : Id;
 
     /// <summary>The name of the group's ARM resource.</summary>
-    internal string GroupName => ExistingGroupName ?? (Name.Length <= 63 ? Name : Name[..63]);
+    internal string GroupName => ExistingGroupName ?? NameFor(AzureNameKind.SandboxGroup);
 
     /// <summary>Public URLs of the sandboxes deployed in this run, keyed by compute resource name; filled by the deploy steps so that later sandboxes can reference them.</summary>
     internal ConcurrentDictionary<string, IReadOnlyList<SandboxPortInfo>> DeployedPorts { get; } = new(StringComparer.Ordinal);
@@ -320,6 +320,7 @@ public sealed class AzureSandboxGroupResource : PulumiAzureResource, IComputeEnv
                 ["type"] = "azure-native:containerregistry:Registry",
                 ["properties"] = new Dictionary<string, object?>
                 {
+                    ["registryName"] = NameFor(AzureNameKind.ContainerRegistry, "acr"),
                     ["resourceGroupName"] = rg,
                     ["location"] = location,
                     ["sku"] = new Dictionary<string, object?> { ["name"] = "Basic" },
@@ -336,6 +337,7 @@ public sealed class AzureSandboxGroupResource : PulumiAzureResource, IComputeEnv
                 ["type"] = "azure-native:managedidentity:UserAssignedIdentity",
                 ["properties"] = new Dictionary<string, object?>
                 {
+                    ["resourceName"] = NameFor(AzureNameKind.UserAssignedIdentity, "mi"),
                     ["resourceGroupName"] = rg,
                     ["location"] = location,
                     ["tags"] = new Dictionary<string, object?> { ["aspire-resource-name"] = $"{Name}-mi" },

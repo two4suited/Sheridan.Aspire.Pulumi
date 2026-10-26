@@ -104,11 +104,19 @@ public sealed class AzureContainerAppEnvironmentResource : PulumiAzureResource, 
 
     ReferenceExpression? IContainerRegistry.Repository => null;
 
+    /// <summary>
+    /// The container app (or job) name for a compute resource: its Aspire resource name, lower-cased, when that conforms to the
+    /// Microsoft.App rules (2-32 lowercase letters, digits and hyphens, starting with a letter), otherwise a deterministic
+    /// shortened name. Unique within the environment's resource group, so no project or stack segments are added.
+    /// </summary>
+    internal static string ContainerAppName(string computeResourceName, bool job = false) =>
+        AzureNaming.ComposeScoped(job ? AzureNameKind.ContainerAppJob : AzureNameKind.ContainerApp, computeResourceName);
+
     public ReferenceExpression GetHostAddressExpression(EndpointReference endpointReference) =>
-        ReferenceExpression.Create($"{endpointReference.Resource.Name.ToLowerInvariant()}");
+        ReferenceExpression.Create($"{ContainerAppName(endpointReference.Resource.Name)}");
 
     public ReferenceExpression GetEndpointPropertyExpression(EndpointReferenceExpression endpointReferenceExpression) =>
-        ReferenceExpression.Create($"{endpointReferenceExpression.Endpoint.Resource.Name.ToLowerInvariant()}");
+        ReferenceExpression.Create($"{ContainerAppName(endpointReferenceExpression.Endpoint.Resource.Name)}");
 
     private async Task LoginToRegistryAsync(PipelineStepContext ctx)
     {
@@ -180,6 +188,7 @@ public sealed class AzureContainerAppEnvironmentResource : PulumiAzureResource, 
                 ["type"] = "azure-native:operationalinsights:Workspace",
                 ["properties"] = new Dictionary<string, object?>
                 {
+                    ["workspaceName"] = NameFor(AzureNameKind.LogAnalyticsWorkspace, "law"),
                     ["resourceGroupName"] = rg,
                     ["location"] = location,
                     ["retentionInDays"] = 30,
@@ -214,6 +223,7 @@ public sealed class AzureContainerAppEnvironmentResource : PulumiAzureResource, 
                 ["type"] = "azure-native:containerregistry:Registry",
                 ["properties"] = new Dictionary<string, object?>
                 {
+                    ["registryName"] = NameFor(AzureNameKind.ContainerRegistry, "acr"),
                     ["resourceGroupName"] = rg,
                     ["location"] = location,
                     ["sku"] = new Dictionary<string, object?> { ["name"] = "Basic" },
@@ -231,6 +241,7 @@ public sealed class AzureContainerAppEnvironmentResource : PulumiAzureResource, 
                 ["type"] = "azure-native:managedidentity:UserAssignedIdentity",
                 ["properties"] = new Dictionary<string, object?>
                 {
+                    ["resourceName"] = NameFor(AzureNameKind.UserAssignedIdentity, "mi"),
                     ["resourceGroupName"] = rg,
                     ["location"] = location,
                     ["tags"] = new Dictionary<string, object?> { ["aspire-resource-name"] = $"{Name}-mi" },
@@ -242,6 +253,7 @@ public sealed class AzureContainerAppEnvironmentResource : PulumiAzureResource, 
 
         var properties = new Dictionary<string, object?>
         {
+            ["environmentName"] = NameFor(AzureNameKind.ContainerAppsEnvironment),
             ["resourceGroupName"] = rg,
             ["location"] = location,
             ["appLogsConfiguration"] = new Dictionary<string, object?>
@@ -325,7 +337,8 @@ public sealed class AzureContainerAppEnvironmentResource : PulumiAzureResource, 
     private async Task<Dictionary<string, object?>> BuildContainerAppAsync(
         IResource r, PulumiContainerAppJobAnnotation? job, PulumiStackResource stack, string rg, PipelineStepContext ctx)
     {
-        var appName = r.Name.ToLowerInvariant();
+        var appName = ContainerAppName(r.Name, job is not null);
+        var imageName = r.Name.ToLowerInvariant();
 
         var envVars = new Dictionary<string, object>();
         var envContext = new EnvironmentCallbackContext(ctx.ExecutionContext, r, envVars, ctx.CancellationToken);
@@ -385,7 +398,7 @@ public sealed class AzureContainerAppEnvironmentResource : PulumiAzureResource, 
         var container = new Dictionary<string, object?>
         {
             ["name"] = appName,
-            ["image"] = $"${{{RegistryRef}.loginServer}}/{appName}:{stack.DeployTag}",
+            ["image"] = $"${{{RegistryRef}.loginServer}}/{imageName}:{stack.DeployTag}",
             ["env"] = env,
         };
 

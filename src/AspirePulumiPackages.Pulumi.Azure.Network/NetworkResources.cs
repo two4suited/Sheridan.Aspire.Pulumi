@@ -23,6 +23,7 @@ public sealed class PulumiVirtualNetworkResource(string name, string addressPref
     protected override Task ContributeResourcesAsync(PulumiProgram program, PipelineStepContext context, string resourceGroup, string location)
     {
         program.AddInfraResource(Id, "azure-native:network:VirtualNetwork", Yaml.Resource("azure-native:network:VirtualNetwork", Yaml.Map(
+            ("virtualNetworkName", NameFor(AzureNameKind.VirtualNetwork)),
             ("resourceGroupName", resourceGroup),
             ("location", location),
             ("addressSpace", Yaml.Map(("addressPrefixes", new List<object?> { AddressPrefix }))),
@@ -91,6 +92,7 @@ public sealed class PulumiNetworkSecurityGroupResource(string name) : PulumiAzur
     protected override Task ContributeResourcesAsync(PulumiProgram program, PipelineStepContext context, string resourceGroup, string location)
     {
         program.AddInfraResource(Id, "azure-native:network:NetworkSecurityGroup", Yaml.Resource("azure-native:network:NetworkSecurityGroup", Yaml.Map(
+            ("networkSecurityGroupName", NameFor(AzureNameKind.NetworkSecurityGroup)),
             ("resourceGroupName", resourceGroup),
             ("location", location),
             ("tags", Yaml.Tags(Name)))));
@@ -101,7 +103,7 @@ public sealed class PulumiNetworkSecurityGroupResource(string name) : PulumiAzur
             program.AddInfraResource(ruleId, "azure-native:network:SecurityRule", Yaml.Resource("azure-native:network:SecurityRule", Yaml.Map(
                 ("resourceGroupName", resourceGroup),
                 ("networkSecurityGroupName", $"${{{Id}.name}}"),
-                ("securityRuleName", rule.Name),
+                ("securityRuleName", AzureNaming.ValidateOverride(AzureNameKind.NetworkSecurityRule, rule.Name)),
                 ("description", rule.Description),
                 ("priority", rule.Priority),
                 ("direction", rule.Direction.ToString()),
@@ -128,6 +130,7 @@ public sealed class PulumiPublicIPAddressResource(string name) : PulumiAzureReso
     protected override Task ContributeResourcesAsync(PulumiProgram program, PipelineStepContext context, string resourceGroup, string location)
     {
         program.AddInfraResource(Id, "azure-native:network:PublicIPAddress", Yaml.Resource("azure-native:network:PublicIPAddress", Yaml.Map(
+            ("publicIpAddressName", NameFor(AzureNameKind.PublicIpAddress)),
             ("resourceGroupName", resourceGroup),
             ("location", location),
             ("publicIPAllocationMethod", "Static"),
@@ -152,6 +155,7 @@ public sealed class PulumiNatGatewayResource(string name) : PulumiAzureResource(
     protected override Task ContributeResourcesAsync(PulumiProgram program, PipelineStepContext context, string resourceGroup, string location)
     {
         var props = Yaml.Map(
+            ("natGatewayName", NameFor(AzureNameKind.NatGateway)),
             ("resourceGroupName", resourceGroup),
             ("location", location),
             ("sku", Yaml.Map(("name", "Standard"))),
@@ -188,7 +192,7 @@ public sealed class PulumiPrivateDnsZoneResource(string name, string zoneName, P
         program.AddInfraResource(linkId, "azure-native:privatedns:VirtualNetworkLink", Yaml.Resource("azure-native:privatedns:VirtualNetworkLink", Yaml.Map(
             ("resourceGroupName", resourceGroup),
             ("privateZoneName", $"${{{Id}.name}}"),
-            ("virtualNetworkLinkName", "vnet-link"),
+            ("virtualNetworkLinkName", NameForChild(AzureNameKind.PrivateDnsVirtualNetworkLink, VirtualNetwork.Name, "link")),
             ("location", "global"),
             ("registrationEnabled", false),
             ("virtualNetwork", Yaml.Map(("id", VirtualNetwork.IdExpression))),
@@ -218,13 +222,14 @@ public sealed class PulumiPrivateEndpointResource(string name, PulumiSubnetResou
     protected override Task ContributeResourcesAsync(PulumiProgram program, PipelineStepContext context, string resourceGroup, string location)
     {
         program.AddInfraResource(Id, "azure-native:network:PrivateEndpoint", Yaml.Resource("azure-native:network:PrivateEndpoint", Yaml.Map(
+            ("privateEndpointName", NameFor(AzureNameKind.PrivateEndpoint)),
             ("resourceGroupName", resourceGroup),
             ("location", location),
             ("subnet", Yaml.Map(("id", Subnet.IdExpression))),
             ("privateLinkServiceConnections", new List<object?>
             {
                 Yaml.Map(
-                    ("name", $"{Name}-connection"),
+                    ("name", NameFor(AzureNameKind.PrivateEndpoint, "connection")),
                     ("privateLinkServiceId", Target.IdExpression),
                     ("groupIds", new List<object?> { Target.PrivateLinkGroupId })),
             }),
@@ -264,6 +269,7 @@ public sealed class PulumiNetworkSecurityPerimeterResource(string name) : Pulumi
     protected override Task ContributeResourcesAsync(PulumiProgram program, PipelineStepContext context, string resourceGroup, string location)
     {
         program.AddInfraResource(Id, "azure-native:network:NetworkSecurityPerimeter", Yaml.Resource("azure-native:network:NetworkSecurityPerimeter", Yaml.Map(
+            ("networkSecurityPerimeterName", NameFor(AzureNameKind.NetworkSecurityPerimeter)),
             ("resourceGroupName", resourceGroup),
             ("location", location),
             ("tags", Yaml.Tags(Name)))));
