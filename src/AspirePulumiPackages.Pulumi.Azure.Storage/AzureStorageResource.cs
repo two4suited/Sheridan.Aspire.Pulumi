@@ -40,7 +40,8 @@ public sealed class AzureStorageResource(string name) : PulumiAzureResource(name
     {
         // No accountName: the azure-native provider auto-names it (<id> + random suffix, lowercase, <= 24 chars), the
         // Pulumi equivalent of Bicep's take('<name>${uniqueString(resourceGroup().id)}', 24).
-        program.Resources[Id] = new Dictionary<string, object?>
+        // An infra target: role assignments are created in the targeted provision pass and depend on the account.
+        program.AddInfraResource(Id, "azure-native:storage:StorageAccount", new Dictionary<string, object?>
         {
             ["type"] = "azure-native:storage:StorageAccount",
             ["properties"] = new Dictionary<string, object?>
@@ -56,7 +57,7 @@ public sealed class AzureStorageResource(string name) : PulumiAzureResource(name
                 ["networkRuleSet"] = new Dictionary<string, object?> { ["defaultAction"] = "Allow" },
                 ["tags"] = new Dictionary<string, object?> { ["aspire-resource-name"] = Name },
             },
-        };
+        });
 
         Dictionary<string, object?> Child(string type, Dictionary<string, object?> extra)
         {
