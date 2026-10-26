@@ -96,6 +96,7 @@ public sealed class AzureStorageResource(string name) : PulumiAzureResource(name
         program.Outputs[$"{Id}Id"] = $"${{{Id}.id}}";
 
         AddRoleAssignments(program, context);
+        Provisioning.PulumiInfrastructureExtensions.ApplyInfrastructureCallbacks(this, program);
         return Task.CompletedTask;
     }
 
