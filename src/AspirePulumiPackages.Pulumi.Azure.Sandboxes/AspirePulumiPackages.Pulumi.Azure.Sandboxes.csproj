@@ -5,11 +5,13 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <RootNamespace>AspirePulumiPackages.Pulumi.Azure.Sandboxes</RootNamespace>
-    <NoWarn>$(NoWarn);ASPIREPIPELINES001;ASPIREPIPELINES004</NoWarn>
+    <NoWarn>$(NoWarn);ASPIREPIPELINES001;ASPIREPIPELINES003;ASPIREPIPELINES004;ASPIRECONTAINERRUNTIME001;ASPIREPROJECTS001</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>
     <PackageReference Include="Aspire.Hosting" Version="13.6.4" />
+    <!-- Credential for the sandbox data plane (not an ARM API), as the official Aspire.Hosting.Azure.Sandboxes uses. -->
+    <PackageReference Include="Azure.Identity" Version="1.17.1" />
   </ItemGroup>
 
   <ItemGroup>
