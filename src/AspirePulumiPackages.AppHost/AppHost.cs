@@ -7,6 +7,7 @@ using AspirePulumiPackages.Pulumi.Azure.EntraId;
 using AspirePulumiPackages.Pulumi.Azure.Kusto;
 using AspirePulumiPackages.Pulumi.Azure.Search;
 using AspirePulumiPackages.Pulumi.Azure.Storage;
+using AspirePulumiPackages.Pulumi.Azure.WebPubSub;
 
 var builder = DistributedApplication.CreateBuilder(args);
 
@@ -52,6 +53,13 @@ var appConfig = builder.AddPulumiAppConfiguration("appconfig")
     .RunAsEmulator()
     .ConfigureInfrastructure(infra => infra.AppConfigurationStore.Set("softDeleteRetentionInDays", 7));
 
+var pubsub = builder.AddPulumiWebPubSub("pubsub")
+    .WithPulumiStack(azureStack)
+    .WithResourceGroup(sharedRg)
+    .ConfigureInfrastructure(infra => infra.WebPubSubService.Set("tls.clientCertEnabled", false));
+pubsub.AddHub("notifications")
+    .AddEventHandler("https://example.com/api/{event}", userEventPattern: "*", systemEvents: ["connected"]);
+
 var kusto = builder.AddPulumiKustoCluster("kusto")
     .WithPulumiStack(azureStack)
     .WithResourceGroup(sharedRg)
@@ -71,6 +79,8 @@ builder.AddProject<Projects.AspirePulumiPackages_Api>("api")
     .WithReference(appRegistration)
     .WithReference(cosmos)
     .WithReference(blobs)
+    .WithReference(pubsub)
+
     .WithReference(telemetry)
     .WithReference(search);
 
