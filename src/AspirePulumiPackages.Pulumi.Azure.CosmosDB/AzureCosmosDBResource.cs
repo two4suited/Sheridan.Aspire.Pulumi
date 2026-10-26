@@ -69,10 +69,9 @@ public sealed class AzureCosmosDBResource(string name) : PulumiAzureResource(nam
 
     protected override Task ContributeResourcesAsync(PulumiProgram program, PipelineStepContext context, string rg, string location)
     {
-        // No accountName: the azure-native provider auto-names it (<id> + random suffix, lowercase), the Pulumi
-        // equivalent of Bicep's take('<name>-${uniqueString(resourceGroup().id)}', 44).
         var props = new Dictionary<string, object?>
         {
+            ["accountName"] = NameFor(AzureNameKind.CosmosDbAccount),
             ["resourceGroupName"] = rg,
             ["location"] = location,
             ["kind"] = "GlobalDocumentDB",

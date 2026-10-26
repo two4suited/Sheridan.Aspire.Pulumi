@@ -50,6 +50,8 @@ public enum AzureNameKind
     AksDnsPrefix,
     FederatedIdentityCredential,
     NetworkSecurityRule,
+    RedisEnterpriseCluster,
+    DeploymentScript,
 }
 
 /// <summary>Where an Azure resource name must be unique.</summary>
@@ -151,6 +153,8 @@ public static class AzureNaming
         R(AzureNameKind.AksDnsPrefix, "Microsoft.ContainerService/managedClusters (dnsPrefix)", 1, 54, AzureNameScope.Global, "aks", note: "The DNS prefix becomes part of the cluster FQDN (<prefix>-<hash>.hcp.<region>.azmk8s.io); AKS limits it to 54 characters."),
         R(AzureNameKind.FederatedIdentityCredential, "Microsoft.ManagedIdentity/userAssignedIdentities/federatedIdentityCredentials", 3, 120, AzureNameScope.Parent, "fic", underscore: true),
         R(AzureNameKind.NetworkSecurityRule, "Microsoft.Network/networkSecurityGroups/securityRules", 1, 80, AzureNameScope.Parent, "rule", underscore: true, period: true),
+        R(AzureNameKind.RedisEnterpriseCluster, "Microsoft.Cache/redisEnterprise", 1, 60, AzureNameScope.Global, "redis", noDoubleHyphen: true, note: "Azure Managed Redis; the name is part of the <name>.<region>.redis.azure.net host name."),
+        R(AzureNameKind.DeploymentScript, "Microsoft.Resources/deploymentScripts", 1, 90, AzureNameScope.ResourceGroup, "ds", underscore: true, period: true, alnumEnd: false, note: "Generated names never end with a period."),
         R(AzureNameKind.FrontDoorRoute, "Microsoft.Cdn/profiles/afdEndpoints/routes", 1, 50, AzureNameScope.Parent, "route"),
     }.ToDictionary(r => r.Kind);
 

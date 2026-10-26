@@ -35,13 +35,12 @@ public sealed class AzureKustoClusterResource(string name) : PulumiAzureResource
 
     protected override Task ContributeResourcesAsync(PulumiProgram program, PipelineStepContext context, string rg, string location)
     {
-        // No clusterName: the provider auto-names it (<id> + random suffix), the equivalent of Bicep's
-        // take('<name>${uniqueString(resourceGroup().id)}', 24).
         program.Resources[Id] = new Dictionary<string, object?>
         {
             ["type"] = "azure-native:kusto:Cluster",
             ["properties"] = new Dictionary<string, object?>
             {
+                ["clusterName"] = NameFor(AzureNameKind.KustoCluster),
                 ["resourceGroupName"] = rg,
                 ["location"] = location,
                 ["sku"] = new Dictionary<string, object?>

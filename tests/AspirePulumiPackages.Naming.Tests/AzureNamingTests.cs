@@ -313,6 +313,11 @@ public class AzureNamingTests
     [InlineData(AzureNameKind.LogAnalyticsWorkspace, "aca-env", "law", "aspire-pulumi-packages-aca-env-law-azure-test")]
     [InlineData(AzureNameKind.UserAssignedIdentity, "aca-env", "mi", "aspire-pulumi-packages-aca-env-mi-azure-test")]
     [InlineData(AzureNameKind.VirtualNetwork, "vnet", null, "aspire-pulumi-packages-vnet-azure-test")]
+    [InlineData(AzureNameKind.SqlServer, "sql", null, "aspire-pulumi-packages-sql-azure-test")]
+    [InlineData(AzureNameKind.PostgresFlexibleServer, "pg", null, "aspire-pulumi-packages-pg-azure-test")]
+    [InlineData(AzureNameKind.RedisCache, "cache", null, "aspire-pulumi-packages-cache-azure-test")]
+    [InlineData(AzureNameKind.RedisEnterpriseCluster, "mredis", null, "aspire-pulumi-packages-mredis-azure-test")]
+    [InlineData(AzureNameKind.DeploymentScript, "sql", "sqldb-aca-env-roles", "aspire-pulumi-packages-sql-sqldb-aca-env-roles-azure-test")]
     public void PinnedExampleNames(AzureNameKind kind, string res, string? suffix, string expected) =>
         Assert.Equal(expected, AzureNaming.Compose(kind, Project, res, "azure-test", suffix));
 

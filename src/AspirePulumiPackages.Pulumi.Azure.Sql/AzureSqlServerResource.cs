@@ -57,7 +57,12 @@ public sealed class AzureSqlServerResource(string name) : PulumiAzureResource(na
             program.AddInfraResource(AdminId, "azure-native:managedidentity:UserAssignedIdentity", new()
             {
                 ["type"] = "azure-native:managedidentity:UserAssignedIdentity",
-                ["properties"] = new Dictionary<string, object?> { ["resourceGroupName"] = rg, ["location"] = location },
+                ["properties"] = new Dictionary<string, object?>
+                {
+                    ["resourceGroupName"] = rg,
+                    ["resourceName"] = NameFor(AzureNameKind.UserAssignedIdentity, "mi"),
+                    ["location"] = location,
+                },
             });
             program.AddInfraResource(server, "azure-native:sql:Server", new()
             {
@@ -65,6 +70,7 @@ public sealed class AzureSqlServerResource(string name) : PulumiAzureResource(na
                 ["properties"] = new Dictionary<string, object?>
                 {
                     ["resourceGroupName"] = rg,
+                    ["serverName"] = NameFor(AzureNameKind.SqlServer),
                     ["location"] = location,
                     ["version"] = "12.0",
                     ["minimalTlsVersion"] = "1.2",
@@ -170,6 +176,7 @@ public sealed class AzureSqlServerResource(string name) : PulumiAzureResource(na
                 ["properties"] = new Dictionary<string, object?>
                 {
                     ["resourceGroupName"] = rg,
+                    ["scriptName"] = NameFor(AzureNameKind.DeploymentScript, $"{db.Name}-{env.Name}-roles"),
                     ["location"] = location,
                     ["kind"] = "AzurePowerShell",
                     ["azPowerShellVersion"] = "14.0",
