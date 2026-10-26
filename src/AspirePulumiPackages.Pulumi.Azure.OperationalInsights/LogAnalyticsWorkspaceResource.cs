@@ -35,6 +35,8 @@ public sealed class LogAnalyticsWorkspaceResource(string name) : PulumiAzureReso
 
         program.Outputs[$"{Id}LogAnalyticsWorkspaceId"] = $"${{{Id}.id}}";
         program.Outputs[$"{Id}Name"] = $"${{{Id}.name}}";
+
+        Provisioning.PulumiInfrastructureExtensions.ApplyInfrastructureCallbacks(this, program);
         return Task.CompletedTask;
     }
 }
