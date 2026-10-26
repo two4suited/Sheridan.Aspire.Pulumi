@@ -76,6 +76,13 @@ public interface IPulumiPrivateEndpointTarget : IPulumiAzureResourceWithId
 
     /// <summary>The private DNS zone for the group (e.g. 'privatelink.blob.core.windows.net').</summary>
     string PrivateDnsZoneName { get; }
+
+    /// <summary>
+    /// Further private DNS zones the endpoint registers in besides <see cref="PrivateDnsZoneName"/> (default none). Foundry, for
+    /// example, resolves through <c>privatelink.services.ai.azure.com</c>, <c>privatelink.openai.azure.com</c> and
+    /// <c>privatelink.cognitiveservices.azure.com</c>.
+    /// </summary>
+    IReadOnlyList<string> AdditionalPrivateDnsZoneNames => [];
 }
 
 /// <summary>Records that a compute resource uses a subnet (WithDelegatedSubnet) so it can reference the subnet id.</summary>

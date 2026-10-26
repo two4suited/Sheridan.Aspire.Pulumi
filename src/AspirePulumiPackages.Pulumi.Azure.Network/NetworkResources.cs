@@ -210,6 +210,9 @@ public sealed class PulumiPrivateEndpointResource(string name, PulumiSubnetResou
     public IPulumiPrivateEndpointTarget Target { get; } = target;
     public PulumiPrivateDnsZoneResource DnsZone { get; } = dnsZone;
 
+    /// <summary>Further zones registered in the endpoint's DNS zone group (see <see cref="IPulumiPrivateEndpointTarget.AdditionalPrivateDnsZoneNames"/>).</summary>
+    public List<PulumiPrivateDnsZoneResource> AdditionalDnsZones { get; } = [];
+
     public string IdExpression => $"${{{Id}.id}}";
 
     protected override Task ContributeResourcesAsync(PulumiProgram program, PipelineStepContext context, string resourceGroup, string location)
@@ -231,10 +234,8 @@ public sealed class PulumiPrivateEndpointResource(string name, PulumiSubnetResou
             ("resourceGroupName", resourceGroup),
             ("privateEndpointName", $"${{{Id}.name}}"),
             ("privateDnsZoneGroupName", "default"),
-            ("privateDnsZoneConfigs", new List<object?>
-            {
-                Yaml.Map(("name", DnsZone.ZoneName.Replace('.', '_')), ("privateDnsZoneId", DnsZone.IdExpression)),
-            }))));
+            ("privateDnsZoneConfigs", new List<object?>(new[] { DnsZone }.Concat(AdditionalDnsZones).Select(z =>
+                (object?)Yaml.Map(("name", z.ZoneName.Replace('.', '_')), ("privateDnsZoneId", z.IdExpression))))))));
 
         program.Outputs[$"{Id}Id"] = $"${{{Id}.id}}";
         program.Outputs[$"{Id}Name"] = $"${{{Id}.name}}";

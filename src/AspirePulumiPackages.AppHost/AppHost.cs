@@ -92,6 +92,10 @@ var search = builder.AddPulumiSearch("search")
     .WithResourceGroup(sharedRg)
     .ConfigureInfrastructure(infra => infra.SearchService.Set("semanticSearch", "free"));
 
+// Foundry project connections to the shared storage and search (connections + project-identity role assignments only; nothing billable).
+foundryProject.AddConnection(storage);
+foundryProject.AddConnection(search);
+
 builder.AddProject<Projects.AspirePulumiPackages_Api>("api")
     .WithReference(signalr)
     .WithExternalHttpEndpoints()
