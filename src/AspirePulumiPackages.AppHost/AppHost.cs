@@ -6,6 +6,7 @@ using AspirePulumiPackages.Pulumi.Azure.CognitiveServices;
 using AspirePulumiPackages.Pulumi.Azure.EntraId;
 using AspirePulumiPackages.Pulumi.Azure.Kusto;
 using AspirePulumiPackages.Pulumi.Azure.Search;
+using AspirePulumiPackages.Pulumi.Azure.SignalR;
 using AspirePulumiPackages.Pulumi.Azure.Storage;
 using AspirePulumiPackages.Pulumi.Azure.WebPubSub;
 
@@ -53,6 +54,11 @@ var openai = builder.AddPulumiOpenAI("openai")
     .ConfigureInfrastructure(infra => infra.CognitiveServicesAccount.Set("properties.publicNetworkAccess", "Enabled"));
 var chat = openai.AddDeployment("chat", "gpt-4o", "2024-08-06");
 
+var signalr = builder.AddPulumiSignalR("signalr")
+    .WithPulumiStack(azureStack)
+    .WithResourceGroup(sharedRg)
+    .ConfigureInfrastructure(infra => infra.SignalRService.Set("cors.allowedOrigins", new[] { "*" }));
+
 var pubsub = builder.AddPulumiWebPubSub("pubsub")
     .WithPulumiStack(azureStack)
     .WithResourceGroup(sharedRg)
@@ -72,6 +78,7 @@ var search = builder.AddPulumiSearch("search")
     .ConfigureInfrastructure(infra => infra.SearchService.Set("semanticSearch", "free"));
 
 builder.AddProject<Projects.AspirePulumiPackages_Api>("api")
+    .WithReference(signalr)
     .WithExternalHttpEndpoints()
     .WithComputeEnvironment(acaEnv)
     .WithReference(appRegistration)
