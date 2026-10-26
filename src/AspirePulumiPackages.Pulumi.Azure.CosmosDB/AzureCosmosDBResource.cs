@@ -228,6 +228,8 @@ public sealed class AzureCosmosDBResource(string name) : PulumiAzureResource(nam
                 {
                     ["resourceGroupName"] = rg,
                     ["accountName"] = $"${{{Id}.name}}",
+                    // Cosmos requires the assignment's name to be a GUID; derive a stable one from the logical name.
+                    ["roleAssignmentId"] = new Guid(System.Security.Cryptography.MD5.HashData(System.Text.Encoding.UTF8.GetBytes($"{Id}{envId}RoleAssignment"))).ToString(),
                     ["principalId"] = env.PrincipalIdExpression,
                     ["roleDefinitionId"] = $"${{{Id}.id}}/sqlRoleDefinitions/{DataContributorRoleId}",
                     ["scope"] = $"${{{Id}.id}}",
