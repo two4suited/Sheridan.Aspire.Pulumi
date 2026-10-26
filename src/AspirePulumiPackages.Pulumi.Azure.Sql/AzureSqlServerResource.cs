@@ -21,7 +21,7 @@ public sealed class AzureSqlServerResource(string name) : PulumiAzureResource(na
     internal List<(string Name, string Start, string End)> FirewallRules { get; } = [];
 
     // Pulumi autonaming keeps the logical name's case, but SQL server names must be lowercase.
-    private string ServerId => Id.ToLowerInvariant() == Id ? Id : $"{Id.ToLowerInvariant()}Server";
+    internal string ServerId => Id.ToLowerInvariant() == Id ? Id : $"{Id.ToLowerInvariant()}Server";
     private string AdminId => $"{Id}AdminIdentity";
 
     private PulumiStackResource BoundStack => Stack ?? throw new InvalidOperationException($"'{Name}' has not been bound to a Pulumi stack yet; call WithPulumiStack().");
