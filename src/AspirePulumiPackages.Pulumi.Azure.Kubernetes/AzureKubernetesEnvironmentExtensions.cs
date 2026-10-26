@@ -83,8 +83,9 @@ public static partial class AzureKubernetesEnvironmentExtensions
     }
 
     /// <summary>
-    /// Enables (default) or disables the OIDC issuer and workload identity on the cluster. Mirrors <c>WithWorkloadIdentity</c>
-    /// (federated credentials for compute workloads are not generated, since this port deploys no workloads).
+    /// Enables (default) or disables the OIDC issuer and workload identity on the cluster. Mirrors <c>WithWorkloadIdentity</c>:
+    /// each compute resource deployed to the cluster gets a service account (<c>{name}-sa</c>) federated to the environment's
+    /// shared user-assigned identity, so role assignments granted to the environment apply to its workloads.
     /// </summary>
     public static IResourceBuilder<AzureKubernetesEnvironmentResource> WithWorkloadIdentity(
         this IResourceBuilder<AzureKubernetesEnvironmentResource> builder, bool enabled = true)
@@ -105,6 +106,47 @@ public static partial class AzureKubernetesEnvironmentExtensions
         ArgumentNullException.ThrowIfNull(builder);
         ArgumentNullException.ThrowIfNull(workspace);
         builder.Resource.LogAnalyticsWorkspace = workspace.Resource;
+        return builder;
+    }
+
+    /// <summary>
+    /// Sets the cluster's network profile (plugin, policy, service CIDR, DNS service IP). Upstream only models this internally
+    /// (defaults: Azure CNI, Calico, 10.0.4.0/22, 10.0.4.10); here it is a typed option. The plugin and policy cannot change after creation.
+    /// </summary>
+    public static IResourceBuilder<AzureKubernetesEnvironmentResource> WithNetworkProfile(
+        this IResourceBuilder<AzureKubernetesEnvironmentResource> builder, string networkPlugin = "azure", string? networkPolicy = "calico",
+        string serviceCidr = "10.0.4.0/22", string dnsServiceIP = "10.0.4.10")
+    {
+        ArgumentNullException.ThrowIfNull(builder);
+        ArgumentException.ThrowIfNullOrEmpty(networkPlugin);
+        ArgumentException.ThrowIfNullOrEmpty(serviceCidr);
+        ArgumentException.ThrowIfNullOrEmpty(dnsServiceIP);
+        builder.Resource.NetworkProfile = new AksNetworkProfile(networkPlugin, networkPolicy, serviceCidr, dnsServiceIP);
+        return builder;
+    }
+
+    /// <summary>
+    /// Makes the API server private (<c>apiServerAccessProfile.enablePrivateCluster</c>), using the AKS-managed private DNS zone. Upstream models this
+    /// internally without a public setter; here it is a typed option. Note that the deploying machine then needs network access to the cluster's VNet.
+    /// </summary>
+    public static IResourceBuilder<AzureKubernetesEnvironmentResource> AsPrivateCluster(this IResourceBuilder<AzureKubernetesEnvironmentResource> builder)
+    {
+        ArgumentNullException.ThrowIfNull(builder);
+        builder.Resource.IsPrivateCluster = true;
+        return builder;
+    }
+
+    /// <summary>
+    /// Makes the API server private and registers it in a custom private DNS zone (named like <c>privatelink.{region}.azmk8s.io</c>). The control plane
+    /// then runs as a user-assigned identity with Private DNS Zone Contributor on the zone and Network Contributor on its virtual network.
+    /// </summary>
+    public static IResourceBuilder<AzureKubernetesEnvironmentResource> AsPrivateCluster(
+        this IResourceBuilder<AzureKubernetesEnvironmentResource> builder, IResourceBuilder<PulumiPrivateDnsZoneResource> privateDnsZone)
+    {
+        ArgumentNullException.ThrowIfNull(builder);
+        ArgumentNullException.ThrowIfNull(privateDnsZone);
+        builder.Resource.IsPrivateCluster = true;
+        builder.Resource.PrivateDnsZone = privateDnsZone.Resource;
         return builder;
     }
 
