@@ -83,6 +83,7 @@ public sealed class AzureContainerRegistryResource(string name) : PulumiAzureRes
         program.Outputs[$"{Id}Name"] = $"${{{Id}.name}}";
         program.Outputs[$"{Id}LoginServer"] = $"${{{Id}.loginServer}}";
         program.Outputs[$"{Id}Id"] = $"${{{Id}.id}}";
+        Provisioning.PulumiInfrastructureExtensions.ApplyInfrastructureCallbacks(this, program);
         return Task.CompletedTask;
     }
 
