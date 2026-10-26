@@ -28,6 +28,7 @@
     <Project Path="src/AspirePulumiPackages.Pulumi.Azure.Functions/AspirePulumiPackages.Pulumi.Azure.Functions.csproj" />
     <Project Path="src/AspirePulumiPackages.Pulumi.Azure.SignalR/AspirePulumiPackages.Pulumi.Azure.SignalR.csproj" />
     <Project Path="src/AspirePulumiPackages.Pulumi.Azure.Redis/AspirePulumiPackages.Pulumi.Azure.Redis.csproj" />
+    <Project Path="src/AspirePulumiPackages.Pulumi.Azure.Kubernetes/AspirePulumiPackages.Pulumi.Azure.Kubernetes.csproj" />
     <Project Path="src/AspirePulumiPackages.Pulumi.Azure.KeyVault/AspirePulumiPackages.Pulumi.Azure.KeyVault.csproj" />
     <Project Path="src/AspirePulumiPackages.Pulumi.Azure.Kusto/AspirePulumiPackages.Pulumi.Azure.Kusto.csproj" />
     <Project Path="src/AspirePulumiPackages.Pulumi.Azure/AspirePulumiPackages.Pulumi.Azure.csproj" />

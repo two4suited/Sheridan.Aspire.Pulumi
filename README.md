@@ -182,6 +182,21 @@ var managed = builder.AddPulumiAzureManagedRedis("managed").WithPulumiStack(azur
 
 `WithAccessKeyAuthentication()` stores `connectionstrings--<name>` (and `primaryaccesskey--<name>` for Managed Redis) in a Key Vault created next to the cache (or the vault you pass, which needs `WithDeployerRoleAssignments(AzureKeyVaultRole.KeyVaultSecretsOfficer)`), and gives referencing environments *Key Vault Secrets User*. Also: `RunAsContainer` (local Redis container), `PublishAsExisting`/`AsExisting`, `WithSku` (Managed Redis). Differences: with access keys the connection string seen by a referencing app is the Key Vault secret **URI** (keys must not appear in stack outputs; Container Apps secret references are not generated), and `AsAzureRedis`/`PublishAsAzureRedis` (converting a stock `AddRedis`) and the polyglot variant are not ported.
 
+## Kubernetes (AKS)
+
+`AspirePulumiPackages.Pulumi.Azure.Kubernetes` ports the infrastructure side of `Aspire.Hosting.Azure.Kubernetes`. `builder.AddPulumiKubernetes("aks")` (alias `AddPulumiAzureKubernetesEnvironment`) provisions an `azure-native:containerservice:ManagedCluster` matching the official Bicep: Free tier, system-assigned identity, an autoscaled `system` pool and a `workload` user pool (Standard_D2s_v5, 1-3 nodes), OIDC issuer and workload identity enabled, plus a Basic container registry (`{name}-acr`) whose `AcrPull` role is granted to the kubelet identity. Outputs (`ClusterFqdn`, `OidcIssuerUrl`, `KubeletIdentityObjectId`, `NodeResourceGroup`, `RegistryEndpoint`, ...) are exposed as `PulumiOutputReference` properties.
+
+```csharp
+var aks = builder.AddPulumiKubernetes("aks").WithPulumiStack(azureStack).WithResourceGroup(sharedRg)
+    .WithSystemNodePool("Standard_D4s_v5", 1, 5)
+    .WithContainerRegistry(registry)           // instead of the default '{name}-acr'
+    .WithSubnet(nodesSubnet)                   // plain (non-delegated) subnet from the Network package
+    .ConfigureInfrastructure(infra => infra.ContainerServiceManagedCluster.Set("apiServerAccessProfile.enablePrivateCluster", true));
+aks.AddNodePool("gpu", "Standard_NC4as_T4_v3", 0, 2);   // user pool, optional .WithSubnet(...)
+```
+
+Also `WithWorkloadIdentity(bool)` and `WithContainerInsights(logAnalyticsWorkspace)` (Log Analytics wiring via the `omsagent` add-on; upstream only exposes this as a property). Not demoed in the sample AppHost because a running AKS cluster (two nodes) has real ongoing cost. Not ported: Helm/Kubernetes deployment of compute resources (the environment is infrastructure only and is not an `IComputeEnvironmentResource`), `AddIngress`/`AddGateway`/`AddHelmChart`/`AddCertManager`, `AddLoadBalancer` (Application Gateway for Containers), `AddPersistentVolume`, per-workload federated identity credentials, and typed network profile / private cluster options (use `ConfigureInfrastructure`). Private DNS and VNet pieces are reachable through the Network package. `pulumi preview`/`up` against Azure was not run.
+
 ## Application Insights
 
 `builder.AddPulumiApplicationInsights("appinsights")` (project `AspirePulumiPackages.Pulumi.Azure.ApplicationInsights`) ports `AddAzureApplicationInsights`: a `web` Application Insights component (`azure-native:applicationinsights:Component`) backed by a Log Analytics workspace, with outputs `appInsightsConnectionString`, `name`, `id`. Without a workspace, a PerGB2018 workspace is created in the same resource group (as the official Bicep does). Link an existing one with `.WithLogAnalyticsWorkspace(law)` (a `AddPulumiLogAnalyticsWorkspace` resource bound to the same stack). The connection string is the resource's connection string, so `.WithReference(appInsights)` yields `ConnectionStrings__appinsights`.
