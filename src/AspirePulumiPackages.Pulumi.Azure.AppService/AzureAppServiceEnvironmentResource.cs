@@ -285,11 +285,19 @@ public sealed class AzureAppServiceEnvironmentResource : PulumiAzureResource, IC
             program.HasApps = true;
             program.Resources[AppId(r)] = await BuildWebAppAsync(r, stack, context, resourceGroup, location, acrPull, tags);
         }
+
+        Provisioning.PulumiInfrastructureExtensions.ApplyInfrastructureCallbacks(this, program);
     }
 
     private const string AzureSubscription = PulumiAzureProgramExtensions.SubscriptionId;
 
-    private string AppId(IResource r) => $"{PulumiAzureProgramExtensions.ToPulumiId(r.Name)}Site";
+    private string AppId(IResource r) => AppId(r.Name);
+
+    /// <summary>Program id of the web app emitted for the compute resource with the given Aspire name.</summary>
+    internal static string AppId(string computeResourceName) => $"{PulumiAzureProgramExtensions.ToPulumiId(computeResourceName)}Site";
+
+    /// <summary>Program id of the App Service plan.</summary>
+    internal string PlanResourceId => $"{Id}Plan";
 
     private static Dictionary<string, object?> UserAssigned(string identityId) => new()
     {
