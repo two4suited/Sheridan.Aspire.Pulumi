@@ -11,6 +11,7 @@
     <Project Path="src/AspirePulumiPackages.Pulumi.Azure.AppContainers/AspirePulumiPackages.Pulumi.Azure.AppContainers.csproj" />
     <Project Path="src/AspirePulumiPackages.Pulumi.Azure.ApplicationInsights/AspirePulumiPackages.Pulumi.Azure.ApplicationInsights.csproj" />
     <Project Path="src/AspirePulumiPackages.Pulumi.Azure.CognitiveServices/AspirePulumiPackages.Pulumi.Azure.CognitiveServices.csproj" />
+    <Project Path="src/AspirePulumiPackages.Pulumi.Azure.ConnectorNamespace/AspirePulumiPackages.Pulumi.Azure.ConnectorNamespace.csproj" />
     <Project Path="src/AspirePulumiPackages.Pulumi.Azure.ContainerRegistry/AspirePulumiPackages.Pulumi.Azure.ContainerRegistry.csproj" />
     <Project Path="src/AspirePulumiPackages.Pulumi.Azure.CosmosDB/AspirePulumiPackages.Pulumi.Azure.CosmosDB.csproj" />
     <Project Path="src/AspirePulumiPackages.Pulumi.Azure.OperationalInsights/AspirePulumiPackages.Pulumi.Azure.OperationalInsights.csproj" />
