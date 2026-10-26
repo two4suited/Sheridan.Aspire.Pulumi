@@ -18,7 +18,6 @@ public sealed class AzureConnectorNamespaceResource(string name) : PulumiAzureRe
 {
     internal const string ApiVersion = "2026-05-01-preview";
     private const string GatewayType = "Microsoft.Web/connectorGateways";
-    private const int GatewayNamePrefixLength = 11;
 
     /// <summary>Name of an existing gateway (set by PublishAsExisting/AsExisting); when set the gateway itself is not created.</summary>
     public string? ExistingGatewayName { get; internal set; }
@@ -29,7 +28,7 @@ public sealed class AzureConnectorNamespaceResource(string name) : PulumiAzureRe
     internal PulumiOutputReference OutputRef(string suffix) =>
         Output(Stack ?? throw new InvalidOperationException($"'{Name}' has not been bound to a Pulumi stack yet; call WithPulumiStack()."), suffix);
 
-    /// <summary>The generated gateway name (<c>conns&lt;uniqueString&gt;</c>).</summary>
+    /// <summary>The generated gateway name (composed from the app, resource and stack names; see docs/naming.md).</summary>
     public PulumiOutputReference NameOutputReference => OutputRef("Name");
     public PulumiOutputReference IdOutputReference => OutputRef("Id");
     /// <summary>Principal id of the gateway's system-assigned identity.</summary>
@@ -46,7 +45,6 @@ public sealed class AzureConnectorNamespaceResource(string name) : PulumiAzureRe
         // An existing gateway is not part of the template, so children must not dependOn it.
         List<object?> GatewayDependsOn() => gatewayDependency is null ? [] : [gatewayDependency];
 
-        var prefix = new string(Name.Where(char.IsAsciiLetter).Select(char.ToLowerInvariant).Take(GatewayNamePrefixLength).ToArray());
         var resources = new List<object?>();
         if (existing is null)
         {
@@ -173,9 +171,7 @@ public sealed class AzureConnectorNamespaceResource(string name) : PulumiAzureRe
                         ["contentVersion"] = "1.0.0.0",
                         ["variables"] = new Dictionary<string, object?>
                         {
-                            ["gatewayName"] = existing is null
-                                ? $"[concat('{prefix}', uniqueString(resourceGroup().id, '{Name}'))]"
-                                : existing,
+                            ["gatewayName"] = existing ?? NameFor(AzureNameKind.ConnectorGateway),
                         },
                         ["resources"] = resources,
                         ["outputs"] = new Dictionary<string, object?>

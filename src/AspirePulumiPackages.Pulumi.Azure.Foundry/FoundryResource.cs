@@ -2,7 +2,6 @@ using Aspire.Hosting.ApplicationModel;
 using Aspire.Hosting.Pipelines;
 using AspirePulumiPackages.Pulumi.Azure.Base;
 using AspirePulumiPackages.Pulumi.Azure.Network;
-using PulumiExpr = AspirePulumiPackages.Pulumi.Provisioning.PulumiExpr;
 
 namespace AspirePulumiPackages.Pulumi.Azure.Foundry;
 
@@ -19,14 +18,13 @@ namespace AspirePulumiPackages.Pulumi.Azure.Foundry;
 public sealed class FoundryResource(string name) : PulumiAzureResource(name), IResourceWithConnectionString, IPulumiPrivateEndpointTarget
 {
     internal static readonly FoundryRole[] DefaultRoles = [FoundryRole.CognitiveServicesUser, FoundryRole.CognitiveServicesOpenAIUser];
-    private const string SubscriptionId = PulumiAzureProgramExtensions.SubscriptionId;
 
     /// <summary>Account SKU (default S0, as in the official integration).</summary>
     public string Sku { get; set; } = "S0";
 
     /// <summary>
-    /// Custom sub-domain of the account endpoint (globally unique). When null, a name is derived from the resource name plus the
-    /// first segment of the subscription id (the official Bicep uses <c>uniqueString(resourceGroup().id)</c>).
+    /// Custom sub-domain of the account endpoint (globally unique, 2-64 letters/digits/hyphens). When null it is composed as
+    /// <c>{app}-{resource}-{stack}</c> (shortened with a stable hash when too long; see docs/naming.md). Can also be pinned with WithAzureName.
     /// </summary>
     public string? CustomSubDomainName { get; set; }
 
@@ -75,13 +73,10 @@ public sealed class FoundryResource(string name) : PulumiAzureResource(name), IR
         ? ReferenceExpression.Create($"{EmulatorServiceUri!.ToString()}")
         : ReferenceExpression.Create($"{AIFoundryApiEndpoint}");
 
-    private object SubDomain()
-    {
-        if (CustomSubDomainName is { } custom) return custom;
-        var prefix = new string(Name.ToLowerInvariant().Where(char.IsAsciiLetterOrDigit).Take(15).ToArray());
-        if (prefix.Length == 0) prefix = "foundry";
-        return PulumiExpr.Join("", prefix, PulumiExpr.Select(0, PulumiExpr.Split("-", SubscriptionId)));
-    }
+    /// <summary>The custom sub-domain: the explicit <see cref="CustomSubDomainName"/> (validated) or one composed from the app, resource and stack names.</summary>
+    private string SubDomain() => CustomSubDomainName is { } custom
+        ? AzureNaming.ValidateOverride(AzureNameKind.CognitiveServicesSubdomain, custom, nameof(CustomSubDomainName))
+        : NameFor(AzureNameKind.CognitiveServicesSubdomain);
 
     protected override Task ContributeResourcesAsync(PulumiProgram program, PipelineStepContext context, string rg, string location)
     {
@@ -107,7 +102,8 @@ public sealed class FoundryResource(string name) : PulumiAzureResource(name), IR
         }
         else
         {
-            // No accountName: the provider auto-names it, the equivalent of Bicep's toLower('<name>-${uniqueString(...)}').
+            // accountName and the custom sub-domain are composed from the app, resource and stack names (see docs/naming.md),
+            // replacing the provider's random suffix / Bicep's uniqueString.
             // An infra target: role assignments are created in the targeted provision pass and depend on the account.
             program.AddInfraResource(Id, "azure-native:cognitiveservices:Account", new Dictionary<string, object?>
             {
@@ -115,6 +111,7 @@ public sealed class FoundryResource(string name) : PulumiAzureResource(name), IR
                 ["properties"] = new Dictionary<string, object?>
                 {
                     ["resourceGroupName"] = rg,
+                    ["accountName"] = NameFor(AzureNameKind.CognitiveServicesAccount),
                     ["location"] = location,
                     ["kind"] = "AIServices",
                     ["identity"] = new Dictionary<string, object?> { ["type"] = "SystemAssigned" },
@@ -241,6 +238,7 @@ public sealed class FoundryResource(string name) : PulumiAzureResource(name), IR
                 ["properties"] = new Dictionary<string, object?>
                 {
                     ["resourceGroupName"] = rg,
+                    ["resourceName"] = NameFor(AzureNameKind.ApplicationInsights, $"{p.Name}-appi"),
                     ["location"] = location,
                     ["kind"] = "web",
                     ["applicationType"] = "web",

@@ -34,6 +34,7 @@ public enum AzureNameKind
     KustoCluster,
     VirtualNetwork,
     FrontDoorProfile,
+    ConnectorGateway,
 }
 
 /// <summary>Where an Azure resource name must be unique.</summary>
@@ -120,6 +121,7 @@ public static class AzureNaming
         R(AzureNameKind.KustoCluster, "Microsoft.Kusto/clusters", 4, 22, AzureNameScope.Region, "adx", hyphen: false, lower: true, letterStart: true),
         R(AzureNameKind.VirtualNetwork, "Microsoft.Network/virtualNetworks", 2, 64, AzureNameScope.ResourceGroup, "vnet", underscore: true, period: true),
         R(AzureNameKind.FrontDoorProfile, "Microsoft.Cdn/profiles", 1, 260, AzureNameScope.ResourceGroup, "afd"),
+        R(AzureNameKind.ConnectorGateway, "Microsoft.Web/connectorGateways", 3, 24, AzureNameScope.ResourceGroup, "conn", hyphen: false, lower: true, letterStart: true, note: "Preview resource without published naming rules; a conservative rule (the length and character set of the official Bicep's generated 'conns<uniqueString>' name)."),
     }.ToDictionary(r => r.Kind);
 
     public static AzureNamingRule RuleFor(AzureNameKind kind) => Rules[kind];
