@@ -7,6 +7,7 @@ using AspirePulumiPackages.Pulumi.Azure.EntraId;
 using AspirePulumiPackages.Pulumi.Azure.Kusto;
 using AspirePulumiPackages.Pulumi.Azure.Search;
 using AspirePulumiPackages.Pulumi.Azure.Storage;
+using AspirePulumiPackages.Pulumi.Azure.WebPubSub;
 
 var builder = DistributedApplication.CreateBuilder(args);
 
@@ -52,6 +53,13 @@ var openai = builder.AddPulumiOpenAI("openai")
     .ConfigureInfrastructure(infra => infra.CognitiveServicesAccount.Set("properties.publicNetworkAccess", "Enabled"));
 var chat = openai.AddDeployment("chat", "gpt-4o", "2024-08-06");
 
+var pubsub = builder.AddPulumiWebPubSub("pubsub")
+    .WithPulumiStack(azureStack)
+    .WithResourceGroup(sharedRg)
+    .ConfigureInfrastructure(infra => infra.WebPubSubService.Set("tls.clientCertEnabled", false));
+pubsub.AddHub("notifications")
+    .AddEventHandler("https://example.com/api/{event}", userEventPattern: "*", systemEvents: ["connected"]);
+
 var kusto = builder.AddPulumiKustoCluster("kusto")
     .WithPulumiStack(azureStack)
     .WithResourceGroup(sharedRg)
@@ -70,6 +78,7 @@ builder.AddProject<Projects.AspirePulumiPackages_Api>("api")
     .WithReference(cosmos)
     .WithReference(blobs)
     .WithReference(chat)
+    .WithReference(pubsub)
     .WithReference(telemetry)
     .WithReference(search);
 
