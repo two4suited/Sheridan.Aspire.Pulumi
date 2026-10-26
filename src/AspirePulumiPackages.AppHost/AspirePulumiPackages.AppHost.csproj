@@ -30,6 +30,7 @@
     <ProjectReference Include="..\AspirePulumiPackages.Pulumi.Azure.Sql\AspirePulumiPackages.Pulumi.Azure.Sql.csproj" IsAspireProjectResource="false" />
     <ProjectReference Include="..\AspirePulumiPackages.Pulumi.Azure.ApplicationInsights\AspirePulumiPackages.Pulumi.Azure.ApplicationInsights.csproj" IsAspireProjectResource="false" />
     <ProjectReference Include="..\AspirePulumiPackages.Pulumi.Azure.KeyVault\AspirePulumiPackages.Pulumi.Azure.KeyVault.csproj" IsAspireProjectResource="false" />
+    <ProjectReference Include="..\AspirePulumiPackages.Pulumi.Azure.Kubernetes\AspirePulumiPackages.Pulumi.Azure.Kubernetes.csproj" IsAspireProjectResource="false" />
     <ProjectReference Include="..\AspirePulumiPackages.Pulumi.Azure.Kusto\AspirePulumiPackages.Pulumi.Azure.Kusto.csproj" IsAspireProjectResource="false" />
     <ProjectReference Include="..\AspirePulumiPackages.Pulumi.Azure.Redis\AspirePulumiPackages.Pulumi.Azure.Redis.csproj" IsAspireProjectResource="false" />
     <ProjectReference Include="..\AspirePulumiPackages.Pulumi.Azure.PostgreSQL\AspirePulumiPackages.Pulumi.Azure.PostgreSQL.csproj" IsAspireProjectResource="false" />
