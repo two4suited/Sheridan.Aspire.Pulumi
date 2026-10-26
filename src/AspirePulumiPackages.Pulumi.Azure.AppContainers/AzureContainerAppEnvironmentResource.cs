@@ -306,6 +306,8 @@ public sealed class AzureContainerAppEnvironmentResource : PulumiAzureResource, 
             var job = r.Annotations.OfType<PulumiContainerAppJobAnnotation>().LastOrDefault();
             program.Resources[AppId(r)] = await BuildContainerAppAsync(r, job, stack, rg, ctx);
         }
+
+        Provisioning.PulumiInfrastructureExtensions.ApplyInfrastructureCallbacks(this, program);
     }
 
     private static void RequireSameStack(PulumiAzureResource? other, PulumiStackResource stack, string what)
@@ -315,7 +317,10 @@ public sealed class AzureContainerAppEnvironmentResource : PulumiAzureResource, 
                 $"The {what} '{other.Name}' is in Pulumi stack '{s.Name}', but the Container Apps environment is in '{stack.Name}'; they must share a stack.");
     }
 
-    private static string AppId(IResource r) => PulumiAzureProgramExtensions.ToPulumiId(r.Name) + "App";
+    private static string AppId(IResource r) => AppId(r.Name);
+
+    /// <summary>Program id of the container app or job emitted for the compute resource with the given Aspire name.</summary>
+    internal static string AppId(string computeResourceName) => PulumiAzureProgramExtensions.ToPulumiId(computeResourceName) + "App";
 
     private async Task<Dictionary<string, object?>> BuildContainerAppAsync(
         IResource r, PulumiContainerAppJobAnnotation? job, PulumiStackResource stack, string rg, PipelineStepContext ctx)
