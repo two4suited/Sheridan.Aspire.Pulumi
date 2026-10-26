@@ -84,6 +84,7 @@ public sealed class AzureEventHubsResource(string name) : PulumiAzureResource(na
         program.Outputs[$"{Id}Id"] = $"${{{Id}.id}}";
 
         AddRoleAssignments(program, context);
+        Provisioning.PulumiInfrastructureExtensions.ApplyInfrastructureCallbacks(this, program);
         return Task.CompletedTask;
     }
 
