@@ -1,5 +1,6 @@
 using AspirePulumiPackages.Pulumi;
 using AspirePulumiPackages.Pulumi.Azure;
+using AspirePulumiPackages.Pulumi.Azure.AppConfiguration;
 using AspirePulumiPackages.Pulumi.Azure.AppContainers;
 using AspirePulumiPackages.Pulumi.Azure.Base;
 using AspirePulumiPackages.Pulumi.Azure.CognitiveServices;
@@ -54,6 +55,12 @@ var openai = builder.AddPulumiOpenAI("openai")
     .ConfigureInfrastructure(infra => infra.CognitiveServicesAccount.Set("properties.publicNetworkAccess", "Enabled"));
 var chat = openai.AddDeployment("chat", "gpt-4o", "2024-08-06");
 
+var appConfig = builder.AddPulumiAppConfiguration("appconfig")
+    .WithPulumiStack(azureStack)
+    .WithResourceGroup(sharedRg)
+    .RunAsEmulator()
+    .ConfigureInfrastructure(infra => infra.AppConfigurationStore.Set("softDeleteRetentionInDays", 7));
+
 var signalr = builder.AddPulumiSignalR("signalr")
     .WithPulumiStack(azureStack)
     .WithResourceGroup(sharedRg)
@@ -81,6 +88,8 @@ builder.AddProject<Projects.AspirePulumiPackages_Api>("api")
     .WithReference(signalr)
     .WithExternalHttpEndpoints()
     .WithComputeEnvironment(acaEnv)
+    .WithRoleAssignments(appConfig, AzureAppConfigurationRole.AppConfigurationDataReader)
+    .WithReference(appConfig)
     .WithReference(appRegistration)
     .WithReference(cosmos)
     .WithReference(blobs)
