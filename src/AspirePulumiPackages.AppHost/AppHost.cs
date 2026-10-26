@@ -1,5 +1,6 @@
 using AspirePulumiPackages.Pulumi;
 using AspirePulumiPackages.Pulumi.Azure;
+using AspirePulumiPackages.Pulumi.Azure.AppConfiguration;
 using AspirePulumiPackages.Pulumi.Azure.AppContainers;
 using AspirePulumiPackages.Pulumi.Azure.Base;
 using AspirePulumiPackages.Pulumi.Azure.EntraId;
@@ -43,9 +44,17 @@ var storage = builder.AddPulumiStorage("storage")
 var blobs = storage.AddBlobs("blobs");
 blobs.AddBlobContainer("documents");
 
+var appConfig = builder.AddPulumiAppConfiguration("appconfig")
+    .WithPulumiStack(azureStack)
+    .WithResourceGroup(sharedRg)
+    .RunAsEmulator()
+    .ConfigureInfrastructure(infra => infra.AppConfigurationStore.Set("softDeleteRetentionInDays", 7));
+
 builder.AddProject<Projects.AspirePulumiPackages_Api>("api")
     .WithExternalHttpEndpoints()
     .WithComputeEnvironment(acaEnv)
+    .WithRoleAssignments(appConfig, AzureAppConfigurationRole.AppConfigurationDataReader)
+    .WithReference(appConfig)
     .WithReference(appRegistration)
     .WithReference(cosmos)
     .WithReference(blobs);
