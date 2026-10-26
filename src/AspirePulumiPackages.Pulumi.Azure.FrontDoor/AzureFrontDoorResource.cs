@@ -35,6 +35,7 @@ public sealed class AzureFrontDoorResource(string name) : PulumiAzureResource(na
             ["type"] = "azure-native:cdn:Profile",
             ["properties"] = new Dictionary<string, object?>
             {
+                ["profileName"] = NameFor(AzureNameKind.FrontDoorProfile),
                 ["resourceGroupName"] = rg,
                 ["location"] = "Global",
                 ["sku"] = new Dictionary<string, object?> { ["name"] = "Standard_AzureFrontDoor" },
@@ -54,6 +55,7 @@ public sealed class AzureFrontDoorResource(string name) : PulumiAzureResource(na
                 {
                     ["resourceGroupName"] = rg,
                     ["profileName"] = profileName,
+                    ["endpointName"] = NameForChild(AzureNameKind.FrontDoorEndpoint, origin.Name),
                     ["location"] = "Global",
                 },
             };
@@ -64,6 +66,7 @@ public sealed class AzureFrontDoorResource(string name) : PulumiAzureResource(na
                 {
                     ["resourceGroupName"] = rg,
                     ["profileName"] = profileName,
+                    ["originGroupName"] = AzureNaming.ComposeScoped(AzureNameKind.FrontDoorOriginGroup, origin.Name),
                     ["healthProbeSettings"] = new Dictionary<string, object?> { ["probePath"] = probePath, ["probeProtocol"] = probeProtocol },
                     ["loadBalancingSettings"] = new Dictionary<string, object?>
                     {
@@ -81,6 +84,7 @@ public sealed class AzureFrontDoorResource(string name) : PulumiAzureResource(na
                     ["resourceGroupName"] = rg,
                     ["profileName"] = profileName,
                     ["originGroupName"] = $"${{{OriginGroupId(origin.Name)}.name}}",
+                    ["originName"] = AzureNaming.ComposeScoped(AzureNameKind.FrontDoorOrigin, origin.Name),
                     ["hostName"] = host,
                     ["originHostHeader"] = host,
                 },
@@ -93,6 +97,7 @@ public sealed class AzureFrontDoorResource(string name) : PulumiAzureResource(na
                     ["resourceGroupName"] = rg,
                     ["profileName"] = profileName,
                     ["endpointName"] = $"${{{EndpointId(origin.Name)}.name}}",
+                    ["routeName"] = AzureNaming.ComposeScoped(AzureNameKind.FrontDoorRoute, origin.Name),
                     ["originGroup"] = new Dictionary<string, object?> { ["id"] = $"${{{OriginGroupId(origin.Name)}.id}}" },
                     ["patternsToMatch"] = new List<object?> { "/*" },
                     ["forwardingProtocol"] = "HttpsOnly",

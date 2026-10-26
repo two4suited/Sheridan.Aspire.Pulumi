@@ -308,6 +308,39 @@ public class AzureNamingTests
     [InlineData(AzureNameKind.ServiceBusNamespace, "messaging", null, "aspire-pulumi-packages-messaging-azure-test")]
     [InlineData(AzureNameKind.StorageAccount, "storage", null, "aspistoraazuretest279b9b")]
     [InlineData(AzureNameKind.CosmosDbAccount, "cosmos", null, "aspire-pulumi-packages-cosmos-azure-test")]
+    [InlineData(AzureNameKind.ContainerRegistry, "aca-env", "acr", "aspirepulumipackagesacaenvacrazuretest")]
+    [InlineData(AzureNameKind.ContainerAppsEnvironment, "aca-env", null, "aspire-pulumi-packages-aca-env-azure-test")]
+    [InlineData(AzureNameKind.LogAnalyticsWorkspace, "aca-env", "law", "aspire-pulumi-packages-aca-env-law-azure-test")]
+    [InlineData(AzureNameKind.UserAssignedIdentity, "aca-env", "mi", "aspire-pulumi-packages-aca-env-mi-azure-test")]
+    [InlineData(AzureNameKind.VirtualNetwork, "vnet", null, "aspire-pulumi-packages-vnet-azure-test")]
     public void PinnedExampleNames(AzureNameKind kind, string res, string? suffix, string expected) =>
         Assert.Equal(expected, AzureNaming.Compose(kind, Project, res, "azure-test", suffix));
+
+    [Theory]
+    [InlineData(AzureNameKind.ContainerApp, "api", "api")]
+    [InlineData(AzureNameKind.ContainerApp, "My_Api", "my-api")]
+    [InlineData(AzureNameKind.Subnet, "Workers", "workers")]
+    public void ScopedNamesKeepConformingResourceNames(AzureNameKind kind, string resource, string expected) =>
+        Assert.Equal(expected, AzureNaming.ComposeScoped(kind, resource));
+
+    [Fact]
+    public void LongContainerAppNamesAreHashedDeterministically()
+    {
+        var a = AzureNaming.ComposeScoped(AzureNameKind.ContainerApp, "inventory-reservation-processing-worker-a");
+        var b = AzureNaming.ComposeScoped(AzureNameKind.ContainerApp, "inventory-reservation-processing-worker-b");
+        Assert.Equal(32, a.Length);
+        Assert.NotEqual(a, b);
+        Assert.Equal(a, AzureNaming.ComposeScoped(AzureNameKind.ContainerApp, "inventory-reservation-processing-worker-a"));
+    }
+
+    [Fact]
+    public void GeneratedSecurityRuleNamesAreSanitized()
+    {
+        var name = AzureNaming.ComposeScoped(AzureNameKind.NetworkSecurityRule, "allow-inbound-*-10.0.0.0/24");
+        Assert.Empty(AzureNaming.Validate(AzureNameKind.NetworkSecurityRule, name));
+    }
+
+    [Fact]
+    public void InvalidSubnetOverrideThrows() =>
+        Assert.Throws<ArgumentException>(() => AzureNaming.ValidateOverride(AzureNameKind.Subnet, "bad name!"));
 }

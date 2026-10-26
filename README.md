@@ -31,7 +31,17 @@ builder.AddProject<Projects.AspirePulumiPackages_Api>("api")
     .WithComputeEnvironment(acaEnv);
 ```
 
-`aspire publish` writes the resource group, Log Analytics workspace, container registry, pull identity (AcrPull) and managed environment, plus a `ContainerApp` per targeted resource. `aspire deploy` runs: `pulumi-provision` (login, ESC, `pulumi up --target` for the infrastructure incl. the registry) → `build-<resource>` → `push-<resource>` → `pulumi-deploy` (full `pulumi up`). Images are tagged with a per-deploy timestamp so each deploy creates a new revision.
+`aspire publish` writes the resource group, Log Analytics workspace, container registry, pull identity (AcrPull) and managed environment, plus a `ContainerApp` per targeted resource. `aspire deploy` runs: `pulumi-provision` (login, ESC, `pulumi up --target` for all the stack's non-app infrastructure incl. the registry) → `build-<resource>` → `push-<resource>` → `pulumi-deploy` (full `pulumi up`). Images are tagged with a per-deploy timestamp so each deploy creates a new revision.
+
+#### How `aspire deploy` orders things (one deploy is enough)
+
+Each `PulumiStackResource` contributes `pulumi-publish` → `pulumi-provision` → `pulumi-deploy` steps. The generated `PulumiProgram` is split in two halves: **app resources** (container apps, web apps, Kubernetes workloads and in-cluster objects, registered with `program.AddAppResource(...)` or inside `program.BeginAppScope()` by the compute environments) and **infrastructure**, which is the default for everything else, so integrations (Cosmos, Storage, Service Bus, Key Vault, SQL, ...) need no changes. Infrastructure that references an app is treated as part of the app half.
+
+1. `pulumi-provision` runs `pulumi up --target` for *every* infrastructure resource (not only the registry), so all stack outputs that apps consume (Cosmos endpoints, storage endpoints, Service Bus hosts, ...) exist.
+2. Images are built and pushed (they need the registry from step 1).
+3. `pulumi-deploy` regenerates the program — the environment variables that read stack outputs now resolve — and runs the full `pulumi up`, creating the apps.
+
+Aspire relationships drive the ordering between stacks: when a resource hosted in stack *S* references (`WithReference`, an endpoint/connection string/`PulumiOutputReference` in its environment) or `WaitFor`s a resource in stack *T*, *S*'s provision step automatically depends on *T*'s deploy step. `DependsOnStack` is only needed for dependencies Aspire can't see. A deferral (`Deferring environment variable ...`) is logged at debug level while the first generation runs (and in `aspire publish`, which has no real stack) and as a warning only if an output is still missing after the provision pass.
 
 ## Cosmos DB
 
@@ -52,7 +62,7 @@ Package: `AspirePulumiPackages.Pulumi.Azure.CosmosDB` (port of `Aspire.Hosting.A
 
 `.RunAsEmulator()` runs the Cosmos DB NoSQL API emulator container locally (no effect in publish mode) so `aspire run` works without any Azure resources. `aspire publish`/`aspire deploy` provision the real account, database(s) and container(s) instead.
 
-`.WithReference(cosmos)` on a project is enough to get data access — no separate role-assignment call is needed. Any compute environment (e.g. `AddPulumiAzureContainerAppEnvironment`) hosting a resource that references the Cosmos DB account automatically gets a Pulumi `SqlResourceSqlRoleAssignment` granting its shared managed identity the built-in **Cosmos DB Built-in Data Contributor** role, scoped to the account — the data-plane equivalent of the ACR pull role assignment described above. `ConnectionStrings__cosmos` (the account's document endpoint, consumed by `Microsoft.Azure.Cosmos`/`Aspire.Microsoft.Azure.Cosmos` with `DefaultAzureCredential`) is read from the stack's outputs the same way `AzureAd__ClientId` is above, so it's subject to the same "deploy once to create the account, deploy again to pick up the endpoint" caveat on the first deploy.
+`.WithReference(cosmos)` on a project is enough to get data access — no separate role-assignment call is needed. Any compute environment (e.g. `AddPulumiAzureContainerAppEnvironment`) hosting a resource that references the Cosmos DB account automatically gets a Pulumi `SqlResourceSqlRoleAssignment` granting its shared managed identity the built-in **Cosmos DB Built-in Data Contributor** role, scoped to the account — the data-plane equivalent of the ACR pull role assignment described above. `ConnectionStrings__cosmos` (the account's document endpoint, consumed by `Microsoft.Azure.Cosmos`/`Aspire.Microsoft.Azure.Cosmos` with `DefaultAzureCredential`) is read from the stack's outputs the same way `AzureAd__ClientId` is above, and resolves on the first deploy because the provision pass creates the account before the program is regenerated for the deploy pass (see "How `aspire deploy` orders things" below).
 
 ## Storage
 
@@ -73,7 +83,7 @@ builder.AddPulumiAzureFunctionsProject("func", "../MyFunctions/MyFunctions.cspro
     .WithComputeEnvironment(acaEnv);
 ```
 
-By default an implicit `funcstorage<hash>` storage account is created (Azurite in run mode; dropped from the model if every project uses `WithHostStorage`). Deployed through `AddPulumiAzureContainerAppEnvironment`, the container app gets `kind: functionapp` (KEDA scale rules follow the triggers), `http` ingress and no 1-replica cap; the environment identity is granted Storage Blob/Queue/Table Data Contributor (via the Storage integration) plus Storage Account Contributor on the host storage, matching the official Bicep. The compute environment hook is `PulumiContainerAppCustomizationAnnotation` in `AspirePulumiPackages.Pulumi.Azure`. Not ported: launch-profile port discovery in run mode, `AZURE_CLIENT_ID` injection (the shared environment identity is not exposed with a client id yet), the Durable Task scheduler APIs. Like the other integrations, storage endpoints are read from stack outputs, so the very first deploy needs a second `aspire deploy`.
+By default an implicit `funcstorage<hash>` storage account is created (Azurite in run mode; dropped from the model if every project uses `WithHostStorage`). Deployed through `AddPulumiAzureContainerAppEnvironment`, the container app gets `kind: functionapp` (KEDA scale rules follow the triggers), `http` ingress and no 1-replica cap; the environment identity is granted Storage Blob/Queue/Table Data Contributor (via the Storage integration) plus Storage Account Contributor on the host storage, matching the official Bicep. The compute environment hook is `PulumiContainerAppCustomizationAnnotation` in `AspirePulumiPackages.Pulumi.Azure`. Not ported: launch-profile port discovery in run mode, `AZURE_CLIENT_ID` injection (the shared environment identity is not exposed with a client id yet), the Durable Task scheduler APIs. Like the other integrations, storage endpoints are read from stack outputs, which the first `aspire deploy` creates in its provision pass.
 
 ## Search
 
@@ -378,4 +388,4 @@ builder.AddProject<Projects.AspirePulumiPackages_Api>("api")
     .WithEnvironment("AzureAd__ClientId", appRegistration.Resource.ClientId);
 ```
 
-These outputs are read with `pulumi stack output` from the **already-deployed** `entra-app` stack, not resolved as a live Pulumi cross-stack reference. On the first `aspire deploy`, before `entra-app` has ever been deployed, the lookup fails and the env var is skipped (logged as a warning) — deploy once, then deploy again to pick up the client id.
+These outputs are read with `pulumi stack output` from the `entra-app` stack, not resolved as a live Pulumi cross-stack reference. Because the API references `appRegistration`, the main stack's provision step is ordered after `entra-app`'s deploy step automatically (no `DependsOnStack`/`WaitFor` needed, though both still work), and the main program is regenerated after that, so the client id resolves on the first `aspire deploy`.

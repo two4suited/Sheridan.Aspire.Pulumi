@@ -49,7 +49,10 @@ public sealed partial class AzureKubernetesEnvironmentResource
         var any = targeted.Count > 0 || Ingresses.Count > 0 || Gateways.Count > 0 || HelmCharts.Count > 0 || PersistentVolumes.Count > 0 || LoadBalancers.Count > 0;
         if (!any) return;
 
-        // The cluster has to exist before anything below can be applied, so the deploy pass (not the infrastructure pass) creates it.
+        // The cluster has to exist before anything below can be applied, so the provision pass creates the cluster (and
+        // other infrastructure) and the deploy pass applies everything emitted from here on: the workloads, in-cluster
+        // objects and the Kubernetes provider are app resources (resources added with AddInfraResource stay infrastructure).
+        using var appScope = program.BeginAppScope();
         program.HasApps = true;
 
         var useIdentity = WorkloadIdentityEnabled && targeted.Count > 0;
@@ -57,7 +60,7 @@ public sealed partial class AzureKubernetesEnvironmentResource
 
         if (useIdentity)
         {
-            program.AddUserAssignedIdentity(IdentityRef, rg, location);
+            program.AddUserAssignedIdentity(IdentityRef, rg, location, NameFor(AzureNameKind.UserAssignedIdentity, "mi"));
             program.Outputs[$"{IdentityRef}Id"] = $"${{{IdentityRef}.id}}";
             program.Outputs[$"{IdentityRef}ClientId"] = $"${{{IdentityRef}.clientId}}";
             program.Outputs[$"{IdentityRef}PrincipalId"] = $"${{{IdentityRef}.principalId}}";
@@ -76,7 +79,7 @@ public sealed partial class AzureKubernetesEnvironmentResource
                     {
                         ["resourceGroupName"] = rg,
                         ["resourceName"] = $"${{{IdentityRef}.name}}",
-                        ["federatedIdentityCredentialResourceName"] = $"{r.Name}-fedcred",
+                        ["federatedIdentityCredentialResourceName"] = AzureNaming.ComposeScoped(AzureNameKind.FederatedIdentityCredential, r.Name + "-fedcred"),
                         ["issuer"] = $"${{{Id}.oidcIssuerProfile.issuerURL}}",
                         ["subject"] = $"system:serviceaccount:{KubernetesNamespace}:{ToKubernetesName(r.Name)}-sa",
                         ["audiences"] = new List<object?> { WorkloadIdentityAudience },
@@ -272,7 +275,7 @@ public sealed partial class AzureKubernetesEnvironmentResource
             catch (Exception e) when (e is not OperationCanceledException || !ctx.CancellationToken.IsCancellationRequested)
             {
                 // Outputs of infrastructure that doesn't exist yet resolve after the provision pass, when deploy regenerates the program.
-                ctx.Logger.LogInformation("Deferring environment variable {Key} for {Resource} until the stack is provisioned: {Message}", key, r.Name, e.Message);
+                ctx.Logger.LogDeferredEnvironmentVariable(stack, key, r.Name, e);
                 continue;
             }
 
