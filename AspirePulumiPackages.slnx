@@ -18,6 +18,7 @@
     <Project Path="src/AspirePulumiPackages.Pulumi.Azure.Base/AspirePulumiPackages.Pulumi.Azure.Base.csproj" />
     <Project Path="src/AspirePulumiPackages.Pulumi.Azure.ServiceBus/AspirePulumiPackages.Pulumi.Azure.ServiceBus.csproj" />
     <Project Path="src/AspirePulumiPackages.Pulumi.Azure.Storage/AspirePulumiPackages.Pulumi.Azure.Storage.csproj" />
+    <Project Path="src/AspirePulumiPackages.Pulumi.Azure.WebPubSub/AspirePulumiPackages.Pulumi.Azure.WebPubSub.csproj" />
     <Project Path="src/AspirePulumiPackages.Pulumi.Azure.PostgreSQL/AspirePulumiPackages.Pulumi.Azure.PostgreSQL.csproj" />
     <Project Path="src/AspirePulumiPackages.Pulumi.Azure.Sql/AspirePulumiPackages.Pulumi.Azure.Sql.csproj" />
     <Project Path="src/AspirePulumiPackages.Pulumi.Azure.Network/AspirePulumiPackages.Pulumi.Azure.Network.csproj" />

@@ -4,6 +4,7 @@ using AspirePulumiPackages.Pulumi.Azure.AppContainers;
 using AspirePulumiPackages.Pulumi.Azure.Base;
 using AspirePulumiPackages.Pulumi.Azure.EntraId;
 using AspirePulumiPackages.Pulumi.Azure.Storage;
+using AspirePulumiPackages.Pulumi.Azure.WebPubSub;
 
 var builder = DistributedApplication.CreateBuilder(args);
 
@@ -43,11 +44,19 @@ var storage = builder.AddPulumiStorage("storage")
 var blobs = storage.AddBlobs("blobs");
 blobs.AddBlobContainer("documents");
 
+var pubsub = builder.AddPulumiWebPubSub("pubsub")
+    .WithPulumiStack(azureStack)
+    .WithResourceGroup(sharedRg)
+    .ConfigureInfrastructure(infra => infra.WebPubSubService.Set("tls.clientCertEnabled", false));
+pubsub.AddHub("notifications")
+    .AddEventHandler("https://example.com/api/{event}", userEventPattern: "*", systemEvents: ["connected"]);
+
 builder.AddProject<Projects.AspirePulumiPackages_Api>("api")
     .WithExternalHttpEndpoints()
     .WithComputeEnvironment(acaEnv)
     .WithReference(appRegistration)
     .WithReference(cosmos)
-    .WithReference(blobs);
+    .WithReference(blobs)
+    .WithReference(pubsub);
 
 builder.Build().Run();
