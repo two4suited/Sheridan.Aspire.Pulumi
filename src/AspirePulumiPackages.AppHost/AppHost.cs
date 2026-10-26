@@ -4,6 +4,7 @@ using AspirePulumiPackages.Pulumi.Azure.AppConfiguration;
 using AspirePulumiPackages.Pulumi.Azure.AppContainers;
 using AspirePulumiPackages.Pulumi.Azure.Base;
 using AspirePulumiPackages.Pulumi.Azure.EntraId;
+using AspirePulumiPackages.Pulumi.Azure.Search;
 using AspirePulumiPackages.Pulumi.Azure.Storage;
 
 var builder = DistributedApplication.CreateBuilder(args);
@@ -50,6 +51,11 @@ var appConfig = builder.AddPulumiAppConfiguration("appconfig")
     .RunAsEmulator()
     .ConfigureInfrastructure(infra => infra.AppConfigurationStore.Set("softDeleteRetentionInDays", 7));
 
+var search = builder.AddPulumiSearch("search")
+    .WithPulumiStack(azureStack)
+    .WithResourceGroup(sharedRg)
+    .ConfigureInfrastructure(infra => infra.SearchService.Set("semanticSearch", "free"));
+
 builder.AddProject<Projects.AspirePulumiPackages_Api>("api")
     .WithExternalHttpEndpoints()
     .WithComputeEnvironment(acaEnv)
@@ -57,6 +63,7 @@ builder.AddProject<Projects.AspirePulumiPackages_Api>("api")
     .WithReference(appConfig)
     .WithReference(appRegistration)
     .WithReference(cosmos)
-    .WithReference(blobs);
+    .WithReference(blobs)
+    .WithReference(search);
 
 builder.Build().Run();
