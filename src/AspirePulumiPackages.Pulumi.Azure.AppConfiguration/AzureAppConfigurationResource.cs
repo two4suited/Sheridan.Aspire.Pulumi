@@ -51,13 +51,13 @@ public sealed class AzureAppConfigurationResource(string name) : PulumiAzureReso
         else
         {
             store = Id;
-            // No configStoreName: the provider auto-names it (<id> + random suffix), the equivalent of Bicep's
-            // take('<name>-${uniqueString(resourceGroup().id)}', 50).
+            // Named by the naming layer ({project}-{resource}-{stack}, normalised for AppConfigurationStore); override with WithAzureName.
             program.Resources[Id] = new Dictionary<string, object?>
             {
                 ["type"] = "azure-native:appconfiguration:ConfigurationStore",
                 ["properties"] = new Dictionary<string, object?>
                 {
+                    ["configStoreName"] = NameFor(AzureNameKind.AppConfigurationStore),
                     ["resourceGroupName"] = rg,
                     ["location"] = location,
                     ["disableLocalAuth"] = true,

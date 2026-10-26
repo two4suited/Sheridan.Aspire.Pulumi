@@ -29,13 +29,13 @@ public sealed class AzureSearchResource(string name) : PulumiAzureResource(name)
 
     protected override Task ContributeResourcesAsync(PulumiProgram program, PipelineStepContext context, string rg, string location)
     {
-        // No searchServiceName: the provider auto-names it (<id> + random suffix), the equivalent of Bicep's
-        // take('<name>-${uniqueString(resourceGroup().id)}', 60).
+        // Named by the naming layer ({project}-{resource}-{stack}, normalised for SearchService); override with WithAzureName.
         program.Resources[Id] = new Dictionary<string, object?>
         {
             ["type"] = "azure-native:search:Service",
             ["properties"] = new Dictionary<string, object?>
             {
+                ["searchServiceName"] = NameFor(AzureNameKind.SearchService),
                 ["resourceGroupName"] = rg,
                 ["location"] = location,
                 ["hostingMode"] = "default",
