@@ -15,6 +15,7 @@
   <ItemGroup>
     <ProjectReference Include="..\AspirePulumiPackages.Pulumi\AspirePulumiPackages.Pulumi.csproj" />
     <ProjectReference Include="..\AspirePulumiPackages.Pulumi.Azure.Base\AspirePulumiPackages.Pulumi.Azure.Base.csproj" />
+    <ProjectReference Include="..\AspirePulumiPackages.Pulumi.Provisioning\AspirePulumiPackages.Pulumi.Provisioning.csproj" />
     <!-- Only for IPulumiManagedIdentityResource (the compute environment identity that receives data-plane roles). -->
     <ProjectReference Include="..\AspirePulumiPackages.Pulumi.Azure\AspirePulumiPackages.Pulumi.Azure.csproj" />
   </ItemGroup>
