@@ -20,6 +20,9 @@ public sealed class AzureConnectorNamespaceResource(string name) : PulumiAzureRe
     private const string GatewayType = "Microsoft.Web/connectorGateways";
     private const int GatewayNamePrefixLength = 11;
 
+    /// <summary>Name of an existing gateway (set by PublishAsExisting/AsExisting); when set the gateway itself is not created.</summary>
+    public string? ExistingGatewayName { get; internal set; }
+
     internal List<AzureConnectorNamespaceConnectionResource> Connections { get; } = [];
     internal List<AzureConnectorNamespaceMcpServerConfigResource> McpServerConfigs { get; } = [];
 
@@ -38,12 +41,16 @@ public sealed class AzureConnectorNamespaceResource(string name) : PulumiAzureRe
         const string gw = "variables('gatewayName')";
         string Child(string type, params string[] names) =>
             $"[resourceId('{GatewayType}/{type}', {gw}, {string.Join(", ", names.Select(n => $"'{n}'"))})]";
-        const string GatewayDependency = $"[resourceId('{GatewayType}', {gw})]";
+        var existing = ExistingGatewayName;
+        var gatewayDependency = existing is null ? $"[resourceId('{GatewayType}', {gw})]" : null;
+        // An existing gateway is not part of the template, so children must not dependOn it.
+        List<object?> GatewayDependsOn() => gatewayDependency is null ? [] : [gatewayDependency];
 
         var prefix = new string(Name.Where(char.IsAsciiLetter).Select(char.ToLowerInvariant).Take(GatewayNamePrefixLength).ToArray());
-        var resources = new List<object?>
+        var resources = new List<object?>();
+        if (existing is null)
         {
-            new Dictionary<string, object?>
+            resources.Add(new Dictionary<string, object?>
             {
                 ["type"] = GatewayType,
                 ["apiVersion"] = ApiVersion,
@@ -52,23 +59,24 @@ public sealed class AzureConnectorNamespaceResource(string name) : PulumiAzureRe
                 ["identity"] = new Dictionary<string, object?> { ["type"] = "SystemAssigned" },
                 ["properties"] = new Dictionary<string, object?>(),
                 ["tags"] = new Dictionary<string, object?> { ["aspire-resource-name"] = Name },
-            },
-        };
+            });
+        }
 
         foreach (var connection in Connections.Where(c => !c.IsExisting))
         {
-            resources.Add(new Dictionary<string, object?>
+            var connectionNode = new Dictionary<string, object?>
             {
                 ["type"] = $"{GatewayType}/connections",
                 ["apiVersion"] = ApiVersion,
                 ["name"] = $"[concat({gw}, '/{connection.ConnectionName}')]",
-                ["dependsOn"] = new List<object?> { GatewayDependency },
                 ["properties"] = new Dictionary<string, object?>
                 {
                     ["displayName"] = connection.DisplayName ?? connection.ConnectionName,
                     ["connectorName"] = connection.ConnectorName,
                 },
-            });
+            };
+            if (GatewayDependsOn() is { Count: > 0 } connectionDeps) connectionNode["dependsOn"] = connectionDeps;
+            resources.Add(connectionNode);
 
             foreach (var policy in connection.AccessPolicies)
             {
@@ -95,7 +103,7 @@ public sealed class AzureConnectorNamespaceResource(string name) : PulumiAzureRe
             if (config.IsExisting) continue;
 
             var connectors = new List<object?>();
-            var dependsOn = new List<object?> { GatewayDependency };
+            var dependsOn = GatewayDependsOn();
             foreach (var connector in config.Connectors)
             {
                 if (!connector.Connection.IsExisting)
@@ -120,15 +128,16 @@ public sealed class AzureConnectorNamespaceResource(string name) : PulumiAzureRe
             if (!string.IsNullOrWhiteSpace(config.Description)) configProps["description"] = config.Description;
             configProps["state"] = "Enabled";
             configProps["connectors"] = connectors;
-            resources.Add(new Dictionary<string, object?>
+            var configNode = new Dictionary<string, object?>
             {
                 ["type"] = $"{GatewayType}/mcpserverConfigs",
                 ["apiVersion"] = ApiVersion,
                 ["name"] = $"[concat({gw}, '/{config.ConfigName}')]",
                 ["kind"] = "ManagedMcpServer",
-                ["dependsOn"] = dependsOn,
-                ["properties"] = configProps,
-            });
+            };
+            if (dependsOn.Count > 0) configNode["dependsOn"] = dependsOn;
+            configNode["properties"] = configProps;
+            resources.Add(configNode);
 
             foreach (var policy in config.AccessPolicies)
             {
@@ -164,7 +173,9 @@ public sealed class AzureConnectorNamespaceResource(string name) : PulumiAzureRe
                         ["contentVersion"] = "1.0.0.0",
                         ["variables"] = new Dictionary<string, object?>
                         {
-                            ["gatewayName"] = $"[concat('{prefix}', uniqueString(resourceGroup().id, '{Name}'))]",
+                            ["gatewayName"] = existing is null
+                                ? $"[concat('{prefix}', uniqueString(resourceGroup().id, '{Name}'))]"
+                                : existing,
                         },
                         ["resources"] = resources,
                         ["outputs"] = new Dictionary<string, object?>
