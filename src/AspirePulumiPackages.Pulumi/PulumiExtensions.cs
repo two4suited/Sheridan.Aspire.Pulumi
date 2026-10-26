@@ -177,8 +177,13 @@ public static class PulumiExtensions
         await PulumiCli.RunOrThrowAsync(dir, args, log, ct);
     }
 
-    private static Task DeployAsync(PipelineStepContext ctx, PulumiStackResource resource) =>
-        PulumiCli.RunOrThrowAsync(ProjectDirectory(ctx, resource), ["up", "--yes", "--skip-preview", "--non-interactive"], ctx.Logger, ctx.CancellationToken);
+    private static async Task DeployAsync(PipelineStepContext ctx, PulumiStackResource resource)
+    {
+        // The provision pass has created the infrastructure, so values read from stack outputs (e.g. a new storage
+        // account's endpoint) that were unavailable when the program was first generated resolve now.
+        if (resource.HasApps) await WriteProjectAsync(ctx, resource);
+        await PulumiCli.RunOrThrowAsync(ProjectDirectory(ctx, resource), ["up", "--yes", "--skip-preview", "--non-interactive"], ctx.Logger, ctx.CancellationToken);
+    }
 
     private static async Task DestroyAsync(PipelineStepContext ctx, PulumiStackResource resource)
     {
