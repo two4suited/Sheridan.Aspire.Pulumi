@@ -2,6 +2,7 @@ using AspirePulumiPackages.Pulumi;
 using AspirePulumiPackages.Pulumi.Azure;
 using AspirePulumiPackages.Pulumi.Azure.AppContainers;
 using AspirePulumiPackages.Pulumi.Azure.Base;
+using AspirePulumiPackages.Pulumi.Azure.CognitiveServices;
 using AspirePulumiPackages.Pulumi.Azure.EntraId;
 using AspirePulumiPackages.Pulumi.Azure.Storage;
 
@@ -43,11 +44,18 @@ var storage = builder.AddPulumiStorage("storage")
 var blobs = storage.AddBlobs("blobs");
 blobs.AddBlobContainer("documents");
 
+var openai = builder.AddPulumiOpenAI("openai")
+    .WithPulumiStack(azureStack)
+    .WithResourceGroup(sharedRg)
+    .ConfigureInfrastructure(infra => infra.CognitiveServicesAccount.Set("properties.publicNetworkAccess", "Enabled"));
+var chat = openai.AddDeployment("chat", "gpt-4o", "2024-08-06");
+
 builder.AddProject<Projects.AspirePulumiPackages_Api>("api")
     .WithExternalHttpEndpoints()
     .WithComputeEnvironment(acaEnv)
     .WithReference(appRegistration)
     .WithReference(cosmos)
-    .WithReference(blobs);
+    .WithReference(blobs)
+    .WithReference(chat);
 
 builder.Build().Run();
