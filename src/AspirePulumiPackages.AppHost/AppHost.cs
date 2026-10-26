@@ -3,6 +3,7 @@ using AspirePulumiPackages.Pulumi.Azure;
 using AspirePulumiPackages.Pulumi.Azure.AppContainers;
 using AspirePulumiPackages.Pulumi.Azure.Base;
 using AspirePulumiPackages.Pulumi.Azure.EntraId;
+using AspirePulumiPackages.Pulumi.Azure.Search;
 using AspirePulumiPackages.Pulumi.Azure.Storage;
 using AspirePulumiPackages.Pulumi.Azure.WebPubSub;
 
@@ -51,12 +52,18 @@ var pubsub = builder.AddPulumiWebPubSub("pubsub")
 pubsub.AddHub("notifications")
     .AddEventHandler("https://example.com/api/{event}", userEventPattern: "*", systemEvents: ["connected"]);
 
+var search = builder.AddPulumiSearch("search")
+    .WithPulumiStack(azureStack)
+    .WithResourceGroup(sharedRg)
+    .ConfigureInfrastructure(infra => infra.SearchService.Set("semanticSearch", "free"));
+
 builder.AddProject<Projects.AspirePulumiPackages_Api>("api")
     .WithExternalHttpEndpoints()
     .WithComputeEnvironment(acaEnv)
     .WithReference(appRegistration)
     .WithReference(cosmos)
     .WithReference(blobs)
-    .WithReference(pubsub);
+    .WithReference(pubsub)
+    .WithReference(search);
 
 builder.Build().Run();
