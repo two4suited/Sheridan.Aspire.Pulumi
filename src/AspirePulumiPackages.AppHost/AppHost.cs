@@ -3,6 +3,7 @@ using AspirePulumiPackages.Pulumi.Azure;
 using AspirePulumiPackages.Pulumi.Azure.AppContainers;
 using AspirePulumiPackages.Pulumi.Azure.Base;
 using AspirePulumiPackages.Pulumi.Azure.EntraId;
+using AspirePulumiPackages.Pulumi.Azure.Kusto;
 using AspirePulumiPackages.Pulumi.Azure.Search;
 using AspirePulumiPackages.Pulumi.Azure.Storage;
 using AspirePulumiPackages.Pulumi.Azure.WebPubSub;
@@ -52,6 +53,12 @@ var pubsub = builder.AddPulumiWebPubSub("pubsub")
 pubsub.AddHub("notifications")
     .AddEventHandler("https://example.com/api/{event}", userEventPattern: "*", systemEvents: ["connected"]);
 
+var kusto = builder.AddPulumiKustoCluster("kusto")
+    .WithPulumiStack(azureStack)
+    .WithResourceGroup(sharedRg)
+    .ConfigureInfrastructure(infra => infra.KustoCluster.Set("enableStreamingIngest", true));
+var telemetry = kusto.AddReadWriteDatabase("telemetry");
+
 var search = builder.AddPulumiSearch("search")
     .WithPulumiStack(azureStack)
     .WithResourceGroup(sharedRg)
@@ -64,6 +71,8 @@ builder.AddProject<Projects.AspirePulumiPackages_Api>("api")
     .WithReference(cosmos)
     .WithReference(blobs)
     .WithReference(pubsub)
+
+    .WithReference(telemetry)
     .WithReference(search);
 
 builder.Build().Run();
