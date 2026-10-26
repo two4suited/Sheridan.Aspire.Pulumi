@@ -3,6 +3,7 @@ using AspirePulumiPackages.Pulumi.Azure;
 using AspirePulumiPackages.Pulumi.Azure.AppContainers;
 using AspirePulumiPackages.Pulumi.Azure.Base;
 using AspirePulumiPackages.Pulumi.Azure.EntraId;
+using AspirePulumiPackages.Pulumi.Azure.Storage;
 
 var builder = DistributedApplication.CreateBuilder(args);
 
@@ -35,10 +36,18 @@ var cosmos = builder.AddPulumiCosmosDB("cosmos")
     .RunAsEmulator();
 cosmos.AddCosmosDatabase("appdb").AddContainer("items", "/id");
 
+var storage = builder.AddPulumiStorage("storage")
+    .WithPulumiStack(azureStack)
+    .WithResourceGroup(sharedRg)
+    .RunAsEmulator();
+var blobs = storage.AddBlobs("blobs");
+blobs.AddBlobContainer("documents");
+
 builder.AddProject<Projects.AspirePulumiPackages_Api>("api")
     .WithExternalHttpEndpoints()
     .WithComputeEnvironment(acaEnv)
     .WithReference(appRegistration)
-    .WithReference(cosmos);
+    .WithReference(cosmos)
+    .WithReference(blobs);
 
 builder.Build().Run();
