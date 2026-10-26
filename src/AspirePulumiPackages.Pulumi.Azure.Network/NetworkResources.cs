@@ -192,6 +192,8 @@ public sealed class PulumiPrivateDnsZoneResource(string name, string zoneName, P
 
         program.Outputs[$"{Id}Id"] = $"${{{Id}.id}}";
         program.Outputs[$"{Id}Name"] = $"${{{Id}.name}}";
+
+        Provisioning.PulumiInfrastructureExtensions.ApplyInfrastructureCallbacks(this, program);
         return Task.CompletedTask;
     }
 }
