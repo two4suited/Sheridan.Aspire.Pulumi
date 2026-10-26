@@ -1,6 +1,7 @@
 using Aspire.Hosting.ApplicationModel;
 using Aspire.Hosting.Pipelines;
 using AspirePulumiPackages.Pulumi.Azure.Base;
+using AspirePulumiPackages.Pulumi.Azure.Network;
 using PulumiExpr = AspirePulumiPackages.Pulumi.Provisioning.PulumiExpr;
 
 namespace AspirePulumiPackages.Pulumi.Azure.Foundry;
@@ -8,12 +9,14 @@ namespace AspirePulumiPackages.Pulumi.Azure.Foundry;
 /// <summary>
 /// A Microsoft Foundry account provisioned by Pulumi (azure-native), mirroring Aspire.Hosting.Foundry's Bicep: a
 /// <c>Microsoft.CognitiveServices/accounts</c> of kind AIServices (S0, system-assigned identity, local auth disabled, public
-/// network access enabled, project management allowed), an Agents capability host, the model deployments (created one after
-/// another) and the projects added to the builder. Compute environments hosting an app that references the account, one of its
-/// deployments or one of its projects are granted Cognitive Services User and Cognitive Services OpenAI User by default
-/// (override with WithRoleAssignments).
+/// network access enabled unless a private endpoint targets it, project management allowed), an Agents capability host
+/// (with <c>enablePublicHostingEnvironment</c>), the model deployments (created one after another) and the projects added to
+/// the builder. Compute environments hosting an app that references the account, one of its deployments or one of its projects
+/// are granted Cognitive Services User and Cognitive Services OpenAI User by default (override with WithRoleAssignments).
+/// Resources a project connects to (Application Insights, Key Vault, Storage, Search, Cosmos DB, Container Registry, another
+/// account) must be provisioned in the same Pulumi stack, because the project's connections reference them directly.
 /// </summary>
-public sealed class FoundryResource(string name) : PulumiAzureResource(name), IResourceWithConnectionString
+public sealed class FoundryResource(string name) : PulumiAzureResource(name), IResourceWithConnectionString, IPulumiPrivateEndpointTarget
 {
     internal static readonly FoundryRole[] DefaultRoles = [FoundryRole.CognitiveServicesUser, FoundryRole.CognitiveServicesOpenAIUser];
     private const string SubscriptionId = PulumiAzureProgramExtensions.SubscriptionId;
@@ -27,8 +30,30 @@ public sealed class FoundryResource(string name) : PulumiAzureResource(name), IR
     /// </summary>
     public string? CustomSubDomainName { get; set; }
 
+    /// <summary>Name of an existing account (set by PublishAsExisting); nothing is created for the account itself, but deployments, projects and role assignments are still applied to it.</summary>
+    public string? ExistingAccountName { get; internal set; }
+
+    /// <summary>The Foundry Local endpoint when running locally (see <c>RunAsFoundryLocal</c>); null when the account runs in Azure.</summary>
+    public Uri? EmulatorServiceUri { get; internal set; }
+
+    /// <summary>True when the resource runs against a Foundry Local endpoint instead of Azure.</summary>
+    public bool IsEmulator => EmulatorServiceUri is not null;
+
+    /// <summary>The (dummy) API key Foundry Local expects.</summary>
+    public string? ApiKey { get; internal set; }
+
     public List<FoundryDeploymentResource> Deployments { get; } = [];
     public List<FoundryProjectResource> Projects { get; } = [];
+
+    /// <summary>Pulumi identifier to reference the account (<c>${x.name}</c>, <c>${x.id}</c>): the resource, or the lookup variable for an existing account.</summary>
+    internal string AccountRef => ExistingAccountName is null ? Id : $"{Id}Existing";
+
+    // IPulumiPrivateEndpointTarget: group 'account', registered in the three zones the official integration uses.
+    string IPulumiAzureResourceWithId.IdExpression => $"${{{AccountRef}.id}}";
+    string IPulumiPrivateEndpointTarget.PrivateLinkGroupId => "account";
+    string IPulumiPrivateEndpointTarget.PrivateDnsZoneName => "privatelink.cognitiveservices.azure.com";
+    IReadOnlyList<string> IPulumiPrivateEndpointTarget.AdditionalPrivateDnsZoneNames =>
+        ["privatelink.services.ai.azure.com", "privatelink.openai.azure.com"];
 
     internal PulumiOutputReference OutputRef(string suffix) =>
         Output(Stack ?? throw new InvalidOperationException($"'{Name}' has not been bound to a Pulumi stack yet; call WithPulumiStack()."), suffix);
@@ -40,12 +65,15 @@ public sealed class FoundryResource(string name) : PulumiAzureResource(name), IR
     public PulumiOutputReference AIFoundryApiEndpoint => OutputRef("AiFoundryApiEndpoint");
     public PulumiOutputReference NameOutput => OutputRef("Name");
 
-    /// <summary>The connection string, <c>Endpoint=&lt;endpoint&gt;;EndpointAIInference=&lt;AI Foundry API endpoint&gt;models</c>.</summary>
-    public ReferenceExpression ConnectionStringExpression =>
-        ReferenceExpression.Create($"Endpoint={Endpoint};EndpointAIInference={AIFoundryApiEndpoint}models");
+    /// <summary>The connection string, <c>Endpoint=&lt;endpoint&gt;;EndpointAIInference=&lt;AI Foundry API endpoint&gt;models</c> (<c>Endpoint=&lt;local&gt;;Key=&lt;key&gt;</c> for Foundry Local).</summary>
+    public ReferenceExpression ConnectionStringExpression => IsEmulator
+        ? ReferenceExpression.Create($"Endpoint={EmulatorServiceUri!.ToString()};Key={ApiKey}")
+        : ReferenceExpression.Create($"Endpoint={Endpoint};EndpointAIInference={AIFoundryApiEndpoint}models");
 
-    /// <summary>The service endpoint URI expression (the AI Foundry API endpoint).</summary>
-    public ReferenceExpression UriExpression => ReferenceExpression.Create($"{AIFoundryApiEndpoint}");
+    /// <summary>The service endpoint URI expression (the AI Foundry API endpoint, or the Foundry Local endpoint).</summary>
+    public ReferenceExpression UriExpression => IsEmulator
+        ? ReferenceExpression.Create($"{EmulatorServiceUri!.ToString()}")
+        : ReferenceExpression.Create($"{AIFoundryApiEndpoint}");
 
     private object SubDomain()
     {
@@ -59,40 +87,65 @@ public sealed class FoundryResource(string name) : PulumiAzureResource(name), IR
     {
         program.AddClientConfig();
 
-        // No accountName: the provider auto-names it, the equivalent of Bicep's toLower('<name>-${uniqueString(...)}').
-        // An infra target: role assignments are created in the targeted provision pass and depend on the account.
-        program.AddInfraResource(Id, "azure-native:cognitiveservices:Account", new Dictionary<string, object?>
+        if (IsEmulator)
+            throw new InvalidOperationException($"'{Name}' runs against Foundry Local (RunAsFoundryLocal) and has nothing to provision; it is only available outside publish mode.");
+
+        // A private endpoint targeting the account turns public network access off, as the official integration does.
+        var hasPrivateEndpoint = context.Model.Resources.OfType<PulumiPrivateEndpointResource>().Any(e => ReferenceEquals(e.Target, this));
+
+        var acct = AccountRef;
+        if (ExistingAccountName is { } existing)
         {
-            ["type"] = "azure-native:cognitiveservices:Account",
-            ["properties"] = new Dictionary<string, object?>
+            program.Variables[acct] = new Dictionary<string, object?>
             {
-                ["resourceGroupName"] = rg,
-                ["location"] = location,
-                ["kind"] = "AIServices",
-                ["identity"] = new Dictionary<string, object?> { ["type"] = "SystemAssigned" },
-                ["sku"] = new Dictionary<string, object?> { ["name"] = Sku },
+                ["fn::invoke"] = new Dictionary<string, object?>
+                {
+                    ["function"] = "azure-native:cognitiveservices:getAccount",
+                    ["arguments"] = new Dictionary<string, object?> { ["resourceGroupName"] = rg, ["accountName"] = existing },
+                },
+            };
+        }
+        else
+        {
+            // No accountName: the provider auto-names it, the equivalent of Bicep's toLower('<name>-${uniqueString(...)}').
+            // An infra target: role assignments are created in the targeted provision pass and depend on the account.
+            program.AddInfraResource(Id, "azure-native:cognitiveservices:Account", new Dictionary<string, object?>
+            {
+                ["type"] = "azure-native:cognitiveservices:Account",
                 ["properties"] = new Dictionary<string, object?>
                 {
-                    ["customSubDomainName"] = SubDomain(),
-                    ["publicNetworkAccess"] = "Enabled",
-                    ["disableLocalAuth"] = true,
-                    ["allowProjectManagement"] = true,
+                    ["resourceGroupName"] = rg,
+                    ["location"] = location,
+                    ["kind"] = "AIServices",
+                    ["identity"] = new Dictionary<string, object?> { ["type"] = "SystemAssigned" },
+                    ["sku"] = new Dictionary<string, object?> { ["name"] = Sku },
+                    ["properties"] = new Dictionary<string, object?>
+                    {
+                        ["customSubDomainName"] = SubDomain(),
+                        ["publicNetworkAccess"] = hasPrivateEndpoint ? "Disabled" : "Enabled",
+                        ["disableLocalAuth"] = true,
+                        ["allowProjectManagement"] = true,
+                    },
+                    ["tags"] = new Dictionary<string, object?> { ["aspire-resource-name"] = Name },
                 },
-                ["tags"] = new Dictionary<string, object?> { ["aspire-resource-name"] = Name },
-            },
-        });
+            });
+        }
 
-        // The Bicep also sets enablePublicHostingEnvironment (API 2025-10-01-preview), which azure-native's default
-        // CapabilityHost type does not expose; only the kind is set here.
+        // The default CapabilityHost type of azure-native does not expose enablePublicHostingEnvironment (the Bicep sets it, API
+        // 2025-10-01-preview); the GA v20251201 version does, so that version of the resource is used.
         program.Resources[$"{Id}Caphost"] = new Dictionary<string, object?>
         {
-            ["type"] = "azure-native:cognitiveservices:AccountCapabilityHost",
+            ["type"] = "azure-native:cognitiveservices/v20251201:AccountCapabilityHost",
             ["properties"] = new Dictionary<string, object?>
             {
                 ["resourceGroupName"] = rg,
-                ["accountName"] = $"${{{Id}.name}}",
-                ["capabilityHostName"] = $"{Name}-caphost",
-                ["capabilityHostProperties"] = new Dictionary<string, object?> { ["capabilityHostKind"] = "Agents" },
+                ["accountName"] = $"${{{acct}.name}}",
+                ["capabilityHostName"] = "foundry-caphost",
+                ["properties"] = new Dictionary<string, object?>
+                {
+                    ["capabilityHostKind"] = "Agents",
+                    ["enablePublicHostingEnvironment"] = true,
+                },
             },
         };
 
@@ -106,7 +159,7 @@ public sealed class FoundryResource(string name) : PulumiAzureResource(name), IR
                 ["properties"] = new Dictionary<string, object?>
                 {
                     ["resourceGroupName"] = rg,
-                    ["accountName"] = $"${{{Id}.name}}",
+                    ["accountName"] = $"${{{acct}.name}}",
                     ["deploymentName"] = d.DeploymentName,
                     ["properties"] = new Dictionary<string, object?>
                     {
@@ -129,10 +182,10 @@ public sealed class FoundryResource(string name) : PulumiAzureResource(name), IR
 
         foreach (var p in Projects) AddProject(program, p, rg, location);
 
-        program.Outputs[$"{Id}AiFoundryApiEndpoint"] = $"${{{Id}.properties.endpoints[\"AI Foundry API\"]}}";
-        program.Outputs[$"{Id}Endpoint"] = $"${{{Id}.properties.endpoint}}";
-        program.Outputs[$"{Id}Name"] = $"${{{Id}.name}}";
-        program.Outputs[$"{Id}Id"] = $"${{{Id}.id}}";
+        program.Outputs[$"{Id}AiFoundryApiEndpoint"] = $"${{{acct}.properties.endpoints[\"AI Foundry API\"]}}";
+        program.Outputs[$"{Id}Endpoint"] = $"${{{acct}.properties.endpoint}}";
+        program.Outputs[$"{Id}Name"] = $"${{{acct}.name}}";
+        program.Outputs[$"{Id}Id"] = $"${{{acct}.id}}";
 
         AddRoleAssignments(program, context);
         Provisioning.PulumiInfrastructureExtensions.ApplyInfrastructureCallbacks(this, program);
@@ -140,11 +193,13 @@ public sealed class FoundryResource(string name) : PulumiAzureResource(name), IR
     }
 
     /// <summary>
-    /// A project (system-assigned identity) with an Application Insights component the project identity may publish metrics to,
-    /// connected to the project through an ApiKey connection (category AppInsights), as the official Bicep does.
+    /// A project (system-assigned identity) with an Application Insights component (a new one, or the one given to WithAppInsights)
+    /// the project identity may publish metrics to, connected to the project through an ApiKey connection (category AppInsights),
+    /// plus its other connections and capability host, as the official Bicep does.
     /// </summary>
     private void AddProject(PulumiProgram program, FoundryProjectResource p, string rg, string location)
     {
+        var acct = AccountRef;
         var id = $"{Id}{p.Id}";
         program.Resources[id] = new Dictionary<string, object?>
         {
@@ -152,7 +207,7 @@ public sealed class FoundryResource(string name) : PulumiAzureResource(name), IR
             ["properties"] = new Dictionary<string, object?>
             {
                 ["resourceGroupName"] = rg,
-                ["accountName"] = $"${{{Id}.name}}",
+                ["accountName"] = $"${{{acct}.name}}",
                 ["projectName"] = p.Name,
                 ["location"] = location,
                 ["identity"] = new Dictionary<string, object?> { ["type"] = "SystemAssigned" },
@@ -161,31 +216,51 @@ public sealed class FoundryResource(string name) : PulumiAzureResource(name), IR
             },
         };
 
-        var ai = $"{id}Ai";
-        program.Resources[ai] = new Dictionary<string, object?>
+        var principal = $"${{{id}.identity.principalId}}";
+        var ctx = new FoundryConnectionContext(program, this, p, id, rg, location);
+
+        // The Key Vault connection (WithKeyVault) is created first; every other project connection depends on it.
+        string? kvConnId = null;
+        if (p.KeyVaultConnection is { } kvConn) kvConnId = EmitConnection(ctx, kvConn, null);
+
+        string aiId, aiLocation, aiConnectionString;
+        if (p.AppInsights is { } existingAi)
         {
-            ["type"] = "azure-native:applicationinsights:Component",
-            ["properties"] = new Dictionary<string, object?>
+            aiId = existingAi.Id;
+            aiLocation = $"${{{aiId}.location}}";
+            aiConnectionString = $"${{{aiId}.connectionString}}";
+        }
+        else
+        {
+            aiId = $"{id}Ai";
+            aiLocation = $"${{{aiId}.location}}";
+            aiConnectionString = $"${{{aiId}.connectionString}}";
+            program.Resources[aiId] = new Dictionary<string, object?>
             {
-                ["resourceGroupName"] = rg,
-                ["location"] = location,
-                ["kind"] = "web",
-                ["applicationType"] = "web",
-                ["tags"] = new Dictionary<string, object?> { ["aspire-resource-name"] = p.Name },
-            },
-        };
+                ["type"] = "azure-native:applicationinsights:Component",
+                ["properties"] = new Dictionary<string, object?>
+                {
+                    ["resourceGroupName"] = rg,
+                    ["location"] = location,
+                    ["kind"] = "web",
+                    ["applicationType"] = "web",
+                    ["tags"] = new Dictionary<string, object?> { ["aspire-resource-name"] = p.Name },
+                },
+            };
+        }
 
         // Monitoring Metrics Publisher for the project identity on the Application Insights component.
-        program.AddRoleAssignment($"{ai}MonitoringMetricsPublisher", $"${{{id}.identity.principalId}}",
-            "3913510d-42f4-4e42-8a64-420c390055eb", $"${{{ai}.id}}");
+        program.AddRoleAssignment(aiId.StartsWith(id, StringComparison.Ordinal) ? $"{aiId}MonitoringMetricsPublisher" : $"{id}{aiId}MonitoringMetricsPublisher", principal,
+            "3913510d-42f4-4e42-8a64-420c390055eb", $"${{{aiId}.id}}");
 
-        program.Resources[$"{ai}Conn"] = new Dictionary<string, object?>
+        var aiConn = $"{id}AiConn";
+        program.Resources[aiConn] = WithDependsOn(new Dictionary<string, object?>
         {
             ["type"] = "azure-native:cognitiveservices:ProjectConnection",
             ["properties"] = new Dictionary<string, object?>
             {
                 ["resourceGroupName"] = rg,
-                ["accountName"] = $"${{{Id}.name}}",
+                ["accountName"] = $"${{{acct}.name}}",
                 ["projectName"] = $"${{{id}.name}}",
                 ["connectionName"] = $"{p.Name}-ai-conn",
                 ["properties"] = new Dictionary<string, object?>
@@ -193,23 +268,142 @@ public sealed class FoundryResource(string name) : PulumiAzureResource(name), IR
                     ["authType"] = "ApiKey",
                     ["category"] = "AppInsights",
                     ["isSharedToAll"] = false,
-                    ["target"] = $"${{{ai}.id}}",
+                    ["target"] = $"${{{aiId}.id}}",
                     ["metadata"] = new Dictionary<string, object?>
                     {
                         ["ApiType"] = "Azure",
-                        ["ResourceId"] = $"${{{ai}.id}}",
-                        ["location"] = $"${{{ai}.location}}",
+                        ["ResourceId"] = $"${{{aiId}.id}}",
+                        ["location"] = aiLocation,
                     },
-                    ["credentials"] = new Dictionary<string, object?> { ["key"] = $"${{{ai}.connectionString}}" },
+                    ["credentials"] = new Dictionary<string, object?> { ["key"] = aiConnectionString },
                 },
             },
-        };
+        }, kvConnId);
+
+        foreach (var conn in p.Connections.Where(c => c != p.KeyVaultConnection)) EmitConnection(ctx, conn, kvConnId);
+
+        if (p.CapabilityHost is { } host) AddProjectCapabilityHost(ctx, host, kvConnId);
 
         program.Outputs[$"{id}Id"] = $"${{{id}.id}}";
-        program.Outputs[$"{id}Name"] = $"${{{Id}.name}}/{p.Name}";
+        program.Outputs[$"{id}Name"] = $"${{{acct}.name}}/{p.Name}";
         program.Outputs[$"{id}Endpoint"] = $"${{{id}.properties.endpoints[\"AI Foundry API\"]}}";
-        program.Outputs[$"{id}PrincipalId"] = $"${{{id}.identity.principalId}}";
-        program.Outputs[$"{id}AppInsightsConnectionString"] = $"${{{ai}.connectionString}}";
+        program.Outputs[$"{id}PrincipalId"] = principal;
+        program.Outputs[$"{id}AppInsightsConnectionString"] = aiConnectionString;
+    }
+
+    private static Dictionary<string, object?> WithDependsOn(Dictionary<string, object?> def, params string?[] dependsOn)
+    {
+        var list = dependsOn.Where(d => d is not null).Select(d => (object?)$"${{{d}}}").ToList();
+        if (list.Count > 0) def["options"] = new Dictionary<string, object?> { ["dependsOn"] = list };
+        return def;
+    }
+
+    /// <summary>Adds a project (or, for Bing grounding, account) connection and its role assignments; returns its Pulumi identifier.</summary>
+    private string EmitConnection(FoundryConnectionContext ctx, FoundryProjectConnectionResource conn, string? kvConnId)
+    {
+        var acct = AccountRef;
+        var connId = $"{ctx.ProjectId}{conn.Id}";
+        var props = new Dictionary<string, object?>
+        {
+            ["resourceGroupName"] = ctx.ResourceGroup,
+            ["accountName"] = $"${{{acct}.name}}",
+            ["connectionName"] = conn.ConnectionName,
+            ["properties"] = conn.Configure(ctx),
+        };
+        if (!conn.AccountLevel) props["projectName"] = $"${{{ctx.ProjectId}.name}}";
+
+        // Role assignments for the connected resource are created first (they only need the project identity), no dependency on the connection.
+        conn.AddRoleAssignments?.Invoke(ctx);
+
+        ctx.Program.Resources[connId] = WithDependsOn(new Dictionary<string, object?>
+        {
+            ["type"] = conn.AccountLevel ? "azure-native:cognitiveservices:AccountConnection" : "azure-native:cognitiveservices:ProjectConnection",
+            ["properties"] = props,
+        }, ReferenceEquals(conn, ctx.Project.KeyVaultConnection) ? null : kvConnId);
+
+        ctx.Program.Outputs[$"{connId}Name"] = $"${{{connId}.name}}";
+        ctx.Program.Outputs[$"{connId}Id"] = $"${{{connId}.id}}";
+        return connId;
+    }
+
+    /// <summary>
+    /// The project capability host: connections to Storage (file storage), Cosmos DB (thread storage), Search (vector store) and,
+    /// optionally, another account for Azure OpenAI, each with the role assignments the official Bicep creates for the project identity.
+    /// </summary>
+    private void AddProjectCapabilityHost(FoundryConnectionContext ctx, FoundryCapabilityHostConfiguration host, string? kvConnId)
+    {
+        host.Validate(ctx.Project.Name);
+        var acct = AccountRef;
+        var program = ctx.Program;
+        var dependsOn = new List<string?> { kvConnId };
+
+        string HostConnection(string suffix, FoundryResourceTargets.Target target)
+        {
+            var connId = $"{ctx.ProjectId}{suffix}Conn";
+            program.Resources[connId] = WithDependsOn(new Dictionary<string, object?>
+            {
+                ["type"] = "azure-native:cognitiveservices:ProjectConnection",
+                ["properties"] = new Dictionary<string, object?>
+                {
+                    ["resourceGroupName"] = ctx.ResourceGroup,
+                    ["accountName"] = $"${{{acct}.name}}",
+                    ["projectName"] = $"${{{ctx.ProjectId}.name}}",
+                    ["connectionName"] = $"${{{ctx.ProjectId}.name}}-${{{target.Ref}.name}}",
+                    ["properties"] = new Dictionary<string, object?>
+                    {
+                        ["authType"] = "AAD",
+                        ["category"] = target.Category,
+                        ["target"] = target.TargetValue,
+                        ["metadata"] = FoundryConnectionContext.Metadata(target.Ref),
+                    },
+                },
+            }, kvConnId);
+            dependsOn.Add(connId);
+            return connId;
+        }
+
+        var storage = FoundryResourceTargets.Storage(host.Storage!);
+        var storageConn = HostConnection("Storage", storage);
+        dependsOn.Add(ctx.Role($"{storage.Ref}BlobDataContributor", AzureRoleDefinitions.StorageBlobDataContributor, $"${{{storage.Ref}.id}}"));
+
+        var cosmos = FoundryResourceTargets.Cosmos(host.CosmosDB!);
+        var cosmosConn = HostConnection("Cosmos", cosmos);
+        dependsOn.Add(ctx.CosmosDataContributor(host.CosmosDB!));
+
+        var search = FoundryResourceTargets.Search(host.Search!);
+        var searchConn = HostConnection("Search", search);
+        dependsOn.Add(ctx.Role($"{search.Ref}SearchServiceContributor", FoundryRoleIds.SearchServiceContributor, $"${{{search.Ref}.id}}"));
+        dependsOn.Add(ctx.Role($"{search.Ref}SearchIndexDataContributor", FoundryRoleIds.SearchIndexDataContributor, $"${{{search.Ref}.id}}"));
+
+        var properties = new Dictionary<string, object?>
+        {
+            ["storageConnections"] = new List<object?> { $"${{{storageConn}.name}}" },
+            ["threadStorageConnections"] = new List<object?> { $"${{{cosmosConn}.name}}" },
+            ["vectorStoreConnections"] = new List<object?> { $"${{{searchConn}.name}}" },
+        };
+
+        if (host.AzureOpenAI is { } openAi)
+        {
+            var aoai = FoundryResourceTargets.AzureOpenAI(openAi);
+            var aoaiConn = HostConnection("Aoai", aoai);
+            dependsOn.Add(ctx.Role($"{aoai.Ref}OpenAIUser", FoundryRoles.RoleDefinitionId(FoundryRole.CognitiveServicesOpenAIUser), $"${{{aoai.Ref}.id}}"));
+            properties["aiServicesConnections"] = new List<object?> { $"${{{aoaiConn}.name}}" };
+        }
+
+        // The official Bicep also sets capabilityHostKind/enablePublicHostingEnvironment on the project capability host; azure-native's
+        // ProjectCapabilityHostProperties (every API version) only exposes the connection lists, so they are omitted here.
+        program.Resources[$"{ctx.ProjectId}{FoundryProjectResource.CapabilityHostIdSuffix}"] = WithDependsOn(new Dictionary<string, object?>
+        {
+            ["type"] = "azure-native:cognitiveservices/v20251201:ProjectCapabilityHost",
+            ["properties"] = new Dictionary<string, object?>
+            {
+                ["resourceGroupName"] = ctx.ResourceGroup,
+                ["accountName"] = $"${{{acct}.name}}",
+                ["projectName"] = $"${{{ctx.ProjectId}.name}}",
+                ["capabilityHostName"] = $"${{{ctx.ProjectId}.name}}-ch",
+                ["properties"] = properties,
+            },
+        }, dependsOn.Where(d => d is not null).Distinct().ToArray());
     }
 
     private bool IsReferencedBy(IResource consumer)
@@ -239,7 +433,7 @@ public sealed class FoundryResource(string name) : PulumiAzureResource(name), IR
             var envId = PulumiAzureProgramExtensions.ToPulumiId(env.Name);
             foreach (var role in roles)
                 program.AddRoleAssignment($"{Id}{envId}{role}", env.PrincipalIdExpression,
-                    FoundryRoles.RoleDefinitionId(role), $"${{{Id}.id}}");
+                    FoundryRoles.RoleDefinitionId(role), $"${{{AccountRef}.id}}");
         }
     }
 }
@@ -279,34 +473,14 @@ public sealed class FoundryDeploymentResource : Resource, IResourceWithConnectio
     /// <summary>Deployment SKU capacity (default 1).</summary>
     public int SkuCapacity { get; set; } = 1;
 
-    internal string Id => PulumiAzureProgramExtensions.ToPulumiId(Name);
-
-    public ReferenceExpression ConnectionStringExpression =>
-        ReferenceExpression.Create($"{Parent.ConnectionStringExpression};Deployment={DeploymentName}");
-}
-
-/// <summary>A Foundry project of a <see cref="FoundryResource"/> (connection string = <c>Endpoint=&lt;project endpoint&gt;</c>).</summary>
-public sealed class FoundryProjectResource(string name, FoundryResource parent)
-    : Resource(name), IResourceWithConnectionString, IResourceWithParent<FoundryResource>
-{
-    public FoundryResource Parent { get; } = parent;
+    /// <summary>The model id Foundry Local serves the deployment as (defaults to the model name).</summary>
+    public string? LocalModelId { get; set; }
 
     internal string Id => PulumiAzureProgramExtensions.ToPulumiId(Name);
 
-    private PulumiOutputReference OutputRef(string suffix) => Parent.OutputRef($"{Id}{suffix}");
-
-    /// <summary>The project API endpoint.</summary>
-    public PulumiOutputReference Endpoint => OutputRef("Endpoint");
-
-    /// <summary>The project's system-assigned identity principal id.</summary>
-    public PulumiOutputReference PrincipalId => OutputRef("PrincipalId");
-
-    /// <summary>The Application Insights connection string created for the project.</summary>
-    public PulumiOutputReference AppInsightsConnectionString => OutputRef("AppInsightsConnectionString");
-
-    public ReferenceExpression ConnectionStringExpression => ReferenceExpression.Create($"Endpoint={Endpoint}");
-
-    public ReferenceExpression UriExpression => ReferenceExpression.Create($"{Endpoint}");
+    public ReferenceExpression ConnectionStringExpression => Parent.IsEmulator
+        ? ReferenceExpression.Create($"{Parent.ConnectionStringExpression};Model={LocalModelId ?? ModelName}")
+        : ReferenceExpression.Create($"{Parent.ConnectionStringExpression};Deployment={DeploymentName}");
 }
 
 /// <summary>Roles the annotated resource's identity should get on an account (replaces the default).</summary>

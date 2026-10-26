@@ -16,6 +16,14 @@
     <ProjectReference Include="..\AspirePulumiPackages.Pulumi\AspirePulumiPackages.Pulumi.csproj" />
     <ProjectReference Include="..\AspirePulumiPackages.Pulumi.Provisioning\AspirePulumiPackages.Pulumi.Provisioning.csproj" />
     <ProjectReference Include="..\AspirePulumiPackages.Pulumi.Azure.Base\AspirePulumiPackages.Pulumi.Azure.Base.csproj" />
+    <!-- Resources a project connects to / private endpoint target (the same-stack resources are referenced directly). -->
+    <ProjectReference Include="..\AspirePulumiPackages.Pulumi.Azure.ApplicationInsights\AspirePulumiPackages.Pulumi.Azure.ApplicationInsights.csproj" />
+    <ProjectReference Include="..\AspirePulumiPackages.Pulumi.Azure.ContainerRegistry\AspirePulumiPackages.Pulumi.Azure.ContainerRegistry.csproj" />
+    <ProjectReference Include="..\AspirePulumiPackages.Pulumi.Azure.CosmosDB\AspirePulumiPackages.Pulumi.Azure.CosmosDB.csproj" />
+    <ProjectReference Include="..\AspirePulumiPackages.Pulumi.Azure.KeyVault\AspirePulumiPackages.Pulumi.Azure.KeyVault.csproj" />
+    <ProjectReference Include="..\AspirePulumiPackages.Pulumi.Azure.Network\AspirePulumiPackages.Pulumi.Azure.Network.csproj" />
+    <ProjectReference Include="..\AspirePulumiPackages.Pulumi.Azure.Search\AspirePulumiPackages.Pulumi.Azure.Search.csproj" />
+    <ProjectReference Include="..\AspirePulumiPackages.Pulumi.Azure.Storage\AspirePulumiPackages.Pulumi.Azure.Storage.csproj" />
     <!-- Only for IPulumiManagedIdentityResource (the compute environment identity that receives data-plane roles). -->
     <ProjectReference Include="..\AspirePulumiPackages.Pulumi.Azure\AspirePulumiPackages.Pulumi.Azure.csproj" />
   </ItemGroup>

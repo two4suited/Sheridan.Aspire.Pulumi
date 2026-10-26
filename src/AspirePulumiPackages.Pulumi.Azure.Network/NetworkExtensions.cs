@@ -183,6 +183,8 @@ public static class NetworkExtensions
             Stack = subnet.Resource.Parent.Stack,
             Location = subnet.Resource.Parent.Location,
         };
+        foreach (var extra in target.Resource.AdditionalPrivateDnsZoneNames)
+            endpoint.AdditionalDnsZones.Add(app.GetOrCreatePrivateDnsZone(extra, subnet.Resource.Parent).Resource);
         return app.AddResource(endpoint)
             .WithParentRelationship(subnet)
             .ExcludeFromManifest();
