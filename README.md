@@ -154,6 +154,7 @@ var sandboxes = builder.AddPulumiSandboxGroup("sandboxes")
 ```
 
 Not ported: the deployment of compute resources into the group (`PublishAsAzureSandbox`, `AzureSandboxOptions`, disk images, sandboxes and ports). Upstream performs those in-process against the Azure Dev Compute data plane (they are not ARM resources), so the Pulumi group is not an `IComputeEnvironmentResource`. Also not ported: existing sandbox groups, the deployment dashboard summary. azure-native only exposes the group under `Microsoft.ContainerInstance` (upstream's Bicep uses `Microsoft.App/sandboxGroups@2026-02-01-preview`); it has not been deployed against a subscription with Sandboxes preview access. It is not demoed in `AppHost.cs` to avoid provisioning a registry and requiring preview access.
+
 ## Web PubSub
 
 `AspirePulumiPackages.Pulumi.Azure.WebPubSub` ports `Aspire.Hosting.Azure.WebPubSub`. `builder.AddPulumiWebPubSub("pubsub")` (alias `AddPulumiAzureWebPubSub`) provisions an `azure-native:webpubsub:WebPubSub` with the official Bicep's shape (SKU `Free_F1`, capacity 1, local auth disabled, `aspire-resource-name` tag; outputs `endpoint`, `name`, `id`). `AddHub(name, hubName?)` adds `WebPubSubHub` resources and `AddEventHandler(urlTemplate, userEventPattern, systemEvents)` configures their event handlers; `WithSku(...)` overrides the SKU.
