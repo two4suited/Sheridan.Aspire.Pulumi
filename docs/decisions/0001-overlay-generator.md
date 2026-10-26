@@ -67,3 +67,17 @@ and the conformance test's schema snapshot would be its starting input.
 
 - One issue: add the schema-conformance test (milestone "Convert Aspire Bicep packages to Pulumi components").
 - No generator issues.
+
+## Status of the conformance test (issue #65)
+
+Implemented in `tests/AspirePulumiPackages.SchemaConformance.Tests` (`dotnet test`). It checks:
+
+- every `"azure-native:module:Name"` literal anywhere in `src/**/*.cs` exists as a resource or function in the schema (all integrations);
+- every `Pulumi.yaml` produced by `aspire publish` for the AppHost: resource tokens, property keys at every depth (against `inputProperties` and
+  referenced types), `fn::invoke` function tokens and argument names, and `${res.prop}` references (against `properties` / function outputs).
+
+The schema comes from `pulumi package get-schema azure-native` (or `AZURE_NATIVE_SCHEMA_PATH`), is trimmed to the tokens used and cached in the
+OS temp directory (`aspire-pulumi-schema`); nothing is committed. Set `PULUMI_PUBLISH_DIR` to reuse an existing publish output.
+
+Limitation: property paths are only validated for resources the AppHost actually emits. Integrations the demo AppHost does not use are covered at
+the token level only (adding costly demos to AppHost is avoided on purpose).
