@@ -3,6 +3,7 @@ using AspirePulumiPackages.Pulumi.Azure;
 using AspirePulumiPackages.Pulumi.Azure.AppContainers;
 using AspirePulumiPackages.Pulumi.Azure.Base;
 using AspirePulumiPackages.Pulumi.Azure.EntraId;
+using AspirePulumiPackages.Pulumi.Azure.Search;
 using AspirePulumiPackages.Pulumi.Azure.SignalR;
 using AspirePulumiPackages.Pulumi.Azure.Storage;
 
@@ -49,12 +50,18 @@ var signalr = builder.AddPulumiSignalR("signalr")
     .WithResourceGroup(sharedRg)
     .ConfigureInfrastructure(infra => infra.SignalRService.Set("cors.allowedOrigins", new[] { "*" }));
 
+var search = builder.AddPulumiSearch("search")
+    .WithPulumiStack(azureStack)
+    .WithResourceGroup(sharedRg)
+    .ConfigureInfrastructure(infra => infra.SearchService.Set("semanticSearch", "free"));
+
 builder.AddProject<Projects.AspirePulumiPackages_Api>("api")
     .WithReference(signalr)
     .WithExternalHttpEndpoints()
     .WithComputeEnvironment(acaEnv)
     .WithReference(appRegistration)
     .WithReference(cosmos)
-    .WithReference(blobs);
+    .WithReference(blobs)
+    .WithReference(search);
 
 builder.Build().Run();
