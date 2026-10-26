@@ -37,23 +37,27 @@ public static class PulumiAzureProgramExtensions
     public const string CurrentPrincipalObjectId = "${clientConfig.objectId}";
 
     /// <summary>Adds a resource group (the equivalent of Aspire's per-environment resource group) and returns its name reference.</summary>
-    public static string AddResourceGroup(this PulumiProgram program, string id, string location)
+    public static string AddResourceGroup(this PulumiProgram program, string id, string location, string? name = null)
     {
+        var properties = new Dictionary<string, object?> { ["location"] = location };
+        if (name is not null) properties["resourceGroupName"] = AzureNaming.ValidateOverride(AzureNameKind.ResourceGroup, name);
         program.AddInfraResource($"{id}Rg", "azure-native:resources:ResourceGroup", new()
         {
             ["type"] = "azure-native:resources:ResourceGroup",
-            ["properties"] = new Dictionary<string, object?> { ["location"] = location },
+            ["properties"] = properties,
         });
         return $"${{{id}Rg.name}}";
     }
 
     /// <summary>Adds a user-assigned managed identity; returns the resource id (e.g. 'myIdentity') usable as <c>${id.principalId}</c>.</summary>
-    public static void AddUserAssignedIdentity(this PulumiProgram program, string id, string resourceGroup, string location)
+    public static void AddUserAssignedIdentity(this PulumiProgram program, string id, string resourceGroup, string location, string? name = null)
     {
+        var properties = new Dictionary<string, object?> { ["resourceGroupName"] = resourceGroup, ["location"] = location };
+        if (name is not null) properties["resourceName"] = AzureNaming.ValidateOverride(AzureNameKind.UserAssignedIdentity, name);
         program.AddInfraResource(id, "azure-native:managedidentity:UserAssignedIdentity", new()
         {
             ["type"] = "azure-native:managedidentity:UserAssignedIdentity",
-            ["properties"] = new Dictionary<string, object?> { ["resourceGroupName"] = resourceGroup, ["location"] = location },
+            ["properties"] = properties,
         });
     }
 
@@ -80,25 +84,27 @@ public static class PulumiAzureProgramExtensions
     }
 
     /// <summary>
-    /// Adds an RBAC-enabled Key Vault (the shared secret store Aspire provisions for secret outputs) and returns its resource id.
+    /// Adds an RBAC-enabled Key Vault (the shared secret store Aspire provisions for secret outputs). When <paramref name="name"/> is given (see <see cref="AzureNaming"/> / <c>NameFor</c>) it is validated and written as <c>vaultName</c>; otherwise the provider auto-names the vault.
     /// </summary>
-    public static void AddKeyVault(this PulumiProgram program, string id, string resourceGroup, string location, string sku = "standard")
+    public static void AddKeyVault(this PulumiProgram program, string id, string resourceGroup, string location, string sku = "standard", string? name = null)
     {
         program.AddClientConfig();
+        var properties = new Dictionary<string, object?>
+        {
+            ["resourceGroupName"] = resourceGroup,
+            ["location"] = location,
+            ["properties"] = new Dictionary<string, object?>
+            {
+                ["tenantId"] = TenantId,
+                ["sku"] = new Dictionary<string, object?> { ["family"] = "A", ["name"] = sku },
+                ["enableRbacAuthorization"] = true,
+            },
+        };
+        if (name is not null) properties["vaultName"] = AzureNaming.ValidateOverride(AzureNameKind.KeyVault, name);
         program.AddInfraResource(id, "azure-native:keyvault:Vault", new()
         {
             ["type"] = "azure-native:keyvault:Vault",
-            ["properties"] = new Dictionary<string, object?>
-            {
-                ["resourceGroupName"] = resourceGroup,
-                ["location"] = location,
-                ["properties"] = new Dictionary<string, object?>
-                {
-                    ["tenantId"] = TenantId,
-                    ["sku"] = new Dictionary<string, object?> { ["family"] = "A", ["name"] = sku },
-                    ["enableRbacAuthorization"] = true,
-                },
-            },
+            ["properties"] = properties,
         });
     }
 
@@ -112,7 +118,7 @@ public static class PulumiAzureProgramExtensions
             {
                 ["resourceGroupName"] = resourceGroup,
                 ["vaultName"] = $"${{{vaultId}.name}}",
-                ["secretName"] = secretName,
+                ["secretName"] = AzureNaming.ValidateOverride(AzureNameKind.KeyVaultSecret, secretName, nameof(secretName)),
                 ["properties"] = new Dictionary<string, object?> { ["value"] = value },
             },
         });

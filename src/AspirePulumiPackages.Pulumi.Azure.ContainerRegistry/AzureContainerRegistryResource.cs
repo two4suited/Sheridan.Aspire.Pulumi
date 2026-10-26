@@ -35,12 +35,13 @@ public sealed class AzureContainerRegistryResource(string name) : PulumiAzureRes
 
     protected override Task ContributeResourcesAsync(PulumiProgram program, PipelineStepContext context, string resourceGroup, string location)
     {
-        // The registry name is left to Pulumi auto-naming (official: take('<name><uniqueString>', 50)).
+        // Registry names are global and alphanumeric only: {project}{name}{stack}, shortened with a hash when too long.
         program.AddInfraResource(Id, "azure-native:containerregistry:Registry", new()
         {
             ["type"] = "azure-native:containerregistry:Registry",
             ["properties"] = new Dictionary<string, object?>
             {
+                ["registryName"] = NameFor(AzureNameKind.ContainerRegistry),
                 ["resourceGroupName"] = resourceGroup,
                 ["location"] = location,
                 ["sku"] = new Dictionary<string, object?> { ["name"] = "Basic" },

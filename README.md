@@ -16,6 +16,10 @@ Use `.WithEscEnvironment("project/env1", "project/env2")` to import one or more 
 
 The code is split across three class libraries under `src/`: `AspirePulumiPackages.Pulumi` (the stack/pipeline/YAML-generation core — `PulumiStackResource`, `PulumiProgram`, `PulumiCli`, `PulumiOutputReference`, `AddPulumiStack`/`DependsOnStack`/etc.), `AspirePulumiPackages.Pulumi.Azure` (the shared managed-identity interface); Cosmos DB lives in `AspirePulumiPackages.Pulumi.Azure.CosmosDB`; the Container Apps environment lives in `AspirePulumiPackages.Pulumi.Azure.AppContainers` (port of `Aspire.Hosting.Azure.AppContainers`: `WithAzureContainerRegistry`, `WithAzureLogAnalyticsWorkspace`, `WithAcrPullIdentity`, `WithDashboard`, VNet via `WithDelegatedSubnet`, and `PublishAsPulumiContainerAppJob`/`PublishAsScheduledPulumiContainerAppJob`), and `AspirePulumiPackages.Pulumi.Entra` (the Azure AD app registration). Azure and Entra both depend on the core project; `AspirePulumiPackages.AppHost` references all three.
 
+## Resource naming
+
+Azure names are built from the app (Pulumi project) name, the Aspire resource name and the stack name, shortened deterministically (with a hash only when lossy) to fit each resource type's limits, and can be pinned with `WithAzureName(AzureNameKind.X, "name")`. See [docs/naming.md](docs/naming.md) for the scheme and the per-resource rule table.
+
 ## Container Apps environment
 
 `builder.AddPulumiAzureContainerAppEnvironment("aca-env")` is the Pulumi equivalent of Aspire's `AddAzureContainerAppEnvironment`. It is a compute environment, so resources opt in the usual way:

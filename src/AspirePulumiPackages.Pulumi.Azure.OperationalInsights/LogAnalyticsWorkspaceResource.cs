@@ -26,6 +26,7 @@ public sealed class LogAnalyticsWorkspaceResource(string name) : PulumiAzureReso
             ["type"] = "azure-native:operationalinsights:Workspace",
             ["properties"] = new Dictionary<string, object?>
             {
+                ["workspaceName"] = NameFor(AzureNameKind.LogAnalyticsWorkspace),
                 ["resourceGroupName"] = resourceGroup,
                 ["location"] = location,
                 ["sku"] = new Dictionary<string, object?> { ["name"] = "PerGB2018" },

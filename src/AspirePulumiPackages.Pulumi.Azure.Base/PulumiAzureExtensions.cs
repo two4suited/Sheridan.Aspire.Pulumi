@@ -38,6 +38,18 @@ public static class PulumiAzureExtensions
         return builder;
     }
 
+    /// <summary>
+    /// Pins the Azure name of one of the resource's Azure resources instead of composing it from the app, resource and stack names.
+    /// The name is validated against the type's naming rules immediately and throws an <see cref="ArgumentException"/> if invalid.
+    /// <paramref name="suffix"/> selects among several resources of the same kind (e.g. "kv"); null targets the primary one.
+    /// </summary>
+    public static IResourceBuilder<T> WithAzureName<T>(this IResourceBuilder<T> builder, AzureNameKind kind, string name, string? suffix = null)
+        where T : IPulumiAzureNamed
+    {
+        builder.Resource.NameOverrides[(kind, suffix)] = AzureNaming.ValidateOverride(kind, name);
+        return builder;
+    }
+
     /// <summary>Adds a standalone Azure resource group provisioned by Pulumi, for grouping several resources together with <see cref="WithResourceGroup{T}"/>.</summary>
     public static IResourceBuilder<PulumiAzureResourceGroupResource> AddPulumiAzureResourceGroup(
         this IDistributedApplicationBuilder builder, string name) =>

@@ -164,6 +164,7 @@ public sealed class AzureAppServiceEnvironmentResource : PulumiAzureResource, IC
             ["type"] = "azure-native:containerregistry:Registry",
             ["properties"] = new Dictionary<string, object?>
             {
+                ["registryName"] = NameFor(AzureNameKind.ContainerRegistry, "acr"),
                 ["resourceGroupName"] = resourceGroup,
                 ["location"] = location,
                 ["sku"] = new Dictionary<string, object?> { ["name"] = "Basic" },
@@ -172,7 +173,7 @@ public sealed class AzureAppServiceEnvironmentResource : PulumiAzureResource, IC
         });
 
         // Pull identity + AcrPull on the registry.
-        program.AddUserAssignedIdentity(Identity, resourceGroup, location);
+        program.AddUserAssignedIdentity(Identity, resourceGroup, location, NameFor(AzureNameKind.UserAssignedIdentity, "mi"));
         var acrPull = program.AddRoleAssignment($"{Id}AcrPull", PrincipalIdExpression, AzureRoleDefinitions.AcrPull, $"${{{Id}Registry.id}}");
 
         // Linux App Service plan.
@@ -181,6 +182,7 @@ public sealed class AzureAppServiceEnvironmentResource : PulumiAzureResource, IC
             ["type"] = "azure-native:web:AppServicePlan",
             ["properties"] = new Dictionary<string, object?>
             {
+                ["name"] = NameFor(AzureNameKind.AppServicePlan, "plan"),
                 ["resourceGroupName"] = resourceGroup,
                 ["location"] = location,
                 ["kind"] = "Linux",
@@ -191,7 +193,7 @@ public sealed class AzureAppServiceEnvironmentResource : PulumiAzureResource, IC
         });
 
         // Website contributor identity (Reader on the resource group), used by the dashboard to discover the environment.
-        program.AddUserAssignedIdentity(ContributorIdentity, resourceGroup, location);
+        program.AddUserAssignedIdentity(ContributorIdentity, resourceGroup, location, NameFor(AzureNameKind.UserAssignedIdentity, "contributor-mi"));
         program.AddRoleAssignment($"{Id}ContributorReader", $"${{{ContributorIdentity}.principalId}}", AzureRoleDefinitions.Reader, $"${{{Id}Rg.id}}");
 
         if (EnableApplicationInsights)
@@ -201,6 +203,7 @@ public sealed class AzureAppServiceEnvironmentResource : PulumiAzureResource, IC
                 ["type"] = "azure-native:operationalinsights:Workspace",
                 ["properties"] = new Dictionary<string, object?>
                 {
+                    ["workspaceName"] = NameFor(AzureNameKind.LogAnalyticsWorkspace, "law"),
                     ["resourceGroupName"] = resourceGroup,
                     ["location"] = location,
                     ["retentionInDays"] = 30,
@@ -213,6 +216,7 @@ public sealed class AzureAppServiceEnvironmentResource : PulumiAzureResource, IC
                 ["type"] = "azure-native:applicationinsights:Component",
                 ["properties"] = new Dictionary<string, object?>
                 {
+                    ["resourceName"] = NameFor(AzureNameKind.ApplicationInsights, "appi"),
                     ["resourceGroupName"] = resourceGroup,
                     ["location"] = location,
                     ["applicationType"] = "web",
@@ -235,6 +239,7 @@ public sealed class AzureAppServiceEnvironmentResource : PulumiAzureResource, IC
                 ["type"] = "azure-native:web:WebApp",
                 ["properties"] = new Dictionary<string, object?>
                 {
+                    ["name"] = NameFor(AzureNameKind.WebApp, "dashboard"),
                     ["resourceGroupName"] = resourceGroup,
                     ["location"] = location,
                     ["kind"] = "app,linux,aspiredashboard",
@@ -311,6 +316,7 @@ public sealed class AzureAppServiceEnvironmentResource : PulumiAzureResource, IC
         string resourceGroup, string location, string acrPull, Dictionary<string, object?> tags)
     {
         var appName = r.Name.ToLowerInvariant();
+        var siteName = NameForChild(AzureNameKind.WebApp, r.Name);
 
         var envVars = new Dictionary<string, object>();
         var envContext = new EnvironmentCallbackContext(ctx.ExecutionContext, r, envVars, ctx.CancellationToken);
@@ -373,6 +379,7 @@ public sealed class AzureAppServiceEnvironmentResource : PulumiAzureResource, IC
             ["type"] = "azure-native:web:WebApp",
             ["properties"] = new Dictionary<string, object?>
             {
+                ["name"] = siteName,
                 ["resourceGroupName"] = resourceGroup,
                 ["location"] = location,
                 ["kind"] = "app,linux,container",

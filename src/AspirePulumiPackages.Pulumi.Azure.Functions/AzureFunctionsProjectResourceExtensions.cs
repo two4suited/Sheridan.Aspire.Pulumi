@@ -1,6 +1,7 @@
 using Aspire.Hosting;
 using Aspire.Hosting.ApplicationModel;
 using Aspire.Hosting.Azure;
+using AspirePulumiPackages.Pulumi.Azure.Base;
 using AspirePulumiPackages.Pulumi.Azure.Storage;
 
 namespace AspirePulumiPackages.Pulumi.Azure.Functions;
@@ -86,6 +87,17 @@ public static class AzureFunctionsProjectResourceExtensions
             {
                 // The implicit account lives in the (single) stack of the model unless WithPulumiStack was called on the project.
                 storage.Stack = e.Model.Resources.OfType<PulumiStackResource>().SingleOrDefault();
+            }
+
+            if (implicitStorageUsed && !storage.NameOverrides.ContainsKey((AzureNameKind.StorageAccount, null)))
+            {
+                // Name the implicit host storage after the app instead of the internal 'funcstorage<hash>' resource name:
+                // {project}{functions project | 'functions'}host{stack}. The Pulumi/Aspire resource name (its logical id) is unchanged.
+                var users = e.Model.Resources.OfType<AzureFunctionsProjectResource>().Where(f => f.HostStorage == storage).ToList();
+                var s = storage.Stack;
+                if (s is not null)
+                    storage.NameOverrides[(AzureNameKind.StorageAccount, null)] =
+                        AzureNaming.Compose(AzureNameKind.StorageAccount, s.ProjectName, users.Count == 1 ? users[0].Name : "functions", s.StackName, "host");
             }
             return Task.CompletedTask;
         });

@@ -50,6 +50,7 @@ public sealed class PulumiApplicationInsightsResource(string name) : PulumiAzure
                 ["type"] = "azure-native:operationalinsights:Workspace",
                 ["properties"] = new Dictionary<string, object?>
                 {
+                    ["workspaceName"] = NameFor(AzureNameKind.LogAnalyticsWorkspace, "law"),
                     ["resourceGroupName"] = resourceGroup,
                     ["location"] = location,
                     ["sku"] = new Dictionary<string, object?> { ["name"] = "PerGB2018" },
@@ -64,6 +65,7 @@ public sealed class PulumiApplicationInsightsResource(string name) : PulumiAzure
             ["type"] = "azure-native:applicationinsights:Component",
             ["properties"] = new Dictionary<string, object?>
             {
+                ["resourceName"] = NameFor(AzureNameKind.ApplicationInsights),
                 ["resourceGroupName"] = resourceGroup,
                 ["location"] = location,
                 ["kind"] = "web",

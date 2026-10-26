@@ -38,14 +38,14 @@ public sealed class AzureStorageResource(string name) : PulumiAzureResource(name
 
     protected override Task ContributeResourcesAsync(PulumiProgram program, PipelineStepContext context, string rg, string location)
     {
-        // No accountName: the azure-native provider auto-names it (<id> + random suffix, lowercase, <= 24 chars), the
-        // Pulumi equivalent of Bicep's take('<name>${uniqueString(resourceGroup().id)}', 24).
+        // Account names are global, 3-24 lowercase alphanumerics: {project}{name}{stack}, shortened with a hash when too long.
         // An infra target: role assignments are created in the targeted provision pass and depend on the account.
         program.AddInfraResource(Id, "azure-native:storage:StorageAccount", new Dictionary<string, object?>
         {
             ["type"] = "azure-native:storage:StorageAccount",
             ["properties"] = new Dictionary<string, object?>
             {
+                ["accountName"] = NameFor(AzureNameKind.StorageAccount),
                 ["resourceGroupName"] = rg,
                 ["location"] = location,
                 ["kind"] = "StorageV2",

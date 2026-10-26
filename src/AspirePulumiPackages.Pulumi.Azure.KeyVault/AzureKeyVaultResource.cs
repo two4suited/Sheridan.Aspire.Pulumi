@@ -53,7 +53,7 @@ public sealed class PulumiAzureKeyVaultResource(string name) : PulumiAzureResour
         else
         {
             vault = Id;
-            program.AddKeyVault(Id, resourceGroup, location);
+            program.AddKeyVault(Id, resourceGroup, location, name: NameFor(AzureNameKind.KeyVault));
             ((Dictionary<string, object?>)((Dictionary<string, object?>)program.Resources[Id]!)["properties"]!)["tags"] =
                 new Dictionary<string, object?> { ["aspire-resource-name"] = Name };
         }
