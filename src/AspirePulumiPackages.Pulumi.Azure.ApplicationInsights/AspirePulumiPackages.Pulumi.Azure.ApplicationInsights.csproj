@@ -13,6 +13,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\AspirePulumiPackages.Pulumi\AspirePulumiPackages.Pulumi.csproj" />
+    <ProjectReference Include="..\AspirePulumiPackages.Pulumi.Provisioning\AspirePulumiPackages.Pulumi.Provisioning.csproj" />
     <ProjectReference Include="..\AspirePulumiPackages.Pulumi.Azure.Base\AspirePulumiPackages.Pulumi.Azure.Base.csproj" />
     <ProjectReference Include="..\AspirePulumiPackages.Pulumi.Azure.OperationalInsights\AspirePulumiPackages.Pulumi.Azure.OperationalInsights.csproj" />
   </ItemGroup>
