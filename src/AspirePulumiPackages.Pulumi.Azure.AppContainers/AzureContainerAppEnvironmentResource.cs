@@ -302,9 +302,8 @@ public sealed class AzureContainerAppEnvironmentResource : PulumiAzureResource, 
 
         foreach (var r in ctx.Model.GetComputeResources().Where(IsTargeted))
         {
-            program.HasApps = true;
             var job = r.Annotations.OfType<PulumiContainerAppJobAnnotation>().LastOrDefault();
-            program.Resources[AppId(r)] = await BuildContainerAppAsync(r, job, stack, rg, ctx);
+            program.AddAppResource(AppId(r), await BuildContainerAppAsync(r, job, stack, rg, ctx));
         }
 
         Provisioning.PulumiInfrastructureExtensions.ApplyInfrastructureCallbacks(this, program);
@@ -361,7 +360,7 @@ public sealed class AzureContainerAppEnvironmentResource : PulumiAzureResource, 
             catch (Exception e) when (e is not OperationCanceledException || !ctx.CancellationToken.IsCancellationRequested)
             {
                 // Outputs of infrastructure that doesn't exist yet resolve after the provision pass, when deploy regenerates the program.
-                ctx.Logger.LogInformation("Deferring environment variable {Key} for {Resource} until the stack is provisioned: {Message}", key, r.Name, e.Message);
+                ctx.Logger.LogDeferredEnvironmentVariable(stack, key, r.Name, e);
                 continue;
             }
 
