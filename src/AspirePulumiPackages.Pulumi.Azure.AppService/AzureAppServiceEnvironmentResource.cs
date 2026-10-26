@@ -287,8 +287,7 @@ public sealed class AzureAppServiceEnvironmentResource : PulumiAzureResource, IC
 
         foreach (var r in context.Model.GetComputeResources().Where(IsTargeted))
         {
-            program.HasApps = true;
-            program.Resources[AppId(r)] = await BuildWebAppAsync(r, stack, context, resourceGroup, location, acrPull, tags);
+            program.AddAppResource(AppId(r), await BuildWebAppAsync(r, stack, context, resourceGroup, location, acrPull, tags));
         }
 
         Provisioning.PulumiInfrastructureExtensions.ApplyInfrastructureCallbacks(this, program);
@@ -357,7 +356,7 @@ public sealed class AzureAppServiceEnvironmentResource : PulumiAzureResource, IC
             catch (Exception e) when (e is not OperationCanceledException || !ctx.CancellationToken.IsCancellationRequested)
             {
                 // Outputs of infrastructure that doesn't exist yet resolve after the provision pass, when deploy regenerates the program.
-                ctx.Logger.LogInformation("Deferring environment variable {Key} for {Resource} until the stack is provisioned: {Message}", key, r.Name, e.Message);
+                ctx.Logger.LogDeferredEnvironmentVariable(stack, key, r.Name, e);
                 continue;
             }
 

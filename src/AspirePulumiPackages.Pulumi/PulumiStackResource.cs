@@ -13,10 +13,17 @@ public sealed class PulumiStackResource(string name, string stackName) : Resourc
     /// <summary>Set when the project is written; used to read stack outputs.</summary>
     public string? ProjectDirectory { get; set; }
 
-    /// <summary>Logical names/types of the resources that must exist before images can be pushed.</summary>
+    /// <summary>Logical names/types of the resources of every infrastructure (non-app) resource of the generated program; the provision pass creates exactly these.</summary>
     public List<(string Type, string Name)> InfraTargets { get; } = [];
 
     public bool HasApps { get; set; }
+
+    /// <summary>
+    /// True once the provision pass has created the stack's infrastructure in this run. Until then, stack outputs of
+    /// not-yet-created resources are expected to be missing (the program is regenerated afterwards), so deferrals are
+    /// only worth a warning once this is set.
+    /// </summary>
+    public bool InfrastructureProvisioned { get; set; }
 
     /// <summary>Image tag shared by every image pushed in this deployment.</summary>
     public string DeployTag { get; } = DateTime.UtcNow.ToString("yyyyMMddHHmmss");

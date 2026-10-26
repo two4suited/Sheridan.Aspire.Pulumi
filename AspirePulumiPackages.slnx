@@ -41,6 +41,7 @@
     <Project Path="src/AspirePulumiPackages.Pulumi/AspirePulumiPackages.Pulumi.csproj" />
   </Folder>
   <Folder Name="/tests/">
+    <Project Path="tests/AspirePulumiPackages.Pulumi.Tests/AspirePulumiPackages.Pulumi.Tests.csproj" />
     <Project Path="tests/AspirePulumiPackages.SchemaConformance.Tests/AspirePulumiPackages.SchemaConformance.Tests.csproj" />
     <Project Path="tests/AspirePulumiPackages.Naming.Tests/AspirePulumiPackages.Naming.Tests.csproj" />
   </Folder>
