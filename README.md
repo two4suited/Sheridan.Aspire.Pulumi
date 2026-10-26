@@ -126,6 +126,34 @@ builder.AddProject<Projects.AspirePulumiPackages_Api>("api").WithReference(offic
 
 `ConfigureInfrastructure(infra => ...)` exposes the `Deployment` root plus the ARM template's `TemplateResources`/`Gateway` maps (ARM property names, not azure-native names). Not ported: gateway-level `AsExisting`/`PublishAsExisting`, the Aspire polyglot (ATS) exports. Not demonstrated in `AppHost.cs` because connections need real Entra object ids and interactive OAuth consent. Note that connections using OAuth must still be consented in the portal after deployment, as with the Bicep version. The ARM template route was verified by comparing `aspire publish` output against the official Bicep, not by a real deployment.
 
+## Front Door
+
+`AspirePulumiPackages.Pulumi.Azure.FrontDoor` ports `Aspire.Hosting.Azure.FrontDoor`. `builder.AddPulumiFrontDoor("frontdoor")` (alias `AddPulumiAzureFrontDoor`) provisions a global `azure-native:cdn:Profile` (`Standard_AzureFrontDoor`) and, for each `WithOrigin(resource)`, an `AFDEndpoint`, an `AFDOriginGroup` (health probe from the origin's `EndpointProbeAnnotation`, default `/` over HTTPS; load balancing 4/3/50), an `AFDOrigin` (host and host header = the app's FQDN) and a `/*` `Route` (HttpsOnly forwarding, HTTPS redirect, linked to the default domain), matching the generated Bicep. Each origin gets its own `*.azurefd.net` URL, output as `{frontdoor}{origin}EndpointUrl` and exposed as `GetEndpointUrl("api")`.
+
+```csharp
+var api = builder.AddProject<Projects.Api>("api").WithExternalHttpEndpoints().WithComputeEnvironment(acaEnv);
+builder.AddPulumiFrontDoor("frontdoor")
+    .WithPulumiStack(azureStack).WithResourceGroup(sharedRg)
+    .WithOrigin(api)
+    .ConfigureInfrastructure(infra => infra.GetRoute("api").Set("patternsToMatch", new[] { "/api/*" }));
+```
+
+`ConfigureInfrastructure` exposes `Profile`, `GetEndpoint/GetOriginGroup/GetOrigin/GetRoute(originName)` (see `docs/provisioning.md`). Origins must be hosted by an Azure Container Apps or App Service environment (the origin host is read from the emitted container app / web app) in the **same Pulumi stack**, and need an external HTTP(S) endpoint. Not demoed in `AppHost.cs` (a Standard profile has a fixed monthly base fee); verified with a temporary AppHost publish. Not ported: custom domains, WAF/security policies, rule sets, Premium SKU or other origin types (e.g. non-Aspire hosts), and Bicep's deterministic `uniqueString` names (the provider auto-names the sub-resources; azure-native endpoint names are limited to 46 characters).
+
+## Container Apps Sandboxes
+
+`AspirePulumiPackages.Pulumi.Azure.Sandboxes` ports the ARM/provisioning half of `Aspire.Hosting.Azure.Sandboxes` (preview upstream). `builder.AddPulumiSandboxGroup("sandboxes")` (aliases `AddPulumiAzureSandboxGroup`, `AddPulumiSandboxes`) provisions what the official Bicep generates: an `azure-native:containerinstance/v20260701:SandboxGroup` with a user-assigned identity, a Basic container registry (`sandboxes-acr`), a dedicated image-pull identity (`sandboxes-mi`) with *AcrPull* on that registry, and *Container Apps SandboxGroup Data Owner* for the deploying principal (outputs `id`, `name`, `location`, `imagePullIdentityClientId`, plus the registry name and login server).
+
+```csharp
+var sandboxes = builder.AddPulumiSandboxGroup("sandboxes")
+    .WithPulumiStack(azureStack)
+    .WithSystemAssignedIdentity()                                   // or WithUserAssignedIdentity(identity) / WithNoManagedIdentity()
+    // .WithAzureContainerRegistry(registry)                        // use your own Pulumi ACR instead of sandboxes-acr
+    // .WithAcrPullIdentity(identity)                               // you then grant AcrPull yourself, as upstream
+    .ConfigureInfrastructure(infra => infra.SandboxGroup.Set("tags.team", "platform"));
+```
+
+Not ported: the deployment of compute resources into the group (`PublishAsAzureSandbox`, `AzureSandboxOptions`, disk images, sandboxes and ports). Upstream performs those in-process against the Azure Dev Compute data plane (they are not ARM resources), so the Pulumi group is not an `IComputeEnvironmentResource`. Also not ported: existing sandbox groups, the deployment dashboard summary. azure-native only exposes the group under `Microsoft.ContainerInstance` (upstream's Bicep uses `Microsoft.App/sandboxGroups@2026-02-01-preview`); it has not been deployed against a subscription with Sandboxes preview access. It is not demoed in `AppHost.cs` to avoid provisioning a registry and requiring preview access.
 ## Web PubSub
 
 `AspirePulumiPackages.Pulumi.Azure.WebPubSub` ports `Aspire.Hosting.Azure.WebPubSub`. `builder.AddPulumiWebPubSub("pubsub")` (alias `AddPulumiAzureWebPubSub`) provisions an `azure-native:webpubsub:WebPubSub` with the official Bicep's shape (SKU `Free_F1`, capacity 1, local auth disabled, `aspire-resource-name` tag; outputs `endpoint`, `name`, `id`). `AddHub(name, hubName?)` adds `WebPubSubHub` resources and `AddEventHandler(urlTemplate, userEventPattern, systemEvents)` configures their event handlers; `WithSku(...)` overrides the SKU.
@@ -199,6 +227,21 @@ var managed = builder.AddPulumiAzureManagedRedis("managed").WithPulumiStack(azur
 ```
 
 `WithAccessKeyAuthentication()` stores `connectionstrings--<name>` (and `primaryaccesskey--<name>` for Managed Redis) in a Key Vault created next to the cache (or the vault you pass, which needs `WithDeployerRoleAssignments(AzureKeyVaultRole.KeyVaultSecretsOfficer)`), and gives referencing environments *Key Vault Secrets User*. Also: `RunAsContainer` (local Redis container), `PublishAsExisting`/`AsExisting`, `WithSku` (Managed Redis). Differences: with access keys the connection string seen by a referencing app is the Key Vault secret **URI** (keys must not appear in stack outputs; Container Apps secret references are not generated), and `AsAzureRedis`/`PublishAsAzureRedis` (converting a stock `AddRedis`) and the polyglot variant are not ported.
+
+## Kubernetes (AKS)
+
+`AspirePulumiPackages.Pulumi.Azure.Kubernetes` ports the infrastructure side of `Aspire.Hosting.Azure.Kubernetes`. `builder.AddPulumiKubernetes("aks")` (alias `AddPulumiAzureKubernetesEnvironment`) provisions an `azure-native:containerservice:ManagedCluster` matching the official Bicep: Free tier, system-assigned identity, an autoscaled `system` pool and a `workload` user pool (Standard_D2s_v5, 1-3 nodes), OIDC issuer and workload identity enabled, plus a Basic container registry (`{name}-acr`) whose `AcrPull` role is granted to the kubelet identity. Outputs (`ClusterFqdn`, `OidcIssuerUrl`, `KubeletIdentityObjectId`, `NodeResourceGroup`, `RegistryEndpoint`, ...) are exposed as `PulumiOutputReference` properties.
+
+```csharp
+var aks = builder.AddPulumiKubernetes("aks").WithPulumiStack(azureStack).WithResourceGroup(sharedRg)
+    .WithSystemNodePool("Standard_D4s_v5", 1, 5)
+    .WithContainerRegistry(registry)           // instead of the default '{name}-acr'
+    .WithSubnet(nodesSubnet)                   // plain (non-delegated) subnet from the Network package
+    .ConfigureInfrastructure(infra => infra.ContainerServiceManagedCluster.Set("apiServerAccessProfile.enablePrivateCluster", true));
+aks.AddNodePool("gpu", "Standard_NC4as_T4_v3", 0, 2);   // user pool, optional .WithSubnet(...)
+```
+
+Also `WithWorkloadIdentity(bool)` and `WithContainerInsights(logAnalyticsWorkspace)` (Log Analytics wiring via the `omsagent` add-on; upstream only exposes this as a property). Not demoed in the sample AppHost because a running AKS cluster (two nodes) has real ongoing cost. Not ported: Helm/Kubernetes deployment of compute resources (the environment is infrastructure only and is not an `IComputeEnvironmentResource`), `AddIngress`/`AddGateway`/`AddHelmChart`/`AddCertManager`, `AddLoadBalancer` (Application Gateway for Containers), `AddPersistentVolume`, per-workload federated identity credentials, and typed network profile / private cluster options (use `ConfigureInfrastructure`). Private DNS and VNet pieces are reachable through the Network package. `pulumi preview`/`up` against Azure was not run.
 
 ## Application Insights
 
