@@ -363,6 +363,10 @@ public sealed class AzureContainerAppEnvironmentResource : PulumiAzureResource, 
             env.Add(new Dictionary<string, object?> { ["name"] = key, ["value"] = resolved });
         }
 
+        // The app runs as the environment's user-assigned identity; DefaultAzureCredential only picks it when told its client id.
+        if (!envVars.ContainsKey("AZURE_CLIENT_ID"))
+            env.Add(new Dictionary<string, object?> { ["name"] = "AZURE_CLIENT_ID", ["value"] = $"${{{IdentityRef}.clientId}}" });
+
         var registries = new List<object?>
         {
             new Dictionary<string, object?>

@@ -128,11 +128,13 @@ public static class PulumiExtensions
         var dir = ProjectDirectory(ctx, resource);
         Directory.CreateDirectory(dir);
 
+        // Set before contributing: contributors resolve stack outputs (PulumiOutputReference) from this directory.
+        resource.ProjectDirectory = dir;
+
         var program = new PulumiProgram();
         foreach (var c in ctx.Model.Resources.OfType<IPulumiProgramContributor>().Where(c => c.Stack is null || c.Stack == resource))
             await c.ContributeAsync(program, ctx);
 
-        resource.ProjectDirectory = dir;
         resource.HasApps = program.HasApps;
         resource.InfraTargets.Clear();
         resource.InfraTargets.AddRange(program.InfraTargets);
