@@ -4,6 +4,7 @@ using AspirePulumiPackages.Pulumi.Azure.AppConfiguration;
 using AspirePulumiPackages.Pulumi.Azure.AppContainers;
 using AspirePulumiPackages.Pulumi.Azure.Base;
 using AspirePulumiPackages.Pulumi.Azure.CognitiveServices;
+using AspirePulumiPackages.Pulumi.Azure.Foundry;
 using AspirePulumiPackages.Pulumi.Azure.EntraId;
 using AspirePulumiPackages.Pulumi.Azure.Kusto;
 using AspirePulumiPackages.Pulumi.Azure.Search;
@@ -55,6 +56,13 @@ var openai = builder.AddPulumiOpenAI("openai")
     .ConfigureInfrastructure(infra => infra.CognitiveServicesAccount.Set("properties.publicNetworkAccess", "Enabled"));
 var chat = openai.AddDeployment("chat", "gpt-4o", "2024-08-06");
 
+// Foundry account + project (no model deployment: keeps the demo free of model quota requirements).
+var foundry = builder.AddPulumiFoundry("foundry")
+    .WithPulumiStack(azureStack)
+    .WithResourceGroup(sharedRg)
+    .ConfigureInfrastructure(infra => infra.CognitiveServicesAccount.Set("properties.publicNetworkAccess", "Enabled"));
+var foundryProject = foundry.AddProject("agents");
+
 var appConfig = builder.AddPulumiAppConfiguration("appconfig")
     .WithPulumiStack(azureStack)
     .WithResourceGroup(sharedRg)
@@ -94,6 +102,7 @@ builder.AddProject<Projects.AspirePulumiPackages_Api>("api")
     .WithReference(cosmos)
     .WithReference(blobs)
     .WithReference(chat)
+    .WithReference(foundryProject)
     .WithReference(pubsub)
     .WithReference(telemetry)
     .WithReference(search);
