@@ -55,6 +55,7 @@ public sealed class PulumiVirtualNetworkResource(string name, string addressPref
 
         program.Outputs[$"{Id}Id"] = $"${{{Id}.id}}";
         program.Outputs[$"{Id}Name"] = $"${{{Id}.name}}";
+        Provisioning.PulumiInfrastructureExtensions.ApplyInfrastructureCallbacks(this, program);
         return Task.CompletedTask;
     }
 }
@@ -114,6 +115,7 @@ public sealed class PulumiNetworkSecurityGroupResource(string name) : PulumiAzur
 
         program.Outputs[$"{Id}Id"] = $"${{{Id}.id}}";
         program.Outputs[$"{Id}Name"] = $"${{{Id}.name}}";
+        Provisioning.PulumiInfrastructureExtensions.ApplyInfrastructureCallbacks(this, program);
         return Task.CompletedTask;
     }
 }
@@ -135,6 +137,7 @@ public sealed class PulumiPublicIPAddressResource(string name) : PulumiAzureReso
         program.Outputs[$"{Id}Id"] = $"${{{Id}.id}}";
         program.Outputs[$"{Id}Name"] = $"${{{Id}.name}}";
         program.Outputs[$"{Id}IpAddress"] = $"${{{Id}.ipAddress}}";
+        Provisioning.PulumiInfrastructureExtensions.ApplyInfrastructureCallbacks(this, program);
         return Task.CompletedTask;
     }
 }
@@ -159,6 +162,7 @@ public sealed class PulumiNatGatewayResource(string name) : PulumiAzureResource(
         program.AddInfraResource(Id, "azure-native:network:NatGateway", Yaml.Resource("azure-native:network:NatGateway", props));
         program.Outputs[$"{Id}Id"] = $"${{{Id}.id}}";
         program.Outputs[$"{Id}Name"] = $"${{{Id}.name}}";
+        Provisioning.PulumiInfrastructureExtensions.ApplyInfrastructureCallbacks(this, program);
         return Task.CompletedTask;
     }
 }
@@ -234,6 +238,7 @@ public sealed class PulumiPrivateEndpointResource(string name, PulumiSubnetResou
 
         program.Outputs[$"{Id}Id"] = $"${{{Id}.id}}";
         program.Outputs[$"{Id}Name"] = $"${{{Id}.name}}";
+        Provisioning.PulumiInfrastructureExtensions.ApplyInfrastructureCallbacks(this, program);
         return Task.CompletedTask;
     }
 }
@@ -300,6 +305,7 @@ public sealed class PulumiNetworkSecurityPerimeterResource(string name) : Pulumi
 
         program.Outputs[$"{Id}Id"] = $"${{{Id}.id}}";
         program.Outputs[$"{Id}Name"] = $"${{{Id}.name}}";
+        Provisioning.PulumiInfrastructureExtensions.ApplyInfrastructureCallbacks(this, program);
         return Task.CompletedTask;
     }
 }
