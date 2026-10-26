@@ -26,6 +26,7 @@
     <Project Path="src/AspirePulumiPackages.Pulumi.Azure.PostgreSQL/AspirePulumiPackages.Pulumi.Azure.PostgreSQL.csproj" />
     <Project Path="src/AspirePulumiPackages.Pulumi.Azure.Sql/AspirePulumiPackages.Pulumi.Azure.Sql.csproj" />
     <Project Path="src/AspirePulumiPackages.Pulumi.Azure.Network/AspirePulumiPackages.Pulumi.Azure.Network.csproj" />
+    <Project Path="src/AspirePulumiPackages.Pulumi.Azure.Foundry/AspirePulumiPackages.Pulumi.Azure.Foundry.csproj" />
     <Project Path="src/AspirePulumiPackages.Pulumi.Azure.FrontDoor/AspirePulumiPackages.Pulumi.Azure.FrontDoor.csproj" />
     <Project Path="src/AspirePulumiPackages.Pulumi.Azure.Functions/AspirePulumiPackages.Pulumi.Azure.Functions.csproj" />
     <Project Path="src/AspirePulumiPackages.Pulumi.Azure.SignalR/AspirePulumiPackages.Pulumi.Azure.SignalR.csproj" />
