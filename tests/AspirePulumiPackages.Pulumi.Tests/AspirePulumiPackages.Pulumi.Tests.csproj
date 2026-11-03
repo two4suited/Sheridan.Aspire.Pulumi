@@ -6,6 +6,7 @@
     <Nullable>enable</Nullable>
     <IsPackable>false</IsPackable>
     <IsTestProject>true</IsTestProject>
+    <NoWarn>$(NoWarn);OPENAI001;OPENAICUA001;AAIP001;ASPIREPIPELINES001;ASPIREPIPELINES004</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>
@@ -16,6 +17,7 @@
 
   <ItemGroup>
     <ProjectReference Include="../../src/AspirePulumiPackages.Pulumi/AspirePulumiPackages.Pulumi.csproj" />
+    <ProjectReference Include="../../src/AspirePulumiPackages.Pulumi.Azure.Foundry/AspirePulumiPackages.Pulumi.Azure.Foundry.csproj" />
   </ItemGroup>
 
 </Project>
