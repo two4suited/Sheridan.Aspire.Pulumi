@@ -94,6 +94,14 @@ public static class EntraIdResourceExtensions
         return builder;
     }
 
+    /// <summary>Pins the app registration's display name (1-256 characters) instead of <c>{app}-{resource}-{stack}</c>.</summary>
+    public static IResourceBuilder<EntraIdApplicationResource> WithDisplayName(
+        this IResourceBuilder<EntraIdApplicationResource> builder, string displayName)
+    {
+        builder.Resource.DisplayName = displayName;
+        return builder;
+    }
+
     public static IResourceBuilder<EntraIdApplicationResource> WithPulumiStack(
         this IResourceBuilder<EntraIdApplicationResource> builder, IResourceBuilder<PulumiStackResource> stack)
     {

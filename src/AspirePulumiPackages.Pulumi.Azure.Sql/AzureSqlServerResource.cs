@@ -59,8 +59,8 @@ public sealed class AzureSqlServerResource(string name) : PulumiAzureResource(na
                 ["type"] = "azure-native:managedidentity:UserAssignedIdentity",
                 ["properties"] = new Dictionary<string, object?>
                 {
+                    ["resourceName"] = NameFor(AzureNameKind.UserAssignedIdentity, "admin-mi"),
                     ["resourceGroupName"] = rg,
-                    ["resourceName"] = NameFor(AzureNameKind.UserAssignedIdentity, "mi"),
                     ["location"] = location,
                 },
             });

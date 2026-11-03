@@ -9,8 +9,10 @@ public sealed class AzureAdAppRegistrationResource(string name) : Resource(name)
 {
     public PulumiStackResource? Stack { get; set; }
 
-    /// <summary>Display name of the app registration; defaults to the resource name.</summary>
-    public string? DisplayName { get; set; }
+    private string? _displayName;
+
+    /// <summary>Display name of the app registration (1-256 characters); defaults to <c>{app}-{resource}-{stack}</c> (see <see cref="PulumiEntraNaming"/>).</summary>
+    public string? DisplayName { get => _displayName; set => _displayName = value is null ? null : PulumiEntraNaming.ValidateDisplayName(value, nameof(DisplayName)); }
 
     private string Id => string.Concat(
         Name.Split(['-', '_', '.', ' '], StringSplitOptions.RemoveEmptyEntries)
@@ -25,12 +27,15 @@ public sealed class AzureAdAppRegistrationResource(string name) : Resource(name)
 
     public Task ContributeAsync(PulumiProgram program, PipelineStepContext ctx)
     {
+        var stack = Stack ?? ctx.Model.Resources.OfType<PulumiStackResource>().SingleOrDefault();
+        var displayName = DisplayName ?? PulumiEntraNaming.DisplayName(stack?.ProjectName, Name, stack?.StackName);
+
         program.Resources[$"{Id}App"] = new Dictionary<string, object?>
         {
             ["type"] = "azuread:index/application:Application",
             ["properties"] = new Dictionary<string, object?>
             {
-                ["displayName"] = DisplayName ?? Name,
+                ["displayName"] = displayName,
             },
         };
 

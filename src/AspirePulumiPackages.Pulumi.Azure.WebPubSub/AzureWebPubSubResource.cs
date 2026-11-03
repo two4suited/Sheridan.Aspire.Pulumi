@@ -32,13 +32,13 @@ public sealed class AzureWebPubSubResource(string name) : PulumiAzureResource(na
 
     protected override async Task ContributeResourcesAsync(PulumiProgram program, PipelineStepContext context, string rg, string location)
     {
-        // No resourceName: the provider auto-names it (<id> + random suffix), the equivalent of Bicep's
-        // take('<name>-${uniqueString(resourceGroup().id)}', 63).
+        // Named by the naming layer ({project}-{resource}-{stack}, normalised for WebPubSubService); override with WithAzureName.
         program.Resources[Id] = new Dictionary<string, object?>
         {
             ["type"] = "azure-native:webpubsub:WebPubSub",
             ["properties"] = new Dictionary<string, object?>
             {
+                ["resourceName"] = NameFor(AzureNameKind.WebPubSubService),
                 ["resourceGroupName"] = rg,
                 ["location"] = location,
                 ["disableLocalAuth"] = true,

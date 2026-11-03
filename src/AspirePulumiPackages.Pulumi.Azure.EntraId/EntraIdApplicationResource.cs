@@ -17,6 +17,11 @@ public sealed class EntraIdApplicationResource(string name) : Resource(name), IP
     /// <summary>The Entra instance (authority host) used by consumers. Defaults to the public cloud.</summary>
     public string Instance { get; set; } = DefaultInstance;
 
+    private string? _displayName;
+
+    /// <summary>Display name of the app registration (1-256 characters); defaults to <c>{app}-{resource}-{stack}</c> (see <see cref="PulumiEntraNaming"/>).</summary>
+    public string? DisplayName { get => _displayName; set => _displayName = value is null ? null : PulumiEntraNaming.ValidateDisplayName(value, nameof(DisplayName)); }
+
     public EntraIdSignInAudience SignInAudience { get; set; } = EntraIdSignInAudience.AzureADMyOrg;
 
     public bool EnableIdTokenIssuance { get; set; }
@@ -55,6 +60,9 @@ public sealed class EntraIdApplicationResource(string name) : Resource(name), IP
             return Task.CompletedTask;
         }
 
+        var stack = Stack ?? ctx.Model.Resources.OfType<PulumiStackResource>().SingleOrDefault();
+        var displayName = DisplayName ?? PulumiEntraNaming.DisplayName(stack?.ProjectName, Name, stack?.StackName);
+
         var web = new Dictionary<string, object?>
         {
             ["implicitGrant"] = new Dictionary<string, object?> { ["idTokenIssuanceEnabled"] = EnableIdTokenIssuance },
@@ -66,7 +74,7 @@ public sealed class EntraIdApplicationResource(string name) : Resource(name), IP
 
         var appProps = new Dictionary<string, object?>
         {
-            ["displayName"] = Name,
+            ["displayName"] = displayName,
             ["signInAudience"] = SignInAudience.ToString(),
             ["api"] = new Dictionary<string, object?> { ["requestedAccessTokenVersion"] = 2 },
             ["web"] = web,

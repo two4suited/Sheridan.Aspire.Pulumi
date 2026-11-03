@@ -110,6 +110,7 @@ names). Container-apps environment and Search are not on Microsoft's page and us
 | `FederatedIdentityCredential` | `Microsoft.ManagedIdentity/userAssignedIdentities/federatedIdentityCredentials` | 3-120 | Parent | letters, digits, hyphen, underscore | letter/digit | letter/digit | no | `fic` |  |
 | `RedisEnterpriseCluster` | `Microsoft.Cache/redisEnterprise` | 1-60 | Global | letters, digits, hyphen | letter/digit | letter/digit | yes | `redis` | Azure Managed Redis; the name is part of the host name. |
 | `DeploymentScript` | `Microsoft.Resources/deploymentScripts` | 1-90 | ResourceGroup | letters, digits, hyphen, underscore, period | letter/digit | any | no | `ds` | Generated names never end with a period. |
+| `ConnectorGateway` | `Microsoft.Web/connectorGateways` | 3-24 | ResourceGroup | lowercase letters, digits | letter | letter/digit | no | `conn` | Preview resource without published naming rules; conservative (the length and character set of the official Bicep's `conns<uniqueString>`). |
 
 Generated names are always lowercase even where Azure accepts upper case.
 
@@ -121,6 +122,14 @@ Generated names are always lowercase even where Azure accepts upper case.
 | `AddPulumiAzureResourceGroup("x")` | `NameFor(ResourceGroup)` | `resourceGroupName` | `<id>` |
 | `AddPulumiAzureUserAssignedIdentity("x")` | `NameFor(UserAssignedIdentity)` | `resourceName` | `<id>` |
 | Key Vaults created by `AddPulumiAzureKeyVault`, and the vaults of Cosmos DB (access keys), PostgreSQL (password auth) and Redis (access keys) | `NameFor(KeyVault[, "kv"])` | `vaultName` | unchanged |
+| Azure OpenAI account (`AddPulumiOpenAI`) | `NameFor(CognitiveServicesAccount)`; custom sub-domain `NameFor(CognitiveServicesSubdomain)` (or `CustomSubDomainName`, validated) | `accountName`, `customSubDomainName` | `<id>` |
+| Foundry account (`AddPulumiFoundry`) | same as OpenAI | `accountName`, `customSubDomainName` | `<id>` |
+| Foundry project Application Insights (when none is given) | `NameFor(ApplicationInsights, "<project>-appi")` | `resourceName` | `<id><project>Ai` |
+| Connector Namespace gateway | `NameFor(ConnectorGateway)` as a literal in the ARM template variable | template variable `gatewayName` | `<id>` |
+| Entra ID app registrations (`AddPulumiEntraId`, `AddPulumiAzureAdAppRegistration`) | `PulumiEntraNaming.DisplayName`: `{project}-{resource}-{stack}` (readable, up to 256 characters, `WithDisplayName` overrides) | `displayName` | unchanged |
+
+Foundry project names, connection names, deployment names and the capability host names (`foundry-caphost`, `<project>-ch`) are
+already deterministic and are unchanged.
 
 Not yet applied (still provider autonaming or their own scheme; follow-ups): all other integrations, the compute environments'
 identities/registries/workspaces, and role assignment names (azure-native requires a GUID, which the provider already generates
@@ -142,6 +151,23 @@ and keeps in state; changing it would replace every assignment).
 | Log Analytics workspace; Application Insights (+ implicit workspace) | `NameFor(LogAnalyticsWorkspace[,"law"])`, `NameFor(ApplicationInsights)` | `workspaceName`, `resourceName` | |
 | Front Door profile, endpoint, origin group, origin, route | `NameFor(FrontDoorProfile)`; endpoint `{project}-{origin}-{stack}`; others scoped to the origin name | `profileName`, `endpointName`, `originGroupName`, `originName`, `routeName` | |
 | Network: vnet, subnet, NSG (+rules), NAT, public IP, private endpoint (+connection), DNS vnet link, NSP | `NameFor(...)`; subnets and generated rule names are scoped (Aspire name, sanitized); the DNS zone name itself is fixed by the service (`privatelink.*`) | `virtualNetworkName`, `subnetName`, `networkSecurityGroupName`, `securityRuleName`, `natGatewayName`, `publicIpAddressName`, `privateEndpointName`, `virtualNetworkLinkName`, `networkSecurityPerimeterName` | `aspire-pulumi-packages-vnet-azure-test` |
+
+### Messaging and configuration integrations
+
+| Resource | Name composed from | Property | Example (project `aspire-pulumi-packages`, stack `azure-test`) |
+| --- | --- | --- | --- |
+| Service Bus namespace | `NameFor(ServiceBusNamespace)` | `namespaceName` | `aspire-pulumi-packages-sb-azure-test` (resource `sb`) |
+| Event Hubs namespace | `NameFor(EventHubsNamespace)` | `namespaceName` | `aspire-pulumi-packages-evh-azure-test` (resource `evh`) |
+| App Configuration store | `NameFor(AppConfigurationStore)` | `configStoreName` | `aspire-pulumi-packages-appconfig-azure-test` |
+| SignalR service | `NameFor(SignalRService)` | `resourceName` | `aspire-pulumi-packages-signalr-azure-test` |
+| Web PubSub service | `NameFor(WebPubSubService)` | `resourceName` | `aspire-pulumi-packages-pubsub-azure-test` |
+| Azure AI Search service | `NameFor(SearchService)` | `searchServiceName` | `aspire-pulumi-packages-search-azure-test` |
+| SQL server admin identity | `NameFor(UserAssignedIdentity, "admin-mi")` | `resourceName` | |
+
+Key Vaults (`AddPulumiAzureKeyVault` and the implicit vaults of Cosmos DB, PostgreSQL and Redis) were already named. Queues, topics,
+subscriptions, event hubs, consumer groups and hubs use the names the caller passes. Still on provider autonaming or invented names
+(owned by the data/AI integrations): Cosmos DB account, SQL server, PostgreSQL server, Redis cache, Kusto cluster, Azure OpenAI and
+Foundry accounts, and the connector namespace gateway (`conns<uniqueString>`).
 
 An explicit subnet name passed to `AddSubnet(..., subnetName)` and explicit security rule names are validated against the rules above. Not touched: node pool names (fixed `system`/`workload` or caller supplied),
 the Front Door/NSP profile constants (`defaultProfile`), private DNS zone group name (`default`), and data-plane sandbox names (which carry a deploy id).
