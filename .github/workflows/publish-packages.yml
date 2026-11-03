@@ -1,0 +1,63 @@
+name: Publish packages
+
+# - Pushing a tag like v1.0.0 publishes every Sheridan.Pulumi.* package at that stable version.
+# - Pushing to main publishes a prerelease: <BASE_VERSION>-preview.<run number>.
+# Packages go to GitHub Packages (NuGet).
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - 'v*.*.*'
+
+env:
+  # Base version for branch (prerelease) builds. Bump when starting a new release line.
+  BASE_VERSION: 1.0.0
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Get version
+        id: version
+        run: |
+          if [[ "$GITHUB_REF_TYPE" == "branch" ]]; then
+            echo "version=${BASE_VERSION}-preview.${GITHUB_RUN_NUMBER}" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          VERSION="${GITHUB_REF_NAME#v}"
+          if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+            echo "Tag '$GITHUB_REF_NAME' is not a valid semver tag (expected vX.Y.Z)" >&2
+            exit 1
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Pack
+        run: |
+          mkdir -p artifacts
+          for proj in src/AspirePulumiPackages.Pulumi*/*.csproj; do
+            dotnet pack "$proj" -c Release -p:Version=${{ steps.version.outputs.version }} -o artifacts
+          done
+          ls -1 artifacts
+
+      - name: Push to GitHub Packages
+        run: |
+          dotnet nuget push "artifacts/*.nupkg" \
+            --source "https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json" \
+            --api-key "${{ secrets.GITHUB_TOKEN }}" \
+            --skip-duplicate
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: nupkgs
+          path: artifacts/*.nupkg
