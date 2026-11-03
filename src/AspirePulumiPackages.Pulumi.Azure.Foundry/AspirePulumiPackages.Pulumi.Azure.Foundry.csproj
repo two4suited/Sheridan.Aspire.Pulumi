@@ -5,11 +5,19 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <RootNamespace>AspirePulumiPackages.Pulumi.Azure.Foundry</RootNamespace>
-    <NoWarn>$(NoWarn);ASPIREPIPELINES001;ASPIREPIPELINES004</NoWarn>
+    <NoWarn>$(NoWarn);ASPIREPIPELINES001;ASPIREPIPELINES004;OPENAI001;OPENAICUA001;AAIP001</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>
+    <InternalsVisibleTo Include="AspirePulumiPackages.Pulumi.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="Aspire.Hosting" Version="13.6.4" />
+    <!-- Foundry Agents data plane (not an ARM API), as the official Aspire.Hosting.Foundry uses. -->
+    <PackageReference Include="Azure.AI.Projects" Version="2.1.0-beta.1" />
+    <PackageReference Include="Azure.Identity" Version="1.21.0" />
+    <PackageReference Include="Polly.Core" Version="8.7.0" />
   </ItemGroup>
 
   <ItemGroup>
