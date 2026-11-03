@@ -139,14 +139,14 @@ and keeps in state; changing it would replace every assignment).
 
 | Resource | Name composed from | Property | Example (project `aspire-pulumi-packages`, stack `azure-test`, resource `aca-env`) |
 | --- | --- | --- | --- |
-| ACA environment / its registry, workspace, identity | `NameFor(ContainerAppsEnvironment)`, `(ContainerRegistry,"acr")`, `(LogAnalyticsWorkspace,"law")`, `(UserAssignedIdentity,"mi")` | `environmentName`, `registryName`, `workspaceName`, `resourceName` | `aspire-pulumi-packages-aca-env-azure-test`, `aspirepulumipackagesacaenvacrazuretest`, `...-aca-env-law-azure-test`, `...-aca-env-mi-azure-test` |
+| ACA environment / its registry, workspace, identity | `NameFor(ContainerAppsEnvironment)`, `(ContainerRegistry,"acr")`, `(LogAnalyticsWorkspace,"law")`, `(UserAssignedIdentity,"admin-mi")` | `environmentName`, `registryName`, `workspaceName`, `resourceName` | `aspire-pulumi-packages-aca-env-azure-test`, `aspirepulumipackagesacaenvacrazuretest`, `...-aca-env-law-azure-test`, `...-aca-env-mi-azure-test` |
 | Container app / job | Aspire compute resource name only (`ComposeScoped`; unique per environment), also used for service discovery host names | `containerAppName`, `jobName` | `api` (hashed to 32 chars only when it does not fit) |
 | App Service environment: registry, identities, plan, workspace, App Insights, dashboard app | `NameFor(..., "acr"/"mi"/"contributor-mi"/"plan"/"law"/"appi"/"dashboard")` | `registryName`, `resourceName`, `name`, `workspaceName`, `resourceName`, `name` | `aspire-pulumi-packages-ase-plan-azure-test` |
 | App Service web app | `{project}-{compute resource}-{stack}` (global `azurewebsites.net` host) | `name` | `aspire-pulumi-packages-api-azure-test` |
 | Functions implicit host storage | `{project}{functions project or "functions"}host{stack}` (the Aspire resource name `funcstorage<hash>` is only the Pulumi logical id) | `accountName` | hashed to 24 characters when too long |
 | AKS: cluster, DNS prefix, registry, workload / control-plane identities, federated credentials | `NameFor(KubernetesCluster)`, `(AksDnsPrefix)`, `(ContainerRegistry,"acr")`, `(UserAssignedIdentity,"mi"/"cp-mi")`, `{app}-fedcred` | `resourceName`, `dnsPrefix`, `registryName`, `resourceName`, `federatedIdentityCredentialResourceName` | |
 | Kubernetes object names (DNS-1123, 63) | Aspire resource name; more than 63 characters is trimmed with a 6-character hash (`-service` is accounted for) | `metadata.name` | |
-| Sandbox group, registry, identity | `NameFor(SandboxGroup)`, `(ContainerRegistry,"acr")`, `(UserAssignedIdentity,"mi")` | `resourceName`, `registryName`, `resourceName` | |
+| Sandbox group, registry, identity | `NameFor(SandboxGroup)`, `(ContainerRegistry,"acr")`, `(UserAssignedIdentity,"admin-mi")` | `resourceName`, `registryName`, `resourceName` | |
 | `AddPulumiAzureContainerRegistry` | `NameFor(ContainerRegistry)` | `registryName` | |
 | Log Analytics workspace; Application Insights (+ implicit workspace) | `NameFor(LogAnalyticsWorkspace[,"law"])`, `NameFor(ApplicationInsights)` | `workspaceName`, `resourceName` | |
 | Front Door profile, endpoint, origin group, origin, route | `NameFor(FrontDoorProfile)`; endpoint `{project}-{origin}-{stack}`; others scoped to the origin name | `profileName`, `endpointName`, `originGroupName`, `originName`, `routeName` | |
@@ -177,7 +177,7 @@ the Front Door/NSP profile constants (`defaultProfile`), private DNS zone group 
 | Resource | Name composed from | Property | Example (project `aspire-pulumi-packages`, stack `azure-test`) |
 | --- | --- | --- | --- |
 | Cosmos DB account (+ Key Vault in access-key mode) | `NameFor(CosmosDbAccount)`, `(KeyVault,"kv")` | `accountName`, `vaultName` | `aspire-pulumi-packages-cosmos-azure-test` |
-| SQL server, admin identity, role deployment scripts | `NameFor(SqlServer)`, `(UserAssignedIdentity,"mi")`, `(DeploymentScript,"{db}-{env}-roles")` | `serverName`, `resourceName`, `scriptName` | `aspire-pulumi-packages-sql-azure-test`, `...-sql-mi-azure-test` |
+| SQL server, admin identity, role deployment scripts | `NameFor(SqlServer)`, `(UserAssignedIdentity,"admin-mi")`, `(DeploymentScript,"{db}-{env}-roles")` | `serverName`, `resourceName`, `scriptName` | `aspire-pulumi-packages-sql-azure-test`, `...-sql-admin-mi-azure-test` |
 | PostgreSQL flexible server (+ Key Vault in password mode) | `NameFor(PostgresFlexibleServer)`, `(KeyVault,"kv")` | `serverName`, `vaultName` | `aspire-pulumi-packages-pg-azure-test` |
 | Redis cache (+ Key Vault) | `NameFor(RedisCache)`, `(KeyVault,"kv")` | `name`, `vaultName` | `aspire-pulumi-packages-cache-azure-test` |
 | Managed Redis | `NameFor(RedisEnterpriseCluster)` | `clusterName` | `aspire-pulumi-packages-mredis-azure-test` |
