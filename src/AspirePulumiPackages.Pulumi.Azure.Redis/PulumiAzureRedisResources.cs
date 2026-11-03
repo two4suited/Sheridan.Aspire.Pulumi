@@ -132,6 +132,7 @@ public sealed class PulumiAzureRedisCacheResource(string name) : PulumiAzureRedi
         {
             var props = new Dictionary<string, object?>
             {
+                ["name"] = NameFor(AzureNameKind.RedisCache),
                 ["resourceGroupName"] = rg,
                 ["location"] = location,
                 ["sku"] = new Dictionary<string, object?> { ["name"] = "Basic", ["family"] = "C", ["capacity"] = 1 },
@@ -144,7 +145,6 @@ public sealed class PulumiAzureRedisCacheResource(string name) : PulumiAzureRedi
                 props["disableAccessKeyAuthentication"] = true;
                 props["redisConfiguration"] = new Dictionary<string, object?> { ["aadEnabled"] = "true" };
             }
-            // No name: the provider auto-names it (<id>-<suffix>), the equivalent of take('<name>-${uniqueString(...)}', 63).
             program.Resources[Id] = new Dictionary<string, object?> { ["type"] = "azure-native:redis:Redis", ["properties"] = props };
         }
 
@@ -225,6 +225,7 @@ public sealed class PulumiAzureManagedRedisResource(string name) : PulumiAzureRe
                 ["type"] = "azure-native:redisenterprise:RedisEnterprise",
                 ["properties"] = new Dictionary<string, object?>
                 {
+                    ["clusterName"] = NameFor(AzureNameKind.RedisEnterpriseCluster),
                     ["resourceGroupName"] = rg,
                     ["location"] = location,
                     ["sku"] = new Dictionary<string, object?> { ["name"] = Sku },

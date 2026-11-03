@@ -108,6 +108,8 @@ names). Container-apps environment and Search are not on Microsoft's page and us
 | `FrontDoorRoute` | `Microsoft.Cdn/profiles/afdEndpoints/routes` | 1-50 | Parent | letters, digits, hyphen | letter/digit | letter/digit | no | `route` |  |
 | `AksDnsPrefix` | `Microsoft.ContainerService/managedClusters (dnsPrefix)` | 1-54 | Global | letters, digits, hyphen | letter/digit | letter/digit | no | `aks` | Part of the cluster FQDN. |
 | `FederatedIdentityCredential` | `Microsoft.ManagedIdentity/userAssignedIdentities/federatedIdentityCredentials` | 3-120 | Parent | letters, digits, hyphen, underscore | letter/digit | letter/digit | no | `fic` |  |
+| `RedisEnterpriseCluster` | `Microsoft.Cache/redisEnterprise` | 1-60 | Global | letters, digits, hyphen | letter/digit | letter/digit | yes | `redis` | Azure Managed Redis; the name is part of the host name. |
+| `DeploymentScript` | `Microsoft.Resources/deploymentScripts` | 1-90 | ResourceGroup | letters, digits, hyphen, underscore, period | letter/digit | any | no | `ds` | Generated names never end with a period. |
 | `ConnectorGateway` | `Microsoft.Web/connectorGateways` | 3-24 | ResourceGroup | lowercase letters, digits | letter | letter/digit | no | `conn` | Preview resource without published naming rules; conservative (the length and character set of the official Bicep's `conns<uniqueString>`). |
 
 Generated names are always lowercase even where Azure accepts upper case.
@@ -169,6 +171,23 @@ Foundry accounts, and the connector namespace gateway (`conns<uniqueString>`).
 
 An explicit subnet name passed to `AddSubnet(..., subnetName)` and explicit security rule names are validated against the rules above. Not touched: node pool names (fixed `system`/`workload` or caller supplied),
 the Front Door/NSP profile constants (`defaultProfile`), private DNS zone group name (`default`), and data-plane sandbox names (which carry a deploy id).
+
+### Data integrations
+
+| Resource | Name composed from | Property | Example (project `aspire-pulumi-packages`, stack `azure-test`) |
+| --- | --- | --- | --- |
+| Cosmos DB account (+ Key Vault in access-key mode) | `NameFor(CosmosDbAccount)`, `(KeyVault,"kv")` | `accountName`, `vaultName` | `aspire-pulumi-packages-cosmos-azure-test` |
+| SQL server, admin identity, role deployment scripts | `NameFor(SqlServer)`, `(UserAssignedIdentity,"mi")`, `(DeploymentScript,"{db}-{env}-roles")` | `serverName`, `resourceName`, `scriptName` | `aspire-pulumi-packages-sql-azure-test`, `...-sql-mi-azure-test` |
+| PostgreSQL flexible server (+ Key Vault in password mode) | `NameFor(PostgresFlexibleServer)`, `(KeyVault,"kv")` | `serverName`, `vaultName` | `aspire-pulumi-packages-pg-azure-test` |
+| Redis cache (+ Key Vault) | `NameFor(RedisCache)`, `(KeyVault,"kv")` | `name`, `vaultName` | `aspire-pulumi-packages-cache-azure-test` |
+| Managed Redis | `NameFor(RedisEnterpriseCluster)` | `clusterName` | `aspire-pulumi-packages-mredis-azure-test` |
+| Storage account | `NameFor(StorageAccount)` | `accountName` | `aspistoraazuretest279b9b` (hashed to 24) |
+| Kusto cluster | `NameFor(KustoCluster)` | `clusterName` | `aspkustazuretest528b82` (hashed to 22) |
+
+Databases, containers, queues, elastic pools and Kusto databases keep the names the caller gave them (they are scoped to their
+parent). Existing-resource modes (`AsExisting`/`PublishAsExisting`) are untouched. Because the SQL server name is now explicit,
+an existing stack's autonamed server, Cosmos/PostgreSQL/Redis/Kusto account and admin identity are **replaced** on the next
+`pulumi up` (data loss for stateful resources) unless pinned first with `WithAzureName(AzureNameKind.X, "<current name>")`.
 
 ## Replacement implications
 

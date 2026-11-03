@@ -92,8 +92,7 @@ public sealed class AzurePostgresFlexibleServerResource(string name) : PulumiAzu
             properties["administratorLoginPassword"] = $"${{{PasswordConfigKey}}}";
         }
 
-        // No serverName: the azure-native provider auto-names the server (<id> + random suffix), the Pulumi equivalent of
-        // Bicep's take('<name>${uniqueString(resourceGroup().id)}', 63).
+        properties["serverName"] = NameFor(AzureNameKind.PostgresFlexibleServer);
         program.Resources[Id] = new Dictionary<string, object?> { ["type"] = "azure-native:dbforpostgresql:Server", ["properties"] = properties };
 
         Dictionary<string, object?> Child(string type, Dictionary<string, object?> extra)
