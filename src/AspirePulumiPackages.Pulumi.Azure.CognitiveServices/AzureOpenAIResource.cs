@@ -1,7 +1,6 @@
 using Aspire.Hosting.ApplicationModel;
 using Aspire.Hosting.Pipelines;
 using AspirePulumiPackages.Pulumi.Azure.Base;
-using PulumiExpr = AspirePulumiPackages.Pulumi.Provisioning.PulumiExpr;
 
 namespace AspirePulumiPackages.Pulumi.Azure.CognitiveServices;
 
@@ -20,8 +19,8 @@ public sealed class AzureOpenAIResource(string name) : PulumiAzureResource(name)
     public string Sku { get; set; } = "S0";
 
     /// <summary>
-    /// Custom sub-domain of the account endpoint (required for Entra ID auth; globally unique). When null, a name is derived from
-    /// the resource name plus the first segment of the subscription id (the official Bicep uses <c>uniqueString(resourceGroup().id)</c>).
+    /// Custom sub-domain of the account endpoint (required for Entra ID auth; globally unique, 2-64 letters/digits/hyphens). When null it is composed
+    /// as <c>{app}-{resource}-{stack}</c> (shortened with a stable hash when too long; see docs/naming.md). Can also be pinned with WithAzureName.
     /// </summary>
     public string? CustomSubDomainName { get; set; }
 
@@ -43,22 +42,17 @@ public sealed class AzureOpenAIResource(string name) : PulumiAzureResource(name)
     internal ReferenceExpression GetConnectionString(string deploymentName) =>
         ReferenceExpression.Create($"{ConnectionStringExpression};Deployment={deploymentName}");
 
-    private object SubDomain()
-    {
-        if (CustomSubDomainName is { } custom) return custom;
-        var prefix = new string(Name.ToLowerInvariant().Where(c => char.IsAsciiLetterOrDigit(c)).Take(15).ToArray());
-        if (prefix.Length == 0) prefix = "openai";
-        return PulumiExpr.Join("", prefix, PulumiExpr.Select(0, PulumiExpr.Split("-", PulumiProgramSubscriptionId)));
-    }
-
-    private const string PulumiProgramSubscriptionId = PulumiAzureProgramExtensions.SubscriptionId;
+    /// <summary>The custom sub-domain: the explicit <see cref="CustomSubDomainName"/> (validated) or one composed from the app, resource and stack names.</summary>
+    private string SubDomain() => CustomSubDomainName is { } custom
+        ? AzureNaming.ValidateOverride(AzureNameKind.CognitiveServicesSubdomain, custom, nameof(CustomSubDomainName))
+        : NameFor(AzureNameKind.CognitiveServicesSubdomain);
 
     protected override Task ContributeResourcesAsync(PulumiProgram program, PipelineStepContext context, string rg, string location)
     {
         program.AddClientConfig();
 
-        // No accountName: the provider auto-names it (<id> + random suffix), the equivalent of Bicep's
-        // take('<name>-${uniqueString(resourceGroup().id)}', 64).
+        // accountName and the custom sub-domain are composed from the app, resource and stack names (see docs/naming.md),
+        // replacing the provider's random suffix / Bicep's uniqueString.
         // An infra target: role assignments are created in the targeted provision pass and depend on the account.
         program.AddInfraResource(Id, "azure-native:cognitiveservices:Account", new Dictionary<string, object?>
         {
@@ -66,6 +60,7 @@ public sealed class AzureOpenAIResource(string name) : PulumiAzureResource(name)
             ["properties"] = new Dictionary<string, object?>
             {
                 ["resourceGroupName"] = rg,
+                ["accountName"] = NameFor(AzureNameKind.CognitiveServicesAccount),
                 ["location"] = location,
                 ["kind"] = "OpenAI",
                 ["sku"] = new Dictionary<string, object?> { ["name"] = Sku },

@@ -108,6 +108,7 @@ names). Container-apps environment and Search are not on Microsoft's page and us
 | `FrontDoorRoute` | `Microsoft.Cdn/profiles/afdEndpoints/routes` | 1-50 | Parent | letters, digits, hyphen | letter/digit | letter/digit | no | `route` |  |
 | `AksDnsPrefix` | `Microsoft.ContainerService/managedClusters (dnsPrefix)` | 1-54 | Global | letters, digits, hyphen | letter/digit | letter/digit | no | `aks` | Part of the cluster FQDN. |
 | `FederatedIdentityCredential` | `Microsoft.ManagedIdentity/userAssignedIdentities/federatedIdentityCredentials` | 3-120 | Parent | letters, digits, hyphen, underscore | letter/digit | letter/digit | no | `fic` |  |
+| `ConnectorGateway` | `Microsoft.Web/connectorGateways` | 3-24 | ResourceGroup | lowercase letters, digits | letter | letter/digit | no | `conn` | Preview resource without published naming rules; conservative (the length and character set of the official Bicep's `conns<uniqueString>`). |
 
 Generated names are always lowercase even where Azure accepts upper case.
 
@@ -119,6 +120,14 @@ Generated names are always lowercase even where Azure accepts upper case.
 | `AddPulumiAzureResourceGroup("x")` | `NameFor(ResourceGroup)` | `resourceGroupName` | `<id>` |
 | `AddPulumiAzureUserAssignedIdentity("x")` | `NameFor(UserAssignedIdentity)` | `resourceName` | `<id>` |
 | Key Vaults created by `AddPulumiAzureKeyVault`, and the vaults of Cosmos DB (access keys), PostgreSQL (password auth) and Redis (access keys) | `NameFor(KeyVault[, "kv"])` | `vaultName` | unchanged |
+| Azure OpenAI account (`AddPulumiOpenAI`) | `NameFor(CognitiveServicesAccount)`; custom sub-domain `NameFor(CognitiveServicesSubdomain)` (or `CustomSubDomainName`, validated) | `accountName`, `customSubDomainName` | `<id>` |
+| Foundry account (`AddPulumiFoundry`) | same as OpenAI | `accountName`, `customSubDomainName` | `<id>` |
+| Foundry project Application Insights (when none is given) | `NameFor(ApplicationInsights, "<project>-appi")` | `resourceName` | `<id><project>Ai` |
+| Connector Namespace gateway | `NameFor(ConnectorGateway)` as a literal in the ARM template variable | template variable `gatewayName` | `<id>` |
+| Entra ID app registrations (`AddPulumiEntraId`, `AddPulumiAzureAdAppRegistration`) | `PulumiEntraNaming.DisplayName`: `{project}-{resource}-{stack}` (readable, up to 256 characters, `WithDisplayName` overrides) | `displayName` | unchanged |
+
+Foundry project names, connection names, deployment names and the capability host names (`foundry-caphost`, `<project>-ch`) are
+already deterministic and are unchanged.
 
 Not yet applied (still provider autonaming or their own scheme; follow-ups): all other integrations, the compute environments'
 identities/registries/workspaces, and role assignment names (azure-native requires a GUID, which the provider already generates

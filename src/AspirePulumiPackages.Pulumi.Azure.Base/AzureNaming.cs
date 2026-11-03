@@ -50,6 +50,7 @@ public enum AzureNameKind
     AksDnsPrefix,
     FederatedIdentityCredential,
     NetworkSecurityRule,
+    ConnectorGateway,
 }
 
 /// <summary>Where an Azure resource name must be unique.</summary>
@@ -152,6 +153,7 @@ public static class AzureNaming
         R(AzureNameKind.FederatedIdentityCredential, "Microsoft.ManagedIdentity/userAssignedIdentities/federatedIdentityCredentials", 3, 120, AzureNameScope.Parent, "fic", underscore: true),
         R(AzureNameKind.NetworkSecurityRule, "Microsoft.Network/networkSecurityGroups/securityRules", 1, 80, AzureNameScope.Parent, "rule", underscore: true, period: true),
         R(AzureNameKind.FrontDoorRoute, "Microsoft.Cdn/profiles/afdEndpoints/routes", 1, 50, AzureNameScope.Parent, "route"),
+        R(AzureNameKind.ConnectorGateway, "Microsoft.Web/connectorGateways", 3, 24, AzureNameScope.ResourceGroup, "conn", hyphen: false, lower: true, letterStart: true, note: "Preview resource without published naming rules; a conservative rule (the length and character set of the official Bicep's generated 'conns<uniqueString>' name)."),
     }.ToDictionary(r => r.Kind);
 
     public static AzureNamingRule RuleFor(AzureNameKind kind) => Rules[kind];
