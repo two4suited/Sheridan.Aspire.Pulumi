@@ -33,14 +33,14 @@ public sealed class AzureSignalRResource(string name) : PulumiAzureResource(name
 
     protected override Task ContributeResourcesAsync(PulumiProgram program, PipelineStepContext context, string rg, string location)
     {
-        // No resourceName: the provider auto-names it (<id> + random suffix), the equivalent of Bicep's
-        // take('<name>-${uniqueString(resourceGroup().id)}', 63).
+        // Named by the naming layer ({project}-{resource}-{stack}, normalised for SignalRService); override with WithAzureName.
         // An infra target: role assignments are created in the targeted provision pass and depend on the service.
         program.AddInfraResource(Id, "azure-native:signalrservice:SignalR", new Dictionary<string, object?>
         {
             ["type"] = "azure-native:signalrservice:SignalR",
             ["properties"] = new Dictionary<string, object?>
             {
+                ["resourceName"] = NameFor(AzureNameKind.SignalRService),
                 ["resourceGroupName"] = rg,
                 ["location"] = location,
                 ["kind"] = "SignalR",

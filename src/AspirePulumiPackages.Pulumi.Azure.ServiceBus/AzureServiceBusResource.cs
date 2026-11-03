@@ -36,13 +36,13 @@ public sealed class AzureServiceBusResource(string name) : PulumiAzureResource(n
 
     protected override Task ContributeResourcesAsync(PulumiProgram program, PipelineStepContext context, string rg, string location)
     {
-        // No namespaceName: the azure-native provider auto-names it, the Pulumi equivalent of
-        // take('<name>-${uniqueString(resourceGroup().id)}', 50).
+        // Named by the naming layer ({project}-{resource}-{stack}, normalised for ServiceBusNamespace); override with WithAzureName.
         program.AddInfraResource(Id, "azure-native:servicebus:Namespace", new()
         {
             ["type"] = "azure-native:servicebus:Namespace",
             ["properties"] = new Dictionary<string, object?>
             {
+                ["namespaceName"] = NameFor(AzureNameKind.ServiceBusNamespace),
                 ["resourceGroupName"] = rg,
                 ["location"] = location,
                 ["disableLocalAuth"] = true,

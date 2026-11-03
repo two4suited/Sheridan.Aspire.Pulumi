@@ -141,6 +141,23 @@ and keeps in state; changing it would replace every assignment).
 | Front Door profile, endpoint, origin group, origin, route | `NameFor(FrontDoorProfile)`; endpoint `{project}-{origin}-{stack}`; others scoped to the origin name | `profileName`, `endpointName`, `originGroupName`, `originName`, `routeName` | |
 | Network: vnet, subnet, NSG (+rules), NAT, public IP, private endpoint (+connection), DNS vnet link, NSP | `NameFor(...)`; subnets and generated rule names are scoped (Aspire name, sanitized); the DNS zone name itself is fixed by the service (`privatelink.*`) | `virtualNetworkName`, `subnetName`, `networkSecurityGroupName`, `securityRuleName`, `natGatewayName`, `publicIpAddressName`, `privateEndpointName`, `virtualNetworkLinkName`, `networkSecurityPerimeterName` | `aspire-pulumi-packages-vnet-azure-test` |
 
+### Messaging and configuration integrations
+
+| Resource | Name composed from | Property | Example (project `aspire-pulumi-packages`, stack `azure-test`) |
+| --- | --- | --- | --- |
+| Service Bus namespace | `NameFor(ServiceBusNamespace)` | `namespaceName` | `aspire-pulumi-packages-sb-azure-test` (resource `sb`) |
+| Event Hubs namespace | `NameFor(EventHubsNamespace)` | `namespaceName` | `aspire-pulumi-packages-evh-azure-test` (resource `evh`) |
+| App Configuration store | `NameFor(AppConfigurationStore)` | `configStoreName` | `aspire-pulumi-packages-appconfig-azure-test` |
+| SignalR service | `NameFor(SignalRService)` | `resourceName` | `aspire-pulumi-packages-signalr-azure-test` |
+| Web PubSub service | `NameFor(WebPubSubService)` | `resourceName` | `aspire-pulumi-packages-pubsub-azure-test` |
+| Azure AI Search service | `NameFor(SearchService)` | `searchServiceName` | `aspire-pulumi-packages-search-azure-test` |
+| SQL server admin identity | `NameFor(UserAssignedIdentity, "admin-mi")` | `resourceName` | |
+
+Key Vaults (`AddPulumiAzureKeyVault` and the implicit vaults of Cosmos DB, PostgreSQL and Redis) were already named. Queues, topics,
+subscriptions, event hubs, consumer groups and hubs use the names the caller passes. Still on provider autonaming or invented names
+(owned by the data/AI integrations): Cosmos DB account, SQL server, PostgreSQL server, Redis cache, Kusto cluster, Azure OpenAI and
+Foundry accounts, and the connector namespace gateway (`conns<uniqueString>`).
+
 An explicit subnet name passed to `AddSubnet(..., subnetName)` and explicit security rule names are validated against the rules above. Not touched: node pool names (fixed `system`/`workload` or caller supplied),
 the Front Door/NSP profile constants (`defaultProfile`), private DNS zone group name (`default`), and data-plane sandbox names (which carry a deploy id).
 

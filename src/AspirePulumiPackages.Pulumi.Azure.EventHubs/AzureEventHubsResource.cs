@@ -33,13 +33,13 @@ public sealed class AzureEventHubsResource(string name) : PulumiAzureResource(na
 
     protected override Task ContributeResourcesAsync(PulumiProgram program, PipelineStepContext context, string rg, string location)
     {
-        // No namespaceName: the provider auto-names it (<id> + random suffix), the equivalent of Bicep's
-        // take('<name>-${uniqueString(resourceGroup().id)}', 256).
+        // Named by the naming layer ({project}-{resource}-{stack}, normalised for EventHubsNamespace); override with WithAzureName.
         program.Resources[Id] = new Dictionary<string, object?>
         {
             ["type"] = "azure-native:eventhub:Namespace",
             ["properties"] = new Dictionary<string, object?>
             {
+                ["namespaceName"] = NameFor(AzureNameKind.EventHubsNamespace),
                 ["resourceGroupName"] = rg,
                 ["location"] = location,
                 ["disableLocalAuth"] = true,
