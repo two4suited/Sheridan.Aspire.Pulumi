@@ -1,0 +1,35 @@
+---
+title: Sheridan.Aspire.Pulumi
+description: Aspire hosting integrations that provision Azure infrastructure with Pulumi instead of Bicep.
+template: splash
+hero:
+  tagline: Provision your Aspire app's Azure infrastructure with Pulumi. Same AddX / WithX calls, no Bicep.
+  actions:
+    - text: Quick start
+      link: /Sheridan.Aspire.Pulumi/get-started/quick-start/
+      icon: right-arrow
+    - text: Browse integrations
+      link: /Sheridan.Aspire.Pulumi/integrations/
+      variant: minimal
+    - text: GitHub
+      link: https://github.com/two4suited/Sheridan.Aspire.Pulumi
+      icon: external
+      variant: minimal
+---
+
+import { Card, CardGrid } from '@astrojs/starlight/components';
+
+<CardGrid stagger>
+  <Card title="Drop-in for Aspire" icon="rocket">
+    Each package mirrors an official `Aspire.Hosting.Azure.*` integration: `AddPulumiX` instead of `AddAzureX`, same `WithX` calls.
+  </Card>
+  <Card title="Generated Pulumi program" icon="document">
+    `aspire publish` writes the Pulumi project from your AppHost; `aspire deploy` runs `pulumi up`. No separate Pulumi code to maintain.
+  </Card>
+  <Card title="Deterministic names" icon="seti:config">
+    Azure resource names are built from your app, resource and stack names and conform to each resource type's rules. See [naming](/Sheridan.Aspire.Pulumi/concepts/naming/).
+  </Card>
+  <Card title="Multiple stacks" icon="random">
+    Split resources across Pulumi stacks with their own ESC environments and ordered deploys. See [multiple stacks](/Sheridan.Aspire.Pulumi/concepts/multiple-stacks/).
+  </Card>
+</CardGrid>

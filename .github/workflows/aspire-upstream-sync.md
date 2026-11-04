@@ -43,10 +43,10 @@ names have changed in this repo before.
 
 ## Step 1: Learn this repo
 
-Read `CLAUDE.md`, `README.md`, `docs/naming.md`, `docs/provisioning.md`, `docs/decisions/` and the
-matching `docs/overlays/<Name>.md` files (skip anything missing). Then list `src/` and `tests/` and
+Read `CLAUDE.md`, `README.md`, `docs/src/content/docs/concepts/naming.md`, `docs/src/content/docs/concepts/provisioning.md`, `docs/src/content/docs/reference/decisions/` and the
+matching `docs/src/content/docs/reference/overlays/<Name>.md` files (skip anything missing). Then list `src/` and `tests/` and
 build a mapping `local project -> upstream project`. Note the pinned `Aspire.Hosting` version in the
-`.csproj` files. Do not file issues for things `docs/decisions/` records as intentionally different
+`.csproj` files. Do not file issues for things `docs/src/content/docs/reference/decisions/` records as intentionally different
 or out of scope.
 
 Remember these repo conventions, because the guidance you write must follow them:
@@ -55,7 +55,7 @@ Remember these repo conventions, because the guidance you write must follow them
 - Resource bodies are hand-written `Dictionary<string, object?>` nodes (`type` + `properties`) built
   with `PulumiResourceBuilder` / `PulumiProgramExtensions`; there is no generator.
 - Upstream's `ConfigureInfrastructure` customisation is mirrored by a `Pulumi<Name>Infrastructure`
-  type documented in `docs/overlays/<Name>.md`.
+  type documented in `docs/src/content/docs/reference/overlays/<Name>.md`.
 - Existing-resource support follows the `PublishAsExisting` / `AsExisting` pattern that other
   integrations already implement (find a current example with `git grep -n PublishAsExisting src`).
 
@@ -85,7 +85,7 @@ against the release tag). Record this as `released in vX`, `on main only`, or `u
 
 A change is actionable if it affects a local project in one of these ways:
 - New or changed public `AddAzureX` / `WithX` / `AsExisting` extension methods, parameters or defaults
-  (needs a matching `AddPulumiX` / `WithX`; names follow `docs/naming.md`).
+  (needs a matching `AddPulumiX` / `WithX`; names follow `docs/src/content/docs/concepts/naming.md`).
 - New or changed Azure resources, properties, SKUs, API versions, networking/private-endpoint
   behaviour, or diagnostic settings in what the Bicep/`Azure.Provisioning` code generates.
 - New or changed role assignments / built-in role definitions, managed identity wiring.
@@ -132,7 +132,7 @@ Body sections, in this order:
 5. **How to resolve** - a concrete plan for a contributor:
    - **Files to change:** the local files/classes to edit or add, including the extension class, the
      resource class, the `Pulumi<Name>Infrastructure` overlay type if relevant, the package `README.md`
-     and the matching `docs/overlays/<Name>.md`.
+     and the matching `docs/src/content/docs/reference/overlays/<Name>.md`.
    - **Pattern to copy:** link the closest existing local implementation of the same kind of feature
      (for example the local `PublishAsExisting` implementation for existing-resource support), so the
      contributor copies a working shape instead of inventing one.
@@ -141,7 +141,7 @@ Body sections, in this order:
      `pulumi package get-schema <provider>` where the CLI is available; otherwise state they are
      unconfirmed.
    - **Repo conventions to follow:** naming through `NameFor`/`AzureNameKind`, no autonaming, YAML
-     node style, and any decision in `docs/decisions/` that applies.
+     node style, and any decision in `docs/src/content/docs/reference/decisions/` that applies.
    - **Gotchas:** behaviour that differs between Bicep and Pulumi, ordering/dependency concerns,
      validation upstream performs, and anything the PR description warns about.
    - **Task list:** a markdown checklist (`- [ ]`) of small steps. If the work is large, split it into

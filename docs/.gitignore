@@ -1,0 +1,6 @@
+node_modules/
+dist/
+.astro/
+# Generated from src/*/README.md by scripts/sync-packages.mjs
+src/content/docs/integrations/
+integrations.generated.json
