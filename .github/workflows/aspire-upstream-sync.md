@@ -10,7 +10,9 @@ on:
 permissions:
   contents: read
   issues: read
-engine: claude
+engine:
+  id: claude
+  model: claude-sonnet-5-5
 timeout-minutes: 30
 network: defaults
 tools:
