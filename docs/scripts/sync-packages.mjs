@@ -45,16 +45,17 @@ for (const r of rows) {
     '---',
     '',
   ].join('\n');
-  writeFileSync(join(dir, `${slugify(r.id)}.md`), fm + body);
+  const links = `[NuGet](https://www.nuget.org/packages/${r.id}) · [Source](${REPO}/tree/main/src/${r.id})\n\n`;
+  writeFileSync(join(dir, `${slugify(r.id)}.md`), fm + links + body);
   if (!areas.has(r.area)) areas.set(r.area, []);
   areas.get(r.area).push({ ...r, short, slug: `${slugify(r.area)}/${slugify(r.id)}` });
 }
 
 let idx = '---\ntitle: Integrations\ndescription: Every Sheridan.Aspire.Pulumi package, grouped by area.\nsidebar:\n  order: -1\n---\n\n';
-idx += 'Each package mirrors the official `Aspire.Hosting.Azure.*` integration (`AddPulumiX` instead of `AddAzureX`). Install the ones you need from the GitHub Packages feed (see [Quick start](' + BASE + '/get-started/quick-start/)).\n\n';
+idx += 'Each package mirrors the official `Aspire.Hosting.Azure.*` integration (`AddPulumiX` instead of `AddAzureX`). Install the ones you need from [nuget.org](https://www.nuget.org/profiles/two4suited) (see [Quick start](' + BASE + '/get-started/quick-start/)).\n\n';
 for (const [a, items] of areas) {
-  idx += `## ${a}\n\n| Package | Provisions |\n| --- | --- |\n`;
-  for (const i of items) idx += `| [\`${i.id}\`](${BASE}/integrations/${i.slug}/) | ${i.description} |\n`;
+  idx += `## ${a}\n\n| Package | Provisions | NuGet |\n| --- | --- | --- |\n`;
+  for (const i of items) idx += `| [\`${i.id}\`](${BASE}/integrations/${i.slug}/) | ${i.description} | [nuget.org](https://www.nuget.org/packages/${i.id}) |\n`;
   idx += '\n';
 }
 writeFileSync(join(out, 'index.md'), idx);

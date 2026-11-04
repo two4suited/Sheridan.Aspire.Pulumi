@@ -130,3 +130,7 @@ var acaEnv = builder.AddPulumiAzureContainerAppEnvironment("aca-env")
 - `docs/`: the [documentation site](https://two4suited.github.io/Sheridan.Aspire.Pulumi/) (Astro Starlight; run `npm install && npm run dev` in `docs/`), including the [naming scheme](https://two4suited.github.io/Sheridan.Aspire.Pulumi/concepts/naming/), [provisioning / `ConfigureInfrastructure`](https://two4suited.github.io/Sheridan.Aspire.Pulumi/concepts/provisioning/) and per-service overlay notes.
 
 See [CLAUDE.md](CLAUDE.md) for how new resource integrations are added.
+
+## License
+
+[MIT](LICENSE)
