@@ -11,6 +11,7 @@
     <Authors>Brian Sheridan</Authors>
     <PackageTags>aspire;pulumi;azure</PackageTags>
     <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <RepositoryUrl>https://github.com/two4suited/Sheridan.Aspire.Pulumi</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
     <PublishRepositoryUrl>true</PublishRepositoryUrl>
