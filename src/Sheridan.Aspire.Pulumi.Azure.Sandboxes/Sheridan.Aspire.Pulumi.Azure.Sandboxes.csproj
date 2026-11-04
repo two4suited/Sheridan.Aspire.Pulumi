@@ -4,7 +4,7 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <Description>Azure Container Apps Sandboxes as an Aspire compute environment, provisioned by Pulumi plus a data-plane deployment step.</Description>
+    <Description>Azure Container Apps Sandboxes as an Aspire compute environment, provisioned by Pulumi plus a data-plane deployment step. Part of Sheridan.Aspire.Pulumi, which provisions Aspire resources with Pulumi instead of Bicep. Usage and docs: https://github.com/two4suited/Sheridan.Aspire.Pulumi/tree/main/src/Sheridan.Aspire.Pulumi.Azure.Sandboxes#readme</Description>
     <RootNamespace>Sheridan.Aspire.Pulumi.Azure.Sandboxes</RootNamespace>
     <NoWarn>$(NoWarn);ASPIREPIPELINES001;ASPIREPIPELINES003;ASPIREPIPELINES004;ASPIRECONTAINERRUNTIME001;ASPIREPROJECTS001</NoWarn>
   </PropertyGroup>

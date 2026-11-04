@@ -4,7 +4,7 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <Description>Azure Functions projects for Aspire, deployed to a Pulumi-provisioned compute environment.</Description>
+    <Description>Azure Functions projects for Aspire, deployed to a Pulumi-provisioned compute environment. Part of Sheridan.Aspire.Pulumi, which provisions Aspire resources with Pulumi instead of Bicep. Usage and docs: https://github.com/two4suited/Sheridan.Aspire.Pulumi/tree/main/src/Sheridan.Aspire.Pulumi.Azure.Functions#readme</Description>
     <RootNamespace>Sheridan.Aspire.Pulumi.Azure.Functions</RootNamespace>
     <NoWarn>$(NoWarn);ASPIREPIPELINES001;ASPIREPIPELINES004;ASPIRECOMMAND001</NoWarn>
   </PropertyGroup>

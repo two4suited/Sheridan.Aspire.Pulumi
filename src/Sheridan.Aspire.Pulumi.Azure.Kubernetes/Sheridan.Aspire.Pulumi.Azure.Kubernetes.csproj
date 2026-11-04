@@ -4,7 +4,7 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <Description>Azure Kubernetes Service (AKS) provisioned by Pulumi, with compute deployment through the Pulumi Kubernetes provider.</Description>
+    <Description>Azure Kubernetes Service (AKS) provisioned by Pulumi, with compute deployment through the Pulumi Kubernetes provider. Part of Sheridan.Aspire.Pulumi, which provisions Aspire resources with Pulumi instead of Bicep. Usage and docs: https://github.com/two4suited/Sheridan.Aspire.Pulumi/tree/main/src/Sheridan.Aspire.Pulumi.Azure.Kubernetes#readme</Description>
     <RootNamespace>Sheridan.Aspire.Pulumi.Azure.Kubernetes</RootNamespace>
     <NoWarn>$(NoWarn);ASPIREPIPELINES001;ASPIREPIPELINES003;ASPIREPIPELINES004;ASPIRECOMPUTE002</NoWarn>
   </PropertyGroup>

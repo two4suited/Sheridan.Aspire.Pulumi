@@ -4,7 +4,7 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <Description>Azure Database for PostgreSQL flexible server provisioned by Pulumi, a drop-in for AddAzurePostgresFlexibleServer.</Description>
+    <Description>Azure Database for PostgreSQL flexible server provisioned by Pulumi, a drop-in for AddAzurePostgresFlexibleServer. Part of Sheridan.Aspire.Pulumi, which provisions Aspire resources with Pulumi instead of Bicep. Usage and docs: https://github.com/two4suited/Sheridan.Aspire.Pulumi/tree/main/src/Sheridan.Aspire.Pulumi.Azure.PostgreSQL#readme</Description>
     <RootNamespace>Sheridan.Aspire.Pulumi.Azure.PostgreSQL</RootNamespace>
     <NoWarn>$(NoWarn);ASPIREPIPELINES001;ASPIREPIPELINES004</NoWarn>
   </PropertyGroup>
