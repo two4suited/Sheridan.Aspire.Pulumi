@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 360" role="img" aria-label="AppHost to Pulumi to Azure">
+  <defs>
+    <linearGradient id="a" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#7c4dff"/><stop offset="1" stop-color="#3b82f6"/></linearGradient>
+  </defs>
+  <rect x="40" y="24" width="400" height="84" rx="14" fill="#3b2a82"/>
+  <text x="64" y="62" font-family="system-ui,sans-serif" font-size="18" font-weight="600" fill="#fff">Aspire AppHost</text>
+  <text x="64" y="88" font-family="ui-monospace,monospace" font-size="14" fill="#cfc4ff">AddPulumiX(...).WithX(...)</text>
+  <path d="M240 112v44m-8-10 8 10 8-10" stroke="url(#a)" stroke-width="3" fill="none" stroke-linecap="round"/>
+  <rect x="40" y="160" width="400" height="84" rx="14" fill="url(#a)"/>
+  <text x="64" y="198" font-family="system-ui,sans-serif" font-size="18" font-weight="600" fill="#fff">Pulumi stack + ESC</text>
+  <text x="64" y="224" font-family="ui-monospace,monospace" font-size="14" fill="#e9e3ff">aspire publish · aspire deploy</text>
+  <path d="M240 248v44m-8-10 8 10 8-10" stroke="url(#a)" stroke-width="3" fill="none" stroke-linecap="round"/>
+  <rect x="40" y="296" width="400" height="48" rx="14" fill="#1d4f91"/>
+  <text x="64" y="327" font-family="system-ui,sans-serif" font-size="18" font-weight="600" fill="#fff">Azure resources</text>
+</svg>

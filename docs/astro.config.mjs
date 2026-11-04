@@ -21,6 +21,8 @@ export default defineConfig({
       editLink: {
         baseUrl: 'https://github.com/two4suited/Sheridan.Aspire.Pulumi/edit/main/docs/',
       },
+      logo: { src: './src/assets/logo.svg' },
+      components: { PageTitle: './src/components/PageTitle.astro' },
       customCss: ['./src/styles/custom.css'],
       sidebar: [
         { label: 'Get started', items: [{ slug: 'get-started/introduction' }, { slug: 'get-started/quick-start' }] },

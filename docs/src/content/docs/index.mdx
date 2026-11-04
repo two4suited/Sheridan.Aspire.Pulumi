@@ -3,6 +3,8 @@ title: Sheridan.Aspire.Pulumi
 description: Aspire hosting integrations that provision Azure infrastructure with Pulumi instead of Bicep.
 template: splash
 hero:
+  image:
+    file: ../../assets/hero.svg
   tagline: Provision your Aspire app's Azure infrastructure with Pulumi. Same AddX / WithX calls, no Bicep.
   actions:
     - text: Quick start
@@ -19,7 +21,7 @@ hero:
 
 import { Card, CardGrid } from '@astrojs/starlight/components';
 
-<CardGrid stagger>
+<CardGrid>
   <Card title="Drop-in for Aspire" icon="rocket">
     Each package mirrors an official `Aspire.Hosting.Azure.*` integration: `AddPulumiX` instead of `AddAzureX`, same `WithX` calls.
   </Card>
