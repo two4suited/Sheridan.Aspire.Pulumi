@@ -1,19 +1,51 @@
 # Sheridan.Aspire.Pulumi.Azure.ConnectorNamespace
 
-_Connector Namespace_ — part of [Sheridan.Aspire.Pulumi](../../README.md).
+Azure connector namespaces (preview) provisioned by Pulumi, a port of `Aspire.Hosting.Azure.ConnectorNamespace`.
 
-`Sheridan.Aspire.Pulumi.Azure.ConnectorNamespace` ports `Aspire.Hosting.Azure.ConnectorNamespace` (preview). **azure-native has no `Microsoft.Web/connectorGateways` resource** (confirmed with `pulumi package get-schema azure-native`), so the namespace is provisioned as a single `azure-native:resources:Deployment` (an ARM template deployment) containing exactly the resource types, `2026-05-01-preview` API version and properties of the official generated Bicep: the gateway (`conns<uniqueString>`, system-assigned identity), connections, connection access policies, `mcpserverConfigs` (`ManagedMcpServer`, state `Enabled`) and MCP access policies. Outputs: `Id`, `Name`, `PrincipalId`, `TenantId`.
+`AddPulumiConnectorNamespace` provisions a connector gateway with connections, access policies and managed MCP server configs. azure-native has no `Microsoft.Web/connectorGateways` resource, so the namespace is a single `azure-native:resources:Deployment` (ARM template) with exactly the resource types, API version (`2026-05-01-preview`) and properties of the official Bicep.
 
-```csharp
-var connectors = builder.AddPulumiConnectorNamespace("connectors").WithPulumiStack(azureStack).WithResourceGroup(rg);
-var office = connectors.AddConnection("office", "office365")
-    .WithAccessPolicy("owner", new() { ObjectId = "<guid>", TenantId = "<guid>" })
-    .WithIdentityAccessPolicy("app", appIdentity);   // a PulumiAzureUserAssignedIdentityResource in the same stack
-connectors.AddMcpServerConfig("mcp", new() { Description = "Mail tools" })
-    .WithConnector("office-tools", office, new() { Operations = [new() { Name = "SendEmail" }] })
-    .WithAccessPolicy("user", new() { ObjectId = "<guid>", TenantId = "<guid>", PrincipalType = AzureConnectorNamespaceMcpAccessPolicyPrincipalType.User });
+## Install
 
-builder.AddProject<Projects.MyApi>("api").WithReference(office);   // {name}__connectorGatewayName / {name}__connectionName
+```bash
+dotnet add package Sheridan.Aspire.Pulumi.Azure.ConnectorNamespace
 ```
 
-`ConfigureInfrastructure(infra => ...)` exposes the `Deployment` root plus the ARM template's `TemplateResources`/`Gateway` maps (ARM property names, not azure-native names). `PublishAsExisting(name, resourceGroup)` / `AsExisting(name, resourceGroup)` on the namespace uses an existing gateway: the template drops the gateway resource (children are deployed under the existing gateway name, in that resource group, without `dependsOn` on it) and the outputs read the existing gateway; connection- and MCP-config-level `AsExisting` work as before. Not ported: the Aspire polyglot (ATS) exports. **Provider gap (checked against the current azure-native schema; azapi is not available as a Pulumi package):** azure-native has no `connectorGateways` resource family (the only similar `azure-native:web:ConnectionGateway` is the unrelated Logic Apps `Microsoft.Web/connectionGateways`), so no typed resource can replace the ARM-template Deployment; per-resource diffs are therefore not available, only a diff of the template. Revisit when azure-native publishes the `2026-05-01-preview` Microsoft.Web specs. Note that connections using OAuth must still be consented in the portal after deployment, as with the Bicep version. The ARM template route was verified by comparing `aspire publish` output against the official Bicep, not by a real deployment.
+## Usage
+
+```csharp
+var builder = DistributedApplication.CreateBuilder(args);
+
+builder.AddPulumiStack("my-app", "dev").WithOrganization("my-org");
+
+var connectors = builder.AddPulumiConnectorNamespace("connectors");
+var office = connectors.AddConnection("office", "office365")
+    .WithAccessPolicy("owner", new() { ObjectId = "<guid>", TenantId = "<guid>" });
+
+connectors.AddMcpServerConfig("mcp", new() { Description = "Mail tools" })
+    .WithConnector("office-tools", office, new() { Operations = [new() { Name = "SendEmail" }] });
+
+builder.AddProject<Projects.MyApi>("api")
+    .WithReference(office);   // {name}__connectorGatewayName / {name}__connectionName
+
+builder.Build().Run();
+```
+
+## Features
+
+- Outputs: `Id`, `Name`, `PrincipalId`, `TenantId`.
+- `WithIdentityAccessPolicy(name, identity)` grants a Pulumi user-assigned identity access; MCP configs add `WithConnector` and `WithAccessPolicy`.
+- `PublishAsExisting(name, resourceGroup)` / `AsExisting(...)` use an existing gateway; connection- and MCP-level `AsExisting` also work.
+- `ConfigureInfrastructure` exposes the `Deployment` root and the template's `TemplateResources` / `Gateway` maps (ARM property names).
+
+## Notes
+
+- Provider gap: only a diff of the template is available, not per-resource diffs. Revisit when azure-native publishes the preview Microsoft.Web specs.
+- Connections that use OAuth must still be consented in the portal after deployment, as with the Bicep version.
+- Verified by comparing `aspire publish` output against the official Bicep, not by a deployment. The Aspire polyglot (ATS) exports are not ported.
+
+## Learn more
+
+- Mirrors the official [`Aspire.Hosting.Azure.ConnectorNamespace`](https://www.nuget.org/packages/Aspire.Hosting.Azure.ConnectorNamespace) integration, so moving from Bicep to Pulumi is a drop-in change in your AppHost.
+- Stack, ESC and deploy setup: [repository README](https://github.com/two4suited/Sheridan.Aspire.Pulumi#readme).
+- Customizing generated resources with `ConfigureInfrastructure`: [provisioning guide](https://github.com/two4suited/Sheridan.Aspire.Pulumi/blob/main/docs/provisioning.md).
+- Resource naming: [naming guide](https://github.com/two4suited/Sheridan.Aspire.Pulumi/blob/main/docs/naming.md).

@@ -1,22 +1,57 @@
 # Sheridan.Aspire.Pulumi.Azure.Foundry
 
-_Microsoft Foundry_ — part of [Sheridan.Aspire.Pulumi](../../README.md).
+Microsoft Foundry (AI Foundry) accounts, projects, deployments, agents and toolboxes provisioned by Pulumi.
 
-`Sheridan.Aspire.Pulumi.Azure.Foundry` ports `Aspire.Hosting.Foundry` (`AddFoundry`). `builder.AddPulumiFoundry("foundry")` (alias `AddPulumiAzureAIFoundry`) provisions an `azure-native:cognitiveservices:Account` of kind `AIServices` (S0, system-assigned identity, local auth disabled, `allowProjectManagement`) plus an account capability host (`foundry-caphost`, kind `Agents`, `enablePublicHostingEnvironment: true`), matching the generated Bicep. The capability host uses the GA `azure-native:cognitiveservices/v20251201:AccountCapabilityHost` type because azure-native's default `CapabilityHost` type does not expose `enablePublicHostingEnvironment` (its settings live under `properties.` for `ConfigureInfrastructure`). `AddDeployment("chat", FoundryModel.OpenAI.Gpt4o)` adds a deployment from the model catalog (`FoundryModel`, generated from the official package without the Foundry Local-only models; `project.AddModelDeployment(...)` is the same on a project), or `AddDeployment("chat", "gpt-4o", "2024-08-06", "OpenAI")` by name (`WithProperties` sets `DeploymentName`, `ModelName`, `ModelVersion`, `Format`, `SkuName`, `SkuCapacity`; defaults GlobalStandard / 1; deployments are chained with `dependsOn`). `AddProject("agents")` adds an `accounts/projects` project (system-assigned identity) with an Application Insights component, a *Monitoring Metrics Publisher* grant for the project identity and the `AppInsights` project connection, as the Bicep does.
+`AddPulumiFoundry` ports `AddFoundry` from `Aspire.Hosting.Foundry`: an `AIServices` account with a capability host, model deployments from the catalog, projects with connections, and Foundry data-plane objects (prompt agents and toolboxes) deployed by pipeline steps.
 
-Project options mirror the official ones. `WithAppInsights(appInsights)` uses a `AddPulumiApplicationInsights` resource instead of creating a component; `WithKeyVault(keyVault)` adds the Key Vault connection (project identity gets *Key Vault Secrets Officer*; every other connection depends on it); `AddConnection(storage | cosmos | search | containerRegistry)` adds the project connection plus the project-identity role assignments the official integration creates (Storage Blob Data Contributor; Search Index Data Contributor and Search Service Contributor); `AddConnection(name, ctx => properties)` adds a raw `ProjectConnection`; `AddBingGroundingConnection(name, bingResourceId, apiKeyParameter)` adds the account-level `GroundingWithBingSearch` connection. `AddCapabilityHost("ch").WithCosmosDB(cosmos).WithStorage(storage).WithSearch(search)` (optionally `.WithAzureOpenAI(foundry)`) adds the project capability host with its Storage / Cosmos DB / Search / Azure OpenAI connections and role assignments (Cosmos: the built-in *Data Contributor* SQL role). The connected resources must be provisioned in the same Pulumi stack as the Foundry account, because the program references them directly. Connection names are deterministic (a hash of project and target) instead of the official random guid, so they do not churn the Pulumi state.
+## Install
 
-`PublishAsExisting("name", "resource-group")` (alias `AsExisting`) looks the account up with `getAccount` instead of creating it; deployments, projects, the capability host and role assignments are still applied to it. Adding a private endpoint (`subnet.AddPrivateEndpoint(foundry)` from the Network project) sets `publicNetworkAccess: Disabled`, uses private link group `account` and registers the endpoint in `privatelink.cognitiveservices.azure.com`, `privatelink.services.ai.azure.com` and `privatelink.openai.azure.com`, as the official integration does (the Network project's `IPulumiPrivateEndpointTarget` gained an optional `AdditionalPrivateDnsZoneNames` for this); the account also works with `WithNetworkSecurityPerimeter`. `RunAsFoundryLocal("http://localhost:5272/v1/")` is a no-op in publish mode like the official method, and in run mode points the connection string at an already running Foundry Local service (`Endpoint=<endpoint>;Key=unused`, deployments `…;Model=<model>`).
+```bash
+dotnet add package Sheridan.Aspire.Pulumi.Azure.Foundry
+```
 
-`WithReference(foundry)`, `WithReference(deployment)` or `WithReference(project)` grants the hosting compute environment's identity *Cognitive Services User* and *Cognitive Services OpenAI User* on the account; `WithRoleAssignments(foundry, FoundryRole.…)` replaces that. Connection strings: account `Endpoint=<endpoint>;EndpointAIInference=<AI Foundry API endpoint>models`, deployment `…;Deployment=<name>`, project `Endpoint=<project endpoint>`. `ConfigureInfrastructure(infra => infra.CognitiveServicesAccount.Set(...))` edits the Pulumi resources (`CognitiveServicesAccount`, `CapabilityHost`, `Deployments`, `Projects`, `ProjectCapabilityHosts`, `Connections`; see `../../docs/provisioning.md`). The account name is auto-generated by the provider; the custom sub-domain is `<name><first segment of the subscription id>` (override with `CustomSubDomainName`).
+## Usage
 
-Prompt agents are Foundry data-plane objects, so Pulumi cannot manage them: `project.AddPromptAgent("helper", deployment, "instructions")` creates a pipeline step (`deploy-helper`, tagged `deploy-compute`) that runs after the stack has deployed and creates an agent version through `AIProjectClient` with `DefaultAzureCredential` (the deploying principal needs *Azure AI User* on the project; the step retries while the project endpoint is not ready yet). The agent's connection string is `<project endpoint>/agents/<name>` (also `AgentName`, `ProjectEndpoint`) and `agent.Resource.Version` holds the deployed version. Tools mirror the official ones and are attached with `WithTool(...)`: `AddCodeInterpreterTool`, `AddFileSearchTool(name, vectorStoreIds)`, `AddWebSearchTool`, `AddImageGenerationTool`, `AddComputerUseTool`, `AddAISearchTool(name, index).WithReference(search)` (adds the project connection), `AddBingGroundingTool(name).WithReference(connection)` or `.WithReference(bingResourceId, apiKeyParameter)`, `AddSharePointTool`, `AddFabricTool`, `AddFunctionTool`, `AddAzureFunctionTool` and `WithCustomTool(IFoundryTool)`. Differences: no run-mode deployment before start and no *Send Message* dashboard command (the project only exists after a deploy), and prompt agents are deleted with the project rather than by a destroy step. Verified with unit tests of the agent definitions only, not against a deployed Foundry project.
+```csharp
+var builder = DistributedApplication.CreateBuilder(args);
 
-Toolboxes: `project.AddToolbox("tools").WithWebSearchTool().WithMcpTool("docs", "https://…/mcp")` (string, `EndpointReference` or `ReferenceExpression`; the endpoint must be Foundry-reachable HTTPS) `.WithAISearchTool("search", search, "index")` (adds the project connection) `.WithDescription(...)`. A `deploy-<name>` step reconciles the toolbox through the Agents data plane after the stack deploys, like the official one: it creates a version only when the configuration hash differs from the current default, promotes it, and refuses to touch a toolbox Aspire does not manage (`aspire-managed-by` metadata). `toolbox.Resource.DeployedVersion` holds the version; the connection string is the toolbox MCP endpoint. Unit tested only, not against a deployed project.
+builder.AddPulumiStack("my-app", "dev").WithOrganization("my-org");
 
-Not ported, and why:
+var acaEnv = builder.AddPulumiAzureContainerAppEnvironment("aca-env");   // Sheridan.Aspire.Pulumi.Azure.AppContainers
 
-- **Provider gaps (azure-native)**: the *project* capability host cannot set `capabilityHostKind` / `enablePublicHostingEnvironment` (every azure-native API version of `ProjectCapabilityHostProperties` only has the four connection lists; the account capability host does expose them); the Bing grounding key cannot be read with `listKeys()` (azure-native has no `Microsoft.Bing` provider), so `AddBingGroundingConnection` takes the key as a secret parameter instead of the official overload that only needs the resource id.
-- **Foundry hosted agents — still to port**: `AsHostedAgent` / `PublishAsHostedAgent`, the project as an Aspire compute environment with its container registry, agent versions and image push need a Sandboxes-style pipeline port (image build/push, reconciliation, destroy) that cannot be verified without a deployed project. Toolbox gaps: run-mode deployment, the tool-discovery readiness probe, `AsExisting` / `RunAsExisting` / `PublishAsExisting`, MCP approval policies and the `Version` pin.
-- **Foundry Local lifecycle**: the official `RunAsFoundryLocal()` also starts the local service and downloads / loads models (`Microsoft.AI.Foundry.Local`), and `FoundryModel.Local` lists the local-only models. That is a run-mode feature with nothing to do with Pulumi; here you pass the endpoint of a service you started yourself.
-- The `endpoints["AI Foundry API"]` output expressions and the new connections were verified with `aspire publish` only, not deployed against Azure.
+var foundry = builder.AddPulumiFoundry("foundry");
+var chat = foundry.AddDeployment("chat", FoundryModel.OpenAI.Gpt4o);
+var project = foundry.AddProject("agents");
+
+var codeInterpreter = project.AddCodeInterpreterTool("code");
+project.AddPromptAgent("helper", chat, "You are a helpful assistant.")
+    .WithTool(codeInterpreter);
+
+builder.AddProject<Projects.MyApi>("api")
+    .WithComputeEnvironment(acaEnv)
+    .WithReference(chat);
+
+builder.Build().Run();
+```
+
+## Features
+
+- Account: `AIServices` (S0, system-assigned identity, local auth disabled) plus a `foundry-caphost` account capability host, matching the generated Bicep.
+- Deployments from `FoundryModel` or by name; projects with Application Insights, `WithKeyVault`, `AddConnection(storage | cosmos | search | containerRegistry)`, `AddBingGroundingConnection` and `AddCapabilityHost(...)`.
+- `PublishAsExisting` / `AsExisting`, private endpoints through the Network package, and `RunAsFoundryLocal(endpoint)` to point run mode at a running Foundry Local service.
+- `WithReference(foundry | deployment | project)` grants *Cognitive Services User* and *Cognitive Services OpenAI User*; `WithRoleAssignments(foundry, FoundryRole....)` replaces that.
+- Prompt agents (`AddPromptAgent`) and toolboxes (`AddToolbox`) are data-plane objects: a `deploy-<name>` step creates or reconciles them through the Foundry APIs after the stack deploys.
+- Alias: `AddPulumiAzureAIFoundry`.
+
+## Notes
+
+- Prompt agents and toolboxes are unit tested only, not against a deployed project. The deploying principal needs *Azure AI User* on the project.
+- Provider gaps: the project capability host cannot set `capabilityHostKind` / `enablePublicHostingEnvironment`, and the Bing grounding key cannot be read with `listKeys()`, so `AddBingGroundingConnection` takes the key as a secret parameter.
+- Not ported: Foundry hosted agents, the Foundry Local model lifecycle, and toolbox run-mode deployment and MCP approval policies.
+
+## Learn more
+
+- Mirrors the official [`Aspire.Hosting.Foundry`](https://www.nuget.org/packages/Aspire.Hosting.Foundry) integration, so moving from Bicep to Pulumi is a drop-in change in your AppHost.
+- Stack, ESC and deploy setup: [repository README](https://github.com/two4suited/Sheridan.Aspire.Pulumi#readme).
+- Customizing generated resources with `ConfigureInfrastructure`: [provisioning guide](https://github.com/two4suited/Sheridan.Aspire.Pulumi/blob/main/docs/provisioning.md).
+- Resource naming: [naming guide](https://github.com/two4suited/Sheridan.Aspire.Pulumi/blob/main/docs/naming.md).

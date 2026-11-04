@@ -1,13 +1,47 @@
 # Sheridan.Aspire.Pulumi.Azure.Redis
 
-_Redis_ — part of [Sheridan.Aspire.Pulumi](../../README.md).
+Azure Cache for Redis and Azure Managed Redis provisioned by Pulumi, drop-ins for `AddAzureRedis` and `AddAzureManagedRedis`.
 
-`Sheridan.Aspire.Pulumi.Azure.Redis` ports `Aspire.Hosting.Azure.Redis`. `builder.AddPulumiAzureRedis("cache")` (alias `AddPulumiRedis`) provisions Azure Cache for Redis (`azure-native:redis:Redis`, Basic C1, TLS 1.2, non-SSL port off) and `builder.AddPulumiAzureManagedRedis("cache")` (alias `AddPulumiManagedRedis`) provisions Azure Managed Redis (`redisenterprise:RedisEnterprise` Balanced_B0 plus a `default` database on port 10000), matching the Bicep the official package generates. Both default to Microsoft Entra authentication (access keys disabled): `.WithReference(cache)` yields `ConnectionStrings__cache` (`host,ssl=true` / `host:10000,ssl=true`) and the hosting compute environment's identity gets the `Data Contributor` access policy.
+`AddPulumiAzureRedis` provisions Azure Cache for Redis (Basic C1, TLS 1.2) and `AddPulumiAzureManagedRedis` provisions Azure Managed Redis (Balanced_B0 with a `default` database on port 10000). Both default to Microsoft Entra authentication with access keys disabled.
 
-```csharp
-var cache = builder.AddPulumiAzureRedis("cache").WithPulumiStack(azureStack).RunAsContainer();
-var managed = builder.AddPulumiAzureManagedRedis("managed").WithPulumiStack(azureStack)
-    .WithAccessKeyAuthentication();                 // or .WithAccessKeyAuthentication(vault) with an AddPulumiAzureKeyVault resource
+## Install
+
+```bash
+dotnet add package Sheridan.Aspire.Pulumi.Azure.Redis
 ```
 
-`WithAccessKeyAuthentication()` stores `connectionstrings--<name>` (and `primaryaccesskey--<name>` for Managed Redis) in a Key Vault created next to the cache (or the vault you pass, which needs `WithDeployerRoleAssignments(AzureKeyVaultRole.KeyVaultSecretsOfficer)`), and gives referencing environments *Key Vault Secrets User*. Also: `RunAsContainer` (local Redis container), `PublishAsExisting`/`AsExisting`, `WithSku` (Managed Redis). Differences: with access keys the connection string seen by a referencing app is the Key Vault secret **URI** (keys must not appear in stack outputs; Container Apps secret references are not generated), and `AsAzureRedis`/`PublishAsAzureRedis` (converting a stock `AddRedis`) and the polyglot variant are not ported.
+## Usage
+
+```csharp
+var builder = DistributedApplication.CreateBuilder(args);
+
+builder.AddPulumiStack("my-app", "dev").WithOrganization("my-org");
+
+var cache = builder.AddPulumiAzureRedis("cache").RunAsContainer();
+var managed = builder.AddPulumiAzureManagedRedis("managed")
+    .WithAccessKeyAuthentication();   // or pass an AddPulumiAzureKeyVault resource
+
+builder.AddProject<Projects.MyApi>("api")
+    .WithReference(cache);   // ConnectionStrings__cache
+
+builder.Build().Run();
+```
+
+## Features
+
+- The hosting compute environment's identity gets the `Data Contributor` access policy on referenced caches.
+- `WithAccessKeyAuthentication()` stores the connection string (and the primary key for Managed Redis) in a Key Vault and gives referencing environments *Key Vault Secrets User*.
+- `RunAsContainer` for local runs, `PublishAsExisting` / `AsExisting`, and `WithSku` (Managed Redis).
+- Aliases: `AddPulumiRedis`, `AddPulumiManagedRedis`.
+
+## Notes
+
+- With access keys, the connection string a referencing app sees is the Key Vault secret **URI**, because keys must not appear in stack outputs.
+- Not ported: `AsAzureRedis` / `PublishAsAzureRedis` (converting a stock `AddRedis`) and the polyglot variant.
+
+## Learn more
+
+- Mirrors the official [`Aspire.Hosting.Azure.Redis`](https://www.nuget.org/packages/Aspire.Hosting.Azure.Redis) integration, so moving from Bicep to Pulumi is a drop-in change in your AppHost.
+- Stack, ESC and deploy setup: [repository README](https://github.com/two4suited/Sheridan.Aspire.Pulumi#readme).
+- Customizing generated resources with `ConfigureInfrastructure`: [provisioning guide](https://github.com/two4suited/Sheridan.Aspire.Pulumi/blob/main/docs/provisioning.md).
+- Resource naming: [naming guide](https://github.com/two4suited/Sheridan.Aspire.Pulumi/blob/main/docs/naming.md).

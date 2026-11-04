@@ -1,18 +1,51 @@
 # Sheridan.Aspire.Pulumi.Entra
 
-_Azure AD app registration_ — part of [Sheridan.Aspire.Pulumi](../../README.md).
+Azure AD (Entra) app registrations provisioned by Pulumi through the `azuread` provider.
 
-`builder.AddPulumiAzureAdAppRegistration("app-registration")` provisions an `azuread:Application` plus a `azuread:ServicePrincipal` (via the `azuread` Pulumi provider) in whichever stack it's bound to with `.WithPulumiStack(...)`. Use `.WithDisplayName(...)` to override the display name (defaults to the resource name). The ESC environment bound to that stack must supply the `azuread` provider's credentials (tenant, client id/secret or OIDC), the same way `azure/test` supplies `azure-native`'s.
+`AddPulumiAzureAdAppRegistration` provisions an `azuread:Application` and an `azuread:ServicePrincipal` in the stack it is bound to. Its outputs can feed other resources, such as the client id of your API.
 
-The resource exposes `ClientId`, `ObjectId` and `ServicePrincipalObjectId` as `PulumiOutputReference`s, so they can be fed into another resource's config the same way any Aspire reference is:
+## Install
 
-```csharp
-var appRegistration = builder.AddPulumiAzureAdAppRegistration("app-registration")
-    .WithPulumiStack(entraStack);
-
-builder.AddProject<Projects.MyApi>("api")
-    .WithComputeEnvironment(acaEnv)
-    .WithEnvironment("AzureAd__ClientId", appRegistration.Resource.ClientId);
+```bash
+dotnet add package Sheridan.Aspire.Pulumi.Entra
 ```
 
-These outputs are read with `pulumi stack output` from the `entra-app` stack, not resolved as a live Pulumi cross-stack reference. Because the API references `appRegistration`, the main stack's provision step is ordered after `entra-app`'s deploy step automatically (no `DependsOnStack`/`WaitFor` needed, though both still work), and the main program is regenerated after that, so the client id resolves on the first `aspire deploy`.
+## Usage
+
+```csharp
+var builder = DistributedApplication.CreateBuilder(args);
+
+builder.AddPulumiStack("my-app", "dev").WithOrganization("my-org");
+
+var entraStack = builder.AddPulumiStack("my-app-entra", "dev")
+    .WithProjectName("my-app")
+    .WithOrganization("my-org")
+    .WithEscEnvironment("entra/dev");   // must supply the azuread provider credentials
+
+var appRegistration = builder.AddPulumiAzureAdAppRegistration("app-registration")
+    .WithPulumiStack(entraStack)
+    .WithDisplayName("My API");
+
+builder.AddProject<Projects.MyApi>("api")
+    .WithEnvironment("AzureAd__ClientId", appRegistration.Resource.ClientId);
+
+builder.Build().Run();
+```
+
+## Features
+
+- `ClientId`, `ObjectId` and `ServicePrincipalObjectId` are exposed as `PulumiOutputReference`s.
+- `WithDisplayName(...)` overrides the display name (defaults to the resource name).
+- Because the API references the registration, the main stack's provision step is ordered after the Entra stack's deploy step automatically, and the client id resolves on the first `aspire deploy`.
+
+## Notes
+
+- The ESC environment bound to the stack must supply the `azuread` provider credentials (tenant, client id/secret or OIDC).
+- Outputs are read with `pulumi stack output`, not resolved as a live Pulumi cross-stack reference.
+- For the Aspire-style API (`AddEntraIdApplication`), see `Sheridan.Aspire.Pulumi.Azure.EntraId`.
+
+## Learn more
+
+- Stack, ESC and deploy setup: [repository README](https://github.com/two4suited/Sheridan.Aspire.Pulumi#readme).
+- Customizing generated resources with `ConfigureInfrastructure`: [provisioning guide](https://github.com/two4suited/Sheridan.Aspire.Pulumi/blob/main/docs/provisioning.md).
+- Resource naming: [naming guide](https://github.com/two4suited/Sheridan.Aspire.Pulumi/blob/main/docs/naming.md).
