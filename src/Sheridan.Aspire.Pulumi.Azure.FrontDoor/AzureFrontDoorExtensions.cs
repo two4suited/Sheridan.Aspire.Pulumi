@@ -1,5 +1,6 @@
 using Aspire.Hosting;
 using Aspire.Hosting.ApplicationModel;
+using Sheridan.Aspire.Pulumi.Azure.AppContainers;
 using Sheridan.Aspire.Pulumi.Provisioning;
 
 namespace Sheridan.Aspire.Pulumi.Azure.FrontDoor;
@@ -43,5 +44,23 @@ public static class AzureFrontDoorExtensions
         ArgumentNullException.ThrowIfNull(configure);
         var owner = builder.Resource;
         return PulumiInfrastructureExtensions.ConfigureInfrastructure(builder, infra => configure(new PulumiFrontDoorInfrastructure(infra, owner)));
+    }
+
+    /// <summary>
+    /// Connects the Front Door to a Container Apps environment over Private Link (the equivalent of
+    /// <c>WithAzureFrontDoorPrivateLink</c>). Public network access on the environment is disabled, the Front Door profile
+    /// becomes Premium, and every origin hosted in the environment gets a shared Private Link resource targeting it
+    /// (group <c>managedEnvironments</c>). The connection is created <b>Pending</b>: approve it on the environment in the portal
+    /// or with <c>az network private-endpoint-connection approve</c>. Use <c>ConfigureInfrastructure</c> to override the
+    /// origin's <c>sharedPrivateLinkResource.privateLinkLocation</c> if Front Door Private Link isn't available in the environment's region.
+    /// </summary>
+    public static IResourceBuilder<AzureContainerAppEnvironmentResource> WithAzureFrontDoorPrivateLink(
+        this IResourceBuilder<AzureContainerAppEnvironmentResource> builder, IResourceBuilder<AzureFrontDoorResource> frontDoor)
+    {
+        ArgumentNullException.ThrowIfNull(builder);
+        ArgumentNullException.ThrowIfNull(frontDoor);
+        if (!builder.Resource.Annotations.OfType<PulumiPrivateLinkTargetAnnotation>().Any(a => a.Source == frontDoor.Resource))
+            builder.Resource.Annotations.Add(new PulumiPrivateLinkTargetAnnotation(frontDoor.Resource));
+        return builder;
     }
 }
