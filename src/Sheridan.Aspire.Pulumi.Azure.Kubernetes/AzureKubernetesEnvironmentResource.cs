@@ -138,6 +138,15 @@ public sealed partial class AzureKubernetesEnvironmentResource : PulumiAzureReso
     /// <summary>The Kubernetes version; when null AKS picks its default.</summary>
     public string? KubernetesVersion { get; set; }
 
+    /// <summary>Name of an existing cluster (set by <c>AsExisting</c>/<c>PublishAsExisting</c>); when set, nothing is created for the cluster itself.</summary>
+    public string? ExistingClusterName { get; internal set; }
+
+    /// <summary>Resource group of the existing cluster; null means the environment's own resource group. Independent of the group supporting resources go to.</summary>
+    public string? ExistingClusterResourceGroup { get; internal set; }
+
+    /// <summary>Whether this environment references a cluster that already exists instead of provisioning one.</summary>
+    public bool IsExisting => ExistingClusterName is not null;
+
     public bool OidcIssuerEnabled { get; set; } = true;
     public bool WorkloadIdentityEnabled { get; set; } = true;
 
@@ -380,97 +389,117 @@ public sealed partial class AzureKubernetesEnvironmentResource : PulumiAzureReso
         else registryRef = Registry.Id;
 
         var targeted = ctx.Model.GetComputeResources().Where(IsTargeted).ToList();
-        var identity = new Dictionary<string, object?> { ["type"] = "SystemAssigned" };
-        var clusterDependsOn = new List<object?>();
-
-        // Private cluster with a custom private DNS zone: the control plane needs a user-assigned identity that can manage the zone.
-        if (IsPrivateCluster && PrivateDnsZone is { } zone)
-        {
-            var cp = $"{Id}ControlPlaneIdentity";
-            program.AddUserAssignedIdentity(cp, rg, location, NameFor(AzureNameKind.UserAssignedIdentity, "cp-mi"));
-            clusterDependsOn.Add($"${{{program.AddRoleAssignment($"{Id}DnsZoneContributor", $"${{{cp}.principalId}}", PrivateDnsZoneContributorRoleId, zone.IdExpression)}}}");
-            clusterDependsOn.Add($"${{{program.AddRoleAssignment($"{Id}VnetNetworkContributor", $"${{{cp}.principalId}}", NetworkContributorRoleId, zone.VirtualNetwork.IdExpression)}}}");
-            identity = new Dictionary<string, object?>
-            {
-                ["type"] = "UserAssigned",
-                ["userAssignedIdentities"] = new List<object?> { $"${{{cp}.id}}" },
-            };
-        }
-
-        var pools = EffectivePools().Select(p => (object?)PoolProfile(p.Config, p.Subnet ?? Subnet)).ToList();
-        var properties = new Dictionary<string, object?>
-        {
-            ["resourceName"] = NameFor(AzureNameKind.KubernetesCluster),
-            ["resourceGroupName"] = rg,
-            ["location"] = location,
-            ["dnsPrefix"] = NameFor(AzureNameKind.AksDnsPrefix),
-            ["agentPoolProfiles"] = pools,
-            ["sku"] = new Dictionary<string, object?> { ["name"] = "Base", ["tier"] = "Free" },
-            ["identity"] = identity,
-            ["tags"] = new Dictionary<string, object?> { ["aspire-resource-name"] = Name },
-        };
-        if (KubernetesVersion is not null) properties["kubernetesVersion"] = KubernetesVersion;
         var oidc = OidcIssuerEnabled || WorkloadIdentityEnabled;
-        if (oidc) properties["oidcIssuerProfile"] = new Dictionary<string, object?> { ["enabled"] = true };
-        if (WorkloadIdentityEnabled)
+        if (ExistingClusterName is { } existingName)
         {
-            properties["securityProfile"] = new Dictionary<string, object?>
+            // Reference the cluster as-is: node pools, networking and add-ons are never reconfigured.
+            program.Variables[Id] = new Dictionary<string, object?>
             {
-                ["workloadIdentity"] = new Dictionary<string, object?> { ["enabled"] = true },
-            };
-        }
-        if (LogAnalyticsWorkspace is { } law)
-        {
-            properties["addonProfiles"] = new Dictionary<string, object?>
-            {
-                ["omsagent"] = new Dictionary<string, object?>
+                ["fn::invoke"] = new Dictionary<string, object?>
                 {
-                    ["enabled"] = true,
-                    ["config"] = new Dictionary<string, object?> { ["logAnalyticsWorkspaceResourceID"] = $"${{{law.Id}.id}}" },
+                    ["function"] = "azure-native:containerservice:getManagedCluster",
+                    ["arguments"] = new Dictionary<string, object?>
+                    {
+                        ["resourceGroupName"] = ExistingClusterResourceGroup ?? rg,
+                        ["resourceName"] = existingName,
+                    },
                 },
             };
         }
-
-        if (IsPrivateCluster)
+        else
         {
-            var access = new Dictionary<string, object?> { ["enablePrivateCluster"] = true };
-            if (PrivateDnsZone is { } dns) access["privateDNSZone"] = dns.IdExpression;
-            properties["apiServerAccessProfile"] = access;
-        }
+            var identity = new Dictionary<string, object?> { ["type"] = "SystemAssigned" };
+            var clusterDependsOn = new List<object?>();
 
-        // Network profile: the explicit typed one, else Azure CNI as soon as a node subnet is used (upstream's implicit default).
-        var usesSubnet = Subnet is not null || NodePools.Any(p => p.Subnet is not null);
-        if (NetworkProfile is { } np)
-        {
-            var network = new Dictionary<string, object?>
+            // Private cluster with a custom private DNS zone: the control plane needs a user-assigned identity that can manage the zone.
+            if (IsPrivateCluster && PrivateDnsZone is { } zone)
             {
-                ["networkPlugin"] = np.NetworkPlugin,
-                ["serviceCidr"] = np.ServiceCidr,
-                ["dnsServiceIP"] = np.DnsServiceIP,
-            };
-            if (np.NetworkPolicy is not null) network["networkPolicy"] = np.NetworkPolicy;
-            properties["networkProfile"] = network;
-        }
-        else if (usesSubnet)
-        {
-            properties["networkProfile"] = new Dictionary<string, object?> { ["networkPlugin"] = "azure" };
-        }
+                var cp = $"{Id}ControlPlaneIdentity";
+                program.AddUserAssignedIdentity(cp, rg, location, NameFor(AzureNameKind.UserAssignedIdentity, "cp-mi"));
+                clusterDependsOn.Add($"${{{program.AddRoleAssignment($"{Id}DnsZoneContributor", $"${{{cp}.principalId}}", PrivateDnsZoneContributorRoleId, zone.IdExpression)}}}");
+                clusterDependsOn.Add($"${{{program.AddRoleAssignment($"{Id}VnetNetworkContributor", $"${{{cp}.principalId}}", NetworkContributorRoleId, zone.VirtualNetwork.IdExpression)}}}");
+                identity = new Dictionary<string, object?>
+                {
+                    ["type"] = "UserAssigned",
+                    ["userAssignedIdentities"] = new List<object?> { $"${{{cp}.id}}" },
+                };
+            }
 
-        // AGC needs the managed Gateway API and the ALB controller add-on, which only exist in preview AKS API versions (as upstream's 2025-09-02-preview).
-        var clusterType = "azure-native:containerservice:ManagedCluster";
-        if (LoadBalancers.Count > 0)
-        {
-            clusterType = AlbPreviewResourceType;
-            properties["ingressProfile"] = new Dictionary<string, object?>
+            var pools = EffectivePools().Select(p => (object?)PoolProfile(p.Config, p.Subnet ?? Subnet)).ToList();
+            var properties = new Dictionary<string, object?>
             {
-                ["gatewayAPI"] = new Dictionary<string, object?> { ["installation"] = "Standard" },
-                ["applicationLoadBalancer"] = new Dictionary<string, object?> { ["enabled"] = true },
+                ["resourceName"] = NameFor(AzureNameKind.KubernetesCluster),
+                ["resourceGroupName"] = rg,
+                ["location"] = location,
+                ["dnsPrefix"] = NameFor(AzureNameKind.AksDnsPrefix),
+                ["agentPoolProfiles"] = pools,
+                ["sku"] = new Dictionary<string, object?> { ["name"] = "Base", ["tier"] = "Free" },
+                ["identity"] = identity,
+                ["tags"] = new Dictionary<string, object?> { ["aspire-resource-name"] = Name },
             };
-        }
+            if (KubernetesVersion is not null) properties["kubernetesVersion"] = KubernetesVersion;
+            var oidcRequested = OidcIssuerEnabled || WorkloadIdentityEnabled;
+            if (oidcRequested) properties["oidcIssuerProfile"] = new Dictionary<string, object?> { ["enabled"] = true };
+            if (WorkloadIdentityEnabled)
+            {
+                properties["securityProfile"] = new Dictionary<string, object?>
+                {
+                    ["workloadIdentity"] = new Dictionary<string, object?> { ["enabled"] = true },
+                };
+            }
+            if (LogAnalyticsWorkspace is { } law)
+            {
+                properties["addonProfiles"] = new Dictionary<string, object?>
+                {
+                    ["omsagent"] = new Dictionary<string, object?>
+                    {
+                        ["enabled"] = true,
+                        ["config"] = new Dictionary<string, object?> { ["logAnalyticsWorkspaceResourceID"] = $"${{{law.Id}.id}}" },
+                    },
+                };
+            }
 
-        var cluster = new Dictionary<string, object?> { ["type"] = clusterType, ["properties"] = properties };
-        if (clusterDependsOn.Count > 0) cluster["options"] = new Dictionary<string, object?> { ["dependsOn"] = clusterDependsOn };
-        program.AddInfraResource(Id, clusterType, cluster);
+            if (IsPrivateCluster)
+            {
+                var access = new Dictionary<string, object?> { ["enablePrivateCluster"] = true };
+                if (PrivateDnsZone is { } dns) access["privateDNSZone"] = dns.IdExpression;
+                properties["apiServerAccessProfile"] = access;
+            }
+
+            // Network profile: the explicit typed one, else Azure CNI as soon as a node subnet is used (upstream's implicit default).
+            var usesSubnet = Subnet is not null || NodePools.Any(p => p.Subnet is not null);
+            if (NetworkProfile is { } np)
+            {
+                var network = new Dictionary<string, object?>
+                {
+                    ["networkPlugin"] = np.NetworkPlugin,
+                    ["serviceCidr"] = np.ServiceCidr,
+                    ["dnsServiceIP"] = np.DnsServiceIP,
+                };
+                if (np.NetworkPolicy is not null) network["networkPolicy"] = np.NetworkPolicy;
+                properties["networkProfile"] = network;
+            }
+            else if (usesSubnet)
+            {
+                properties["networkProfile"] = new Dictionary<string, object?> { ["networkPlugin"] = "azure" };
+            }
+
+            // AGC needs the managed Gateway API and the ALB controller add-on, which only exist in preview AKS API versions (as upstream's 2025-09-02-preview).
+            var clusterType = "azure-native:containerservice:ManagedCluster";
+            if (LoadBalancers.Count > 0)
+            {
+                clusterType = AlbPreviewResourceType;
+                properties["ingressProfile"] = new Dictionary<string, object?>
+                {
+                    ["gatewayAPI"] = new Dictionary<string, object?> { ["installation"] = "Standard" },
+                    ["applicationLoadBalancer"] = new Dictionary<string, object?> { ["enabled"] = true },
+                };
+            }
+
+            var cluster = new Dictionary<string, object?> { ["type"] = clusterType, ["properties"] = properties };
+            if (clusterDependsOn.Count > 0) cluster["options"] = new Dictionary<string, object?> { ["dependsOn"] = clusterDependsOn };
+            program.AddInfraResource(Id, clusterType, cluster);
+        }
 
         // Kubelet identity pulls images from the registry (official: acrPullRole scoped to the registry).
         var kubelet = $"${{{Id}.identityProfile[\"kubeletidentity\"].objectId}}";
@@ -478,7 +507,8 @@ public sealed partial class AzureKubernetesEnvironmentResource : PulumiAzureReso
 
         // The AGC controller's identity joins the load balancers' (delegated) subnets (upstream: a Network Contributor assignment per subnet).
         var albJoins = new List<string>();
-        foreach (var subnet in LoadBalancers.Select(l => l.Subnet).Distinct())
+        // An existing cluster's add-on identity is managed outside this program, so its subnet permissions are too.
+        foreach (var subnet in IsExisting ? [] : LoadBalancers.Select(l => l.Subnet).Distinct())
         {
             albJoins.Add(program.AddRoleAssignment($"{Id}AlbSubnetJoin{subnet.PulumiId}",
                 $"${{{Id}.ingressProfile.applicationLoadBalancer.identity.objectId}}", NetworkContributorRoleId, subnet.IdExpression));
@@ -486,11 +516,12 @@ public sealed partial class AzureKubernetesEnvironmentResource : PulumiAzureReso
 
         program.Outputs[$"{Id}Id"] = $"${{{Id}.id}}";
         program.Outputs[$"{Id}Name"] = $"${{{Id}.name}}";
-        program.Outputs[$"{Id}ClusterFqdn"] = $"${{{Id}.fqdn}}";
+        // A private cluster can have its public name disabled; the user flags that with AsPrivateCluster().
+        program.Outputs[$"{Id}ClusterFqdn"] = IsExisting && IsPrivateCluster ? $"${{{Id}.privateFQDN}}" : $"${{{Id}.fqdn}}";
         if (oidc) program.Outputs[$"{Id}OidcIssuerUrl"] = $"${{{Id}.oidcIssuerProfile.issuerURL}}";
         program.Outputs[$"{Id}KubeletIdentityObjectId"] = kubelet;
         program.Outputs[$"{Id}NodeResourceGroup"] = $"${{{Id}.nodeResourceGroup}}";
-        program.Outputs[$"{Id}ResourceGroup"] = rg;
+        program.Outputs[$"{Id}ResourceGroup"] = ExistingClusterResourceGroup ?? rg;
         program.Outputs[$"{Id}SubscriptionId"] = PulumiAzureProgramExtensions.SubscriptionId;
         program.Outputs[$"{Id}RegistryName"] = $"${{{registryRef}.name}}";
         program.Outputs[$"{Id}RegistryEndpoint"] = $"${{{registryRef}.loginServer}}";
