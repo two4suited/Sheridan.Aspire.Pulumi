@@ -4,7 +4,7 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <Description>Azure API Management provisioned by Pulumi, a drop-in for AddAzureApiManagement.</Description>
+    <Description>Azure API Management provisioned by Pulumi instead of Bicep, a drop-in for AddAzureApiManagement in Aspire.Hosting.Azure.ApiManagement. Call AddPulumiAzureApiManagement(name, new AzureApiManagementOptions { PublisherEmail, PublisherName, Sku }) to provision the service with a system-assigned identity (outputs gatewayUrl, name, id, principalId), then model APIs (AddApi, AddOperation), backends (AddBackend, WithBackend), products (AddProduct, WithApi), named values (AddNamedValue) and policies (WithInboundPolicy, WithPolicy). Requires Sheridan.Aspire.Pulumi (AddPulumiStack). Full usage and the list of not-yet-ported features: https://github.com/two4suited/Sheridan.Aspire.Pulumi/tree/main/src/Sheridan.Aspire.Pulumi.Azure.ApiManagement#readme</Description>
     <RootNamespace>Sheridan.Aspire.Pulumi.Azure.ApiManagement</RootNamespace>
     <NoWarn>$(NoWarn);ASPIREPIPELINES001;ASPIREPIPELINES004</NoWarn>
   </PropertyGroup>
