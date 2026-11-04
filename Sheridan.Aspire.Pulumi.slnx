@@ -6,6 +6,7 @@
   </Configurations>
   <Folder Name="/src/">
     <Project Path="src/Sheridan.Aspire.Pulumi.Azure.AppConfiguration/Sheridan.Aspire.Pulumi.Azure.AppConfiguration.csproj" />
+    <Project Path="src/Sheridan.Aspire.Pulumi.Azure.ApiManagement/Sheridan.Aspire.Pulumi.Azure.ApiManagement.csproj" />
     <Project Path="src/Sheridan.Aspire.Pulumi.Azure.AppContainers/Sheridan.Aspire.Pulumi.Azure.AppContainers.csproj" />
     <Project Path="src/Sheridan.Aspire.Pulumi.Azure.ApplicationInsights/Sheridan.Aspire.Pulumi.Azure.ApplicationInsights.csproj" />
     <Project Path="src/Sheridan.Aspire.Pulumi.Azure.CognitiveServices/Sheridan.Aspire.Pulumi.Azure.CognitiveServices.csproj" />

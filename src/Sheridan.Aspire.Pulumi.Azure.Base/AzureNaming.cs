@@ -53,6 +53,7 @@ public enum AzureNameKind
     RedisEnterpriseCluster,
     DeploymentScript,
     ConnectorGateway,
+    ApiManagementService,
 }
 
 /// <summary>Where an Azure resource name must be unique.</summary>
@@ -158,6 +159,7 @@ public static class AzureNaming
         R(AzureNameKind.DeploymentScript, "Microsoft.Resources/deploymentScripts", 1, 90, AzureNameScope.ResourceGroup, "ds", underscore: true, period: true, alnumEnd: false, note: "Generated names never end with a period."),
         R(AzureNameKind.FrontDoorRoute, "Microsoft.Cdn/profiles/afdEndpoints/routes", 1, 50, AzureNameScope.Parent, "route"),
         R(AzureNameKind.ConnectorGateway, "Microsoft.Web/connectorGateways", 3, 24, AzureNameScope.ResourceGroup, "conn", hyphen: false, lower: true, letterStart: true, note: "Preview resource without published naming rules; a conservative rule (the length and character set of the official Bicep's generated 'conns<uniqueString>' name)."),
+        R(AzureNameKind.ApiManagementService, "Microsoft.ApiManagement/service", 1, 50, AzureNameScope.Global, "apim", letterStart: true, noDoubleHyphen: true, note: "Global per gateway host name (<name>.azure-api.net)."),
     }.ToDictionary(r => r.Kind);
 
     public static AzureNamingRule RuleFor(AzureNameKind kind) => Rules[kind];

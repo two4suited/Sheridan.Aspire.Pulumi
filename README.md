@@ -67,6 +67,7 @@ The package id equals the folder name under `src/`, and namespaces match the pac
 |  | [`Sheridan.Aspire.Pulumi.Azure.Foundry`](src/Sheridan.Aspire.Pulumi.Azure.Foundry) | Microsoft Foundry: projects, deployments, agents |
 | Config & security | [`Sheridan.Aspire.Pulumi.Azure.KeyVault`](src/Sheridan.Aspire.Pulumi.Azure.KeyVault) | Key Vault |
 |  | [`Sheridan.Aspire.Pulumi.Azure.AppConfiguration`](src/Sheridan.Aspire.Pulumi.Azure.AppConfiguration) | App Configuration |
+|  | [`Sheridan.Aspire.Pulumi.Azure.ApiManagement`](src/Sheridan.Aspire.Pulumi.Azure.ApiManagement) | API Management (core: APIs, backends, products, policies) |
 |  | [`Sheridan.Aspire.Pulumi.Azure.EntraId`](src/Sheridan.Aspire.Pulumi.Azure.EntraId) | Entra ID app registrations (`AddEntraIdApplication` API) |
 |  | [`Sheridan.Aspire.Pulumi.Entra`](src/Sheridan.Aspire.Pulumi.Entra) | Azure AD app registration through the `azuread` provider |
 | Networking | [`Sheridan.Aspire.Pulumi.Azure.Network`](src/Sheridan.Aspire.Pulumi.Azure.Network) | VNets, subnets, private endpoints, private DNS |
