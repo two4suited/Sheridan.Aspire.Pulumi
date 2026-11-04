@@ -3,7 +3,7 @@
 Pulumi counterpart of upstream `Aspire.Hosting.Azure.Provisioning.Cdn`, which overlays the Front Door hosting integration.
 General mechanics are in [../provisioning.md](../provisioning.md).
 
-**Packaging:** the overlay lives alongside the hosting project (`AspirePulumiPackages.Pulumi.Azure.FrontDoor`,
+**Packaging:** the overlay lives alongside the hosting project (`Sheridan.Aspire.Pulumi.Azure.FrontDoor`,
 `PulumiFrontDoorInfrastructure.cs`). There is no sibling `...Azure.Cdn.Provisioning` package.
 
 ## Roots

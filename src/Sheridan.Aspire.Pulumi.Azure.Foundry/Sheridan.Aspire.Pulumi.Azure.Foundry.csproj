@@ -1,0 +1,39 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>Sheridan.Aspire.Pulumi.Azure.Foundry</RootNamespace>
+    <NoWarn>$(NoWarn);ASPIREPIPELINES001;ASPIREPIPELINES004;OPENAI001;OPENAICUA001;AAIP001</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Sheridan.Aspire.Pulumi.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Aspire.Hosting" Version="13.6.4" />
+    <!-- Foundry Agents data plane (not an ARM API), as the official Aspire.Hosting.Foundry uses. -->
+    <PackageReference Include="Azure.AI.Projects" Version="2.1.0-beta.1" />
+    <PackageReference Include="Azure.Identity" Version="1.21.0" />
+    <PackageReference Include="Polly.Core" Version="8.7.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Sheridan.Aspire.Pulumi\Sheridan.Aspire.Pulumi.csproj" />
+    <ProjectReference Include="..\Sheridan.Aspire.Pulumi.Provisioning\Sheridan.Aspire.Pulumi.Provisioning.csproj" />
+    <ProjectReference Include="..\Sheridan.Aspire.Pulumi.Azure.Base\Sheridan.Aspire.Pulumi.Azure.Base.csproj" />
+    <!-- Resources a project connects to / private endpoint target (the same-stack resources are referenced directly). -->
+    <ProjectReference Include="..\Sheridan.Aspire.Pulumi.Azure.ApplicationInsights\Sheridan.Aspire.Pulumi.Azure.ApplicationInsights.csproj" />
+    <ProjectReference Include="..\Sheridan.Aspire.Pulumi.Azure.ContainerRegistry\Sheridan.Aspire.Pulumi.Azure.ContainerRegistry.csproj" />
+    <ProjectReference Include="..\Sheridan.Aspire.Pulumi.Azure.CosmosDB\Sheridan.Aspire.Pulumi.Azure.CosmosDB.csproj" />
+    <ProjectReference Include="..\Sheridan.Aspire.Pulumi.Azure.KeyVault\Sheridan.Aspire.Pulumi.Azure.KeyVault.csproj" />
+    <ProjectReference Include="..\Sheridan.Aspire.Pulumi.Azure.Network\Sheridan.Aspire.Pulumi.Azure.Network.csproj" />
+    <ProjectReference Include="..\Sheridan.Aspire.Pulumi.Azure.Search\Sheridan.Aspire.Pulumi.Azure.Search.csproj" />
+    <ProjectReference Include="..\Sheridan.Aspire.Pulumi.Azure.Storage\Sheridan.Aspire.Pulumi.Azure.Storage.csproj" />
+    <!-- Only for IPulumiManagedIdentityResource (the compute environment identity that receives data-plane roles). -->
+    <ProjectReference Include="..\Sheridan.Aspire.Pulumi.Azure\Sheridan.Aspire.Pulumi.Azure.csproj" />
+  </ItemGroup>
+
+</Project>

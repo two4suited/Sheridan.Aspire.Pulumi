@@ -1,14 +1,12 @@
 <Project>
 
   <!--
-    Every AspirePulumiPackages.Pulumi* project under src/ is published as a NuGet package named
-    Sheridan.Pulumi<suffix>, e.g. AspirePulumiPackages.Pulumi.Azure.KeyVault -> Sheridan.Pulumi.Azure.KeyVault.
-    The Api and AppHost projects are not packages.
-    ProjectReferences become package dependencies using the renamed PackageId automatically.
+    Every project under src/ is published as a NuGet package whose PackageId equals the project
+    name, e.g. Sheridan.Aspire.Pulumi.Azure.KeyVault. ProjectReferences become package
+    dependencies automatically.
   -->
-  <PropertyGroup Condition="$(MSBuildProjectName.StartsWith('AspirePulumiPackages.Pulumi'))">
+  <PropertyGroup>
     <IsPackable>true</IsPackable>
-    <PackageId>Sheridan.Pulumi$(MSBuildProjectName.Substring(27))</PackageId>
     <Version Condition="'$(Version)' == ''">1.0.0</Version>
     <Authors>Brian Sheridan</Authors>
     <Description>Aspire hosting integration that provisions Azure infrastructure with Pulumi instead of Bicep/ARM.</Description>
@@ -19,11 +17,7 @@
     <PublishRepositoryUrl>true</PublishRepositoryUrl>
   </PropertyGroup>
 
-  <PropertyGroup Condition="!$(MSBuildProjectName.StartsWith('AspirePulumiPackages.Pulumi'))">
-    <IsPackable>false</IsPackable>
-  </PropertyGroup>
-
-  <ItemGroup Condition="'$(IsPackable)' == 'true'">
+  <ItemGroup>
     <None Include="$(MSBuildThisFileDirectory)..\README.md" Pack="true" PackagePath="\" Visible="false" />
   </ItemGroup>
 

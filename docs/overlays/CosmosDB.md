@@ -1,7 +1,7 @@
 # CosmosDB overlay (issue #36)
 
 Pulumi counterpart of `Aspire.Hosting.Azure.Provisioning.CosmosDB`. Overlays `AddPulumiCosmosDB`
-(`AspirePulumiPackages.Pulumi.Azure.CosmosDB`). General mechanism: [../provisioning.md](../provisioning.md).
+(`Sheridan.Aspire.Pulumi.Azure.CosmosDB`). General mechanism: [../provisioning.md](../provisioning.md).
 
 **Packaging decision:** the overlay lives alongside the hosting project (no sibling `...Provisioning` package, no opt-in gate).
 The hook already existed (`PulumiCosmosDBInfrastructure`) and is applied last in `ContributeResourcesAsync`.

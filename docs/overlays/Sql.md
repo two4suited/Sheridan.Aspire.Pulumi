@@ -4,7 +4,7 @@ Pulumi port of `Aspire.Hosting.Azure.Provisioning.Sql`. The overlay lets you cus
 `AddPulumiSql` / `AddPulumiAzureSqlServer` before the Pulumi program is written. See [provisioning.md](../provisioning.md) for the
 shared `ConfigureInfrastructure` machinery.
 
-**Packaging decision:** the overlay lives alongside the hosting project (`AspirePulumiPackages.Pulumi.Azure.Sql`), not in a
+**Packaging decision:** the overlay lives alongside the hosting project (`Sheridan.Aspire.Pulumi.Azure.Sql`), not in a
 sibling opt-in package.
 
 ## Roots

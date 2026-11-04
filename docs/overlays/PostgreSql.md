@@ -1,7 +1,7 @@
 # PostgreSql overlay (issue #42)
 
 Port of `Aspire.Hosting.Azure.Provisioning.PostgreSql`. Packaging decision: **lives alongside the hosting project**
-(`AspirePulumiPackages.Pulumi.Azure.PostgreSQL`); there is no sibling opt-in package. See `docs/provisioning.md` for the shared mechanism.
+(`Sheridan.Aspire.Pulumi.Azure.PostgreSQL`); there is no sibling opt-in package. See `docs/provisioning.md` for the shared mechanism.
 
 ## Roots
 

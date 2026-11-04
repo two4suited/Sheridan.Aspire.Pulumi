@@ -1,7 +1,7 @@
 # Azure resource naming
 
 Integrations used to leave names to Pulumi autonaming (logical name plus a random suffix) or invent them
-(`conns<uniqueString>`, `<id>Kv`). The naming layer in `AspirePulumiPackages.Pulumi.Azure.Base`
+(`conns<uniqueString>`, `<id>Kv`). The naming layer in `Sheridan.Aspire.Pulumi.Azure.Base`
 (`AzureNaming`, `AzureNameKind`) replaces that with names **built from the app name** that **conform to each Azure
 resource type's rules**. Names are computed in .NET at generation time (Pulumi YAML has no string helpers) and written as
 literal properties (`resourceGroupName`, `resourceName`, `vaultName`, ...). They never contain random values and are

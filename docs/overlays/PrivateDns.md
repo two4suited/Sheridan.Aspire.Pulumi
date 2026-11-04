@@ -1,7 +1,7 @@
 # PrivateDns overlay (issue #43)
 
 Port of `Aspire.Hosting.Azure.Provisioning.PrivateDns`. Packaging decision: **lives alongside the hosting project**
-(`AspirePulumiPackages.Pulumi.Azure.Network`); there is no sibling `...PrivateDns.Provisioning` package. See `docs/provisioning.md`.
+(`Sheridan.Aspire.Pulumi.Azure.Network`); there is no sibling `...PrivateDns.Provisioning` package. See `docs/provisioning.md`.
 
 ## Roots
 

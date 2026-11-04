@@ -1,7 +1,7 @@
 # Kusto overlay (issue #39)
 
 Pulumi counterpart of `Aspire.Hosting.Azure.Provisioning.Kusto`. Overlays `AddPulumiKustoCluster`
-(`AspirePulumiPackages.Pulumi.Azure.Kusto`). General mechanism: [../provisioning.md](../provisioning.md).
+(`Sheridan.Aspire.Pulumi.Azure.Kusto`). General mechanism: [../provisioning.md](../provisioning.md).
 
 **Packaging decision:** the overlay lives alongside the hosting project (no sibling `...Provisioning` package, no opt-in gate).
 The hook already existed (`PulumiKustoInfrastructure`) and is applied last in `ContributeResourcesAsync`.
@@ -31,8 +31,7 @@ builder.AddPulumiKustoCluster("kusto")
 
 Paths are inputs of `Cluster` (`enableStreamingIngest`, `enableAutoStop`, `enablePurge`, `sku`, `publicNetworkAccess`,
 `optimizedAutoscale`, `zones`, `virtualNetworkConfiguration`, ...) per `pulumi package get-schema azure-native`;
-`ReadWriteDatabase` has `softDeletePeriod` and `hotCachePeriod`. The `enableStreamingIngest` call is the one used in the demo
-`AppHost.cs` and shows up in its `aspire publish` output.
+`ReadWriteDatabase` has `softDeletePeriod` and `hotCachePeriod`.
 
 ## Unsupported / excluded
 

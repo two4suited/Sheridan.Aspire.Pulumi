@@ -3,7 +3,7 @@
 Pulumi counterpart of upstream `Aspire.Hosting.Azure.Provisioning.CognitiveServices`, which overlays the CognitiveServices
 (Azure OpenAI) hosting integration. General mechanics are in [../provisioning.md](../provisioning.md).
 
-**Packaging:** the overlay lives alongside the hosting project (`AspirePulumiPackages.Pulumi.Azure.CognitiveServices`,
+**Packaging:** the overlay lives alongside the hosting project (`Sheridan.Aspire.Pulumi.Azure.CognitiveServices`,
 `PulumiOpenAIInfrastructure.cs`). There is no sibling `...Azure.CognitiveServices.Provisioning` package.
 
 ## Roots
@@ -15,7 +15,7 @@ Pulumi counterpart of upstream `Aspire.Hosting.Azure.Provisioning.CognitiveServi
 | `CognitiveServicesAccount` | `azure-native:cognitiveservices:Account` (kind `OpenAI`) |
 | `Deployments` (extra) | `azure-native:cognitiveservices:Deployment`, one per model deployment |
 
-The Foundry integration (`AspirePulumiPackages.Pulumi.Azure.Foundry`) exposes the same `CognitiveServicesAccount` root on its own
+The Foundry integration (`Sheridan.Aspire.Pulumi.Azure.Foundry`) exposes the same `CognitiveServicesAccount` root on its own
 `ConfigureInfrastructure`. Other resources are reachable with `infra.GetResource(id)` / `infra.GetResources(type)`. The callback
 runs last in `ContributeResourcesAsync`, after role assignments have been added.
 

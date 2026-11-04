@@ -4,7 +4,7 @@ Pulumi port of `Aspire.Hosting.Azure.Provisioning.SignalR`. The overlay lets you
 `AddPulumiSignalR` before the Pulumi program is written. See [provisioning.md](../provisioning.md) for the shared
 `ConfigureInfrastructure` machinery.
 
-**Packaging decision:** the overlay lives alongside the hosting project (`AspirePulumiPackages.Pulumi.Azure.SignalR`), not in a
+**Packaging decision:** the overlay lives alongside the hosting project (`Sheridan.Aspire.Pulumi.Azure.SignalR`), not in a
 sibling opt-in package. It was added together with the hosting port (`PulumiSignalRInfrastructure.cs`); this issue only documents it.
 
 ## Roots
@@ -32,7 +32,7 @@ builder.AddPulumiSignalR("signalr")
     });
 ```
 
-`AppHost.cs` demos `Set("cors.allowedOrigins", ...)`; `aspire publish` emits it under the resource's `properties` in `Pulumi.yaml`.
+For example, `Set("cors.allowedOrigins", ...)`; `aspire publish` emits it under the resource's `properties` in `Pulumi.yaml`.
 
 ## Unsupported / excluded
 

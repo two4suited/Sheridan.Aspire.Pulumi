@@ -1,6 +1,6 @@
 name: Publish packages
 
-# Pushing a tag like v1.0.0 (or v1.1.0-rc.1) publishes every Sheridan.Pulumi.* package
+# Pushing a tag like v1.0.0 (or v1.1.0-rc.1) publishes every Sheridan.Aspire.Pulumi.* package
 # at that version to GitHub Packages (NuGet) and creates a GitHub Release.
 on:
   push:
@@ -34,7 +34,7 @@ jobs:
       - name: Pack
         run: |
           mkdir -p artifacts
-          for proj in src/AspirePulumiPackages.Pulumi*/*.csproj; do
+          for proj in src/*/*.csproj; do
             dotnet pack "$proj" -c Release -p:Version=${{ steps.version.outputs.version }} -o artifacts
           done
           ls -1 artifacts

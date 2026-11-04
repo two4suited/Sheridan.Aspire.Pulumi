@@ -3,7 +3,7 @@
 Pulumi counterpart of upstream `Aspire.Hosting.Azure.Provisioning.AppService`, which overlays the App Service environment
 integration. General mechanics are in [../provisioning.md](../provisioning.md).
 
-**Packaging:** the overlay lives alongside the hosting project (`AspirePulumiPackages.Pulumi.Azure.AppService`,
+**Packaging:** the overlay lives alongside the hosting project (`Sheridan.Aspire.Pulumi.Azure.AppService`,
 `PulumiAppServiceInfrastructure.cs`). There is no sibling opt-in `...Provisioning` package.
 
 ## Roots

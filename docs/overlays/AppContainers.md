@@ -3,7 +3,7 @@
 Pulumi counterpart of upstream `Aspire.Hosting.Azure.Provisioning.AppContainers`, which overlays the Container Apps
 environment integration. General mechanics are in [../provisioning.md](../provisioning.md).
 
-**Packaging:** the overlay lives alongside the hosting project (`AspirePulumiPackages.Pulumi.Azure.AppContainers`,
+**Packaging:** the overlay lives alongside the hosting project (`Sheridan.Aspire.Pulumi.Azure.AppContainers`,
 `PulumiContainerAppsInfrastructure.cs`). There is no sibling opt-in `...Provisioning` package.
 
 ## Roots
