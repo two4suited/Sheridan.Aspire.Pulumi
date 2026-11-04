@@ -1,16 +1,44 @@
 # Sheridan.Aspire.Pulumi.Azure.Base
 
-_Resource groups_ — part of [Sheridan.Aspire.Pulumi](../../README.md).
+The shared Azure layer: resource groups, user-assigned identities, role definitions and the deterministic naming scheme.
 
-Resources built on the shared `Sheridan.Aspire.Pulumi.Azure.Base` layer (e.g. `AddPulumiAzureUserAssignedIdentity`) create their own resource group by default. To put several of them in one shared resource group instead, provision it explicitly and point each resource at it with `WithResourceGroup`:
+Every Azure integration builds on this package. By default a resource creates its own resource group; use `AddPulumiAzureResourceGroup` and `WithResourceGroup` to share one. Names are derived from the app, resource and stack names, shortened deterministically to fit each resource type's limits.
 
-```csharp
-var sharedRg = builder.AddPulumiAzureResourceGroup("shared-rg")
-    .WithPulumiStack(azureStack);
+## Install
 
-var workloadIdentity = builder.AddPulumiAzureUserAssignedIdentity("workload-identity")
-    .WithPulumiStack(azureStack)
-    .WithResourceGroup(sharedRg);
+```bash
+dotnet add package Sheridan.Aspire.Pulumi.Azure.Base
 ```
 
-Both resources must be bound to the same Pulumi stack — `WithResourceGroup` is a same-program `${sharedRg.name}` reference, not a cross-stack output lookup — and binding them to different stacks throws a clear error instead of generating broken YAML. `WithExistingResourceGroup("name")` is still available for pointing at a resource group Pulumi doesn't manage at all.
+## Usage
+
+```csharp
+var builder = DistributedApplication.CreateBuilder(args);
+
+builder.AddPulumiStack("my-app", "dev").WithOrganization("my-org");
+
+var sharedRg = builder.AddPulumiAzureResourceGroup("shared-rg");
+
+var workloadIdentity = builder.AddPulumiAzureUserAssignedIdentity("workload-identity")
+    .WithResourceGroup(sharedRg)
+    .WithLocation("westeurope");
+
+builder.Build().Run();
+```
+
+## Features
+
+- `AddPulumiAzureResourceGroup`, `WithResourceGroup(rg)` and `WithExistingResourceGroup("name")` for resource groups Pulumi does not manage.
+- `AddPulumiAzureUserAssignedIdentity` for user-assigned managed identities.
+- `WithLocation` and `WithAzureName(AzureNameKind.X, "name")` to pin a location or a generated name.
+- `AzureNaming` / `AzureNamingExtensions` implement the naming scheme; `AzureRoleDefinitions` maps built-in Azure roles.
+
+## Notes
+
+- `WithResourceGroup` is a same-program reference: both resources must be bound to the same Pulumi stack. Binding them to different stacks throws a clear error instead of generating broken YAML.
+
+## Learn more
+
+- Stack, ESC and deploy setup: [repository README](https://github.com/two4suited/Sheridan.Aspire.Pulumi#readme).
+- Customizing generated resources with `ConfigureInfrastructure`: [provisioning guide](https://github.com/two4suited/Sheridan.Aspire.Pulumi/blob/main/docs/provisioning.md).
+- Resource naming: [naming guide](https://github.com/two4suited/Sheridan.Aspire.Pulumi/blob/main/docs/naming.md).

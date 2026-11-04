@@ -1,24 +1,42 @@
 # Sheridan.Aspire.Pulumi.Azure.AppContainers
 
-_Container Apps environment_ — part of [Sheridan.Aspire.Pulumi](../../README.md).
+Azure Container Apps environment provisioned by Pulumi, a drop-in for `AddAzureContainerAppEnvironment`.
 
-`builder.AddPulumiAzureContainerAppEnvironment("aca-env")` is the Pulumi equivalent of Aspire's `AddAzureContainerAppEnvironment`. It is a compute environment, so resources opt in the usual way:
+`AddPulumiAzureContainerAppEnvironment` is a compute environment: resources opt in with `WithComputeEnvironment`, are built and pushed to the environment's registry, and are deployed as container apps.
+
+## Install
+
+```bash
+dotnet add package Sheridan.Aspire.Pulumi.Azure.AppContainers
+```
+
+## Usage
 
 ```csharp
-var acaEnv = builder.AddPulumiAzureContainerAppEnvironment("aca-env");
+var builder = DistributedApplication.CreateBuilder(args);
+
+builder.AddPulumiStack("my-app", "dev").WithOrganization("my-org");
+
+var acaEnv = builder.AddPulumiAzureContainerAppEnvironment("aca-env");   // Sheridan.Aspire.Pulumi.Azure.AppContainers
+
 builder.AddProject<Projects.MyApi>("api")
     .WithExternalHttpEndpoints()
     .WithComputeEnvironment(acaEnv);
+
+builder.Build().Run();
 ```
 
-`aspire publish` writes the resource group, Log Analytics workspace, container registry, pull identity (AcrPull) and managed environment, plus a `ContainerApp` per targeted resource. `aspire deploy` runs: `pulumi-provision` (login, ESC, `pulumi up --target` for all the stack's non-app infrastructure incl. the registry) → `build-<resource>` → `push-<resource>` → `pulumi-deploy` (full `pulumi up`). Images are tagged with a per-deploy timestamp so each deploy creates a new revision.
+## Features
 
-### How `aspire deploy` orders things (one deploy is enough)
+- Provisions the resource group, Log Analytics workspace, container registry, an AcrPull identity and the managed environment, plus a `ContainerApp` per targeted resource.
+- Customize with `WithAzureContainerRegistry`, `WithAzureLogAnalyticsWorkspace`, `WithAcrPullIdentity` and `WithDashboard`; add VNet integration with `WithDelegatedSubnet`.
+- Container Apps jobs via `PublishAsPulumiContainerAppJob` and `PublishAsScheduledPulumiContainerAppJob`.
+- The environment's shared identity is granted data-plane roles by the data integrations (Cosmos DB, Storage, Service Bus, Key Vault, ...) automatically when an app references them.
+- Images are tagged with a per-deploy timestamp so every deploy creates a new revision.
 
-Each `PulumiStackResource` contributes `pulumi-publish` → `pulumi-provision` → `pulumi-deploy` steps. The generated `PulumiProgram` is split in two halves: **app resources** (container apps, web apps, Kubernetes workloads and in-cluster objects, registered with `program.AddAppResource(...)` or inside `program.BeginAppScope()` by the compute environments) and **infrastructure**, which is the default for everything else, so integrations (Cosmos, Storage, Service Bus, Key Vault, SQL, ...) need no changes. Infrastructure that references an app is treated as part of the app half.
+## Learn more
 
-1. `pulumi-provision` runs `pulumi up --target` for *every* infrastructure resource (not only the registry), so all stack outputs that apps consume (Cosmos endpoints, storage endpoints, Service Bus hosts, ...) exist.
-2. Images are built and pushed (they need the registry from step 1).
-3. `pulumi-deploy` regenerates the program — the environment variables that read stack outputs now resolve — and runs the full `pulumi up`, creating the apps.
-
-Aspire relationships drive the ordering between stacks: when a resource hosted in stack *S* references (`WithReference`, an endpoint/connection string/`PulumiOutputReference` in its environment) or `WaitFor`s a resource in stack *T*, *S*'s provision step automatically depends on *T*'s deploy step. `DependsOnStack` is only needed for dependencies Aspire can't see. A deferral (`Deferring environment variable ...`) is logged at debug level while the first generation runs (and in `aspire publish`, which has no real stack) and as a warning only if an output is still missing after the provision pass.
+- Mirrors the official [`Aspire.Hosting.Azure.AppContainers`](https://www.nuget.org/packages/Aspire.Hosting.Azure.AppContainers) integration, so moving from Bicep to Pulumi is a drop-in change in your AppHost.
+- Stack, ESC and deploy setup: [repository README](https://github.com/two4suited/Sheridan.Aspire.Pulumi#readme).
+- Customizing generated resources with `ConfigureInfrastructure`: [provisioning guide](https://github.com/two4suited/Sheridan.Aspire.Pulumi/blob/main/docs/provisioning.md).
+- Resource naming: [naming guide](https://github.com/two4suited/Sheridan.Aspire.Pulumi/blob/main/docs/naming.md).

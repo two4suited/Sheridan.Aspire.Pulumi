@@ -1,15 +1,49 @@
 # Sheridan.Aspire.Pulumi.Azure.FrontDoor
 
-_Front Door_ — part of [Sheridan.Aspire.Pulumi](../../README.md).
+Azure Front Door in front of your Container Apps or App Service apps, provisioned by Pulumi.
 
-`Sheridan.Aspire.Pulumi.Azure.FrontDoor` ports `Aspire.Hosting.Azure.FrontDoor`. `builder.AddPulumiFrontDoor("frontdoor")` (alias `AddPulumiAzureFrontDoor`) provisions a global `azure-native:cdn:Profile` (`Standard_AzureFrontDoor`) and, for each `WithOrigin(resource)`, an `AFDEndpoint`, an `AFDOriginGroup` (health probe from the origin's `EndpointProbeAnnotation`, default `/` over HTTPS; load balancing 4/3/50), an `AFDOrigin` (host and host header = the app's FQDN) and a `/*` `Route` (HttpsOnly forwarding, HTTPS redirect, linked to the default domain), matching the generated Bicep. Each origin gets its own `*.azurefd.net` URL, output as `{frontdoor}{origin}EndpointUrl` and exposed as `GetEndpointUrl("api")`.
+`AddPulumiFrontDoor` provisions a global `Standard_AzureFrontDoor` profile and, for each origin you add, an endpoint, origin group, origin and a `/*` route, matching the official generated Bicep. Each origin gets its own `*.azurefd.net` URL.
 
-```csharp
-var api = builder.AddProject<Projects.Api>("api").WithExternalHttpEndpoints().WithComputeEnvironment(acaEnv);
-builder.AddPulumiFrontDoor("frontdoor")
-    .WithPulumiStack(azureStack).WithResourceGroup(sharedRg)
-    .WithOrigin(api)
-    .ConfigureInfrastructure(infra => infra.GetRoute("api").Set("patternsToMatch", new[] { "/api/*" }));
+## Install
+
+```bash
+dotnet add package Sheridan.Aspire.Pulumi.Azure.FrontDoor
 ```
 
-`ConfigureInfrastructure` exposes `Profile`, `GetEndpoint/GetOriginGroup/GetOrigin/GetRoute(originName)` (see `../../docs/provisioning.md`). Origins must be hosted by an Azure Container Apps or App Service environment (the origin host is read from the emitted container app / web app) in the **same Pulumi stack**, and need an external HTTP(S) endpoint. Verified with a temporary AppHost publish. Not ported: custom domains, WAF/security policies, rule sets, Premium SKU or other origin types (e.g. non-Aspire hosts), and Bicep's deterministic `uniqueString` names (the provider auto-names the sub-resources; azure-native endpoint names are limited to 46 characters).
+## Usage
+
+```csharp
+var builder = DistributedApplication.CreateBuilder(args);
+
+builder.AddPulumiStack("my-app", "dev").WithOrganization("my-org");
+
+var acaEnv = builder.AddPulumiAzureContainerAppEnvironment("aca-env");   // Sheridan.Aspire.Pulumi.Azure.AppContainers
+var api = builder.AddProject<Projects.MyApi>("api")
+    .WithExternalHttpEndpoints()
+    .WithComputeEnvironment(acaEnv);
+
+var frontDoor = builder.AddPulumiFrontDoor("frontdoor")
+    .WithOrigin(api)
+    .ConfigureInfrastructure(infra =>
+        infra.GetRoute("api").Set("patternsToMatch", new[] { "/api/*" }));
+
+builder.Build().Run();
+```
+
+## Features
+
+- Health probe comes from the origin's `EndpointProbeAnnotation` (default `/` over HTTPS); routes are HTTPS-only with HTTPS redirect.
+- `GetEndpointUrl("api")` returns the Front Door URL for an origin, also output as `{frontdoor}{origin}EndpointUrl`.
+- `ConfigureInfrastructure` exposes `Profile` and `GetEndpoint/GetOriginGroup/GetOrigin/GetRoute(originName)`.
+
+## Notes
+
+- Origins must be hosted by a Container Apps or App Service environment in the **same Pulumi stack** and need an external HTTP(S) endpoint.
+- Not ported: custom domains, WAF/security policies, rule sets, Premium SKU, non-Aspire origins and Bicep's `uniqueString` names.
+
+## Learn more
+
+- Mirrors the official [`Aspire.Hosting.Azure.FrontDoor`](https://www.nuget.org/packages/Aspire.Hosting.Azure.FrontDoor) integration, so moving from Bicep to Pulumi is a drop-in change in your AppHost.
+- Stack, ESC and deploy setup: [repository README](https://github.com/two4suited/Sheridan.Aspire.Pulumi#readme).
+- Customizing generated resources with `ConfigureInfrastructure`: [provisioning guide](https://github.com/two4suited/Sheridan.Aspire.Pulumi/blob/main/docs/provisioning.md).
+- Resource naming: [naming guide](https://github.com/two4suited/Sheridan.Aspire.Pulumi/blob/main/docs/naming.md).
