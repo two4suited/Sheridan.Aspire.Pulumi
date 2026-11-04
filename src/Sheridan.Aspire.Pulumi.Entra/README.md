@@ -42,7 +42,7 @@ builder.Build().Run();
 
 - The ESC environment bound to the stack must supply the `azuread` provider credentials (tenant, client id/secret or OIDC).
 - Outputs are read with `pulumi stack output`, not resolved as a live Pulumi cross-stack reference.
-- For the Aspire-style API (`AddEntraIdApplication`), see `Sheridan.Aspire.Pulumi.Azure.EntraId`.
+- This is the lower-level option. For the Aspire-style API (`AddPulumiEntraId`, with `WithReference`, scopes, app roles and consent), prefer `Sheridan.Aspire.Pulumi.Azure.EntraId`.
 
 ## Learn more
 
