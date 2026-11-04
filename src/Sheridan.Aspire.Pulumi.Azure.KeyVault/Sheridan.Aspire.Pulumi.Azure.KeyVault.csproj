@@ -4,6 +4,7 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <Description>Azure Key Vault provisioned by Pulumi, a drop-in for AddAzureKeyVault.</Description>
     <RootNamespace>Sheridan.Aspire.Pulumi.Azure.KeyVault</RootNamespace>
     <NoWarn>$(NoWarn);ASPIREPIPELINES001;ASPIREPIPELINES004</NoWarn>
   </PropertyGroup>

@@ -4,6 +4,7 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <Description>Microsoft Foundry (AI Foundry) accounts, projects, deployments, agents and toolboxes provisioned by Pulumi.</Description>
     <RootNamespace>Sheridan.Aspire.Pulumi.Azure.Foundry</RootNamespace>
     <NoWarn>$(NoWarn);ASPIREPIPELINES001;ASPIREPIPELINES004;OPENAI001;OPENAICUA001;AAIP001</NoWarn>
   </PropertyGroup>

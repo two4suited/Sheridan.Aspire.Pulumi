@@ -4,6 +4,7 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <Description>Azure Container Apps Sandboxes as an Aspire compute environment, provisioned by Pulumi plus a data-plane deployment step.</Description>
     <RootNamespace>Sheridan.Aspire.Pulumi.Azure.Sandboxes</RootNamespace>
     <NoWarn>$(NoWarn);ASPIREPIPELINES001;ASPIREPIPELINES003;ASPIREPIPELINES004;ASPIRECONTAINERRUNTIME001;ASPIREPROJECTS001</NoWarn>
   </PropertyGroup>

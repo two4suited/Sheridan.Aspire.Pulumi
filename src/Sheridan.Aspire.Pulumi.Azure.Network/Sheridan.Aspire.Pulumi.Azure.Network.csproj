@@ -4,6 +4,7 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <Description>Virtual networks, subnets, NAT, private endpoints, private DNS and network security perimeters provisioned by Pulumi.</Description>
     <RootNamespace>Sheridan.Aspire.Pulumi.Azure.Network</RootNamespace>
     <NoWarn>$(NoWarn);ASPIREPIPELINES001;ASPIREPIPELINES004</NoWarn>
   </PropertyGroup>

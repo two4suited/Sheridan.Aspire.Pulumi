@@ -4,6 +4,7 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <Description>Azure SignalR Service provisioned by Pulumi, a drop-in for AddAzureSignalR.</Description>
     <RootNamespace>Sheridan.Aspire.Pulumi.Azure.SignalR</RootNamespace>
     <NoWarn>$(NoWarn);ASPIREPIPELINES001;ASPIREPIPELINES004</NoWarn>
   </PropertyGroup>

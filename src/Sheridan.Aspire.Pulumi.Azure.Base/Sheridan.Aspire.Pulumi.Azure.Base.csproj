@@ -4,6 +4,7 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <Description>The shared Azure layer: resource groups, user-assigned identities, role definitions and the deterministic naming scheme.</Description>
     <RootNamespace>Sheridan.Aspire.Pulumi.Azure.Base</RootNamespace>
     <NoWarn>$(NoWarn);ASPIREPIPELINES001;ASPIREPIPELINES004</NoWarn>
   </PropertyGroup>

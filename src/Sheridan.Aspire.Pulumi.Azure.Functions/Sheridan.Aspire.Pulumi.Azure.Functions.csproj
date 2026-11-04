@@ -4,6 +4,7 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <Description>Azure Functions projects for Aspire, deployed to a Pulumi-provisioned compute environment.</Description>
     <RootNamespace>Sheridan.Aspire.Pulumi.Azure.Functions</RootNamespace>
     <NoWarn>$(NoWarn);ASPIREPIPELINES001;ASPIREPIPELINES004;ASPIRECOMMAND001</NoWarn>
   </PropertyGroup>

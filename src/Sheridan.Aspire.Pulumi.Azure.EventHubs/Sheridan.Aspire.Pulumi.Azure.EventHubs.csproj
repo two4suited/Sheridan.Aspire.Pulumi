@@ -4,6 +4,7 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <Description>Azure Event Hubs provisioned by Pulumi, a drop-in for AddAzureEventHubs.</Description>
     <RootNamespace>Sheridan.Aspire.Pulumi.Azure.EventHubs</RootNamespace>
     <NoWarn>$(NoWarn);ASPIREPIPELINES001;ASPIREPIPELINES004</NoWarn>
   </PropertyGroup>

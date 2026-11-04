@@ -4,6 +4,7 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <Description>Azure Kubernetes Service (AKS) provisioned by Pulumi, with compute deployment through the Pulumi Kubernetes provider.</Description>
     <RootNamespace>Sheridan.Aspire.Pulumi.Azure.Kubernetes</RootNamespace>
     <NoWarn>$(NoWarn);ASPIREPIPELINES001;ASPIREPIPELINES003;ASPIREPIPELINES004;ASPIRECOMPUTE002</NoWarn>
   </PropertyGroup>

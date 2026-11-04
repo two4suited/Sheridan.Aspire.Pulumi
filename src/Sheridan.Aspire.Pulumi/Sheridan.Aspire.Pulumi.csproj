@@ -4,6 +4,7 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <Description>The core of the Sheridan.Aspire.Pulumi family: turns an Aspire AppHost into a Pulumi program and drives pulumi up / pulumi destroy from the Aspire pipeline.</Description>
     <NoWarn>$(NoWarn);ASPIREPIPELINES001;ASPIREPIPELINES004</NoWarn>
   </PropertyGroup>
 
