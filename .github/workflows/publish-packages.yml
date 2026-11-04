@@ -1,18 +1,11 @@
 name: Publish packages
 
-# - Pushing a tag like v1.0.0 publishes every Sheridan.Pulumi.* package at that stable version.
-# - Pushing to main publishes a prerelease: <BASE_VERSION>-preview.<run number>.
-# Packages go to GitHub Packages (NuGet).
+# Pushing a tag like v1.0.0 (or v1.1.0-rc.1) publishes every Sheridan.Pulumi.* package
+# at that version to GitHub Packages (NuGet) and creates a GitHub Release.
 on:
   push:
-    branches:
-      - main
     tags:
       - 'v*.*.*'
-
-env:
-  # Base version for branch (prerelease) builds. Bump when starting a new release line.
-  BASE_VERSION: 1.0.0
 
 permissions:
   contents: write
@@ -31,10 +24,6 @@ jobs:
       - name: Get version
         id: version
         run: |
-          if [[ "$GITHUB_REF_TYPE" == "branch" ]]; then
-            echo "version=${BASE_VERSION}-preview.${GITHUB_RUN_NUMBER}" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
           VERSION="${GITHUB_REF_NAME#v}"
           if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
             echo "Tag '$GITHUB_REF_NAME' is not a valid semver tag (expected vX.Y.Z)" >&2
@@ -58,7 +47,6 @@ jobs:
             --skip-duplicate
 
       - name: Create GitHub Release
-        if: github.ref_type == 'tag'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
