@@ -32,7 +32,7 @@ Then `aspire publish` to generate the Pulumi program, or `aspire deploy` to depl
 
 ## Packages
 
-Packages are published to [nuget.org](https://www.nuget.org/profiles/two4suited) (and GitHub Packages) when a `vX.Y.Z` tag is pushed, so a plain `dotnet add package` works with no extra feed.
+Packages are published to [nuget.org](https://www.nuget.org/profiles/two4suited) (and mirrored to GitHub Packages) when a `vX.Y.Z` tag is pushed, so a plain `dotnet add package <PackageId>` works with no extra feed. Each package's page on nuget.org is `https://www.nuget.org/packages/<PackageId>`.
 
 The package id equals the folder name under `src/`, and namespaces match the package ids. Each package has its own README with usage details.
 
