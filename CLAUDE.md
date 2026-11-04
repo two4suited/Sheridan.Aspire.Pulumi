@@ -13,3 +13,22 @@ When adding support for a new Azure resource (a new `AddPulumiX`), mirror the of
 5. Confirm the exact Pulumi resource tokens and required/output properties with `pulumi package get-schema <provider>` rather than guessing, then verify with `aspire publish` that the generated `Pulumi.yaml` looks right.
 
 When there's no official Aspire/Bicep integration for the resource (e.g. Azure AD app registrations), skip straight to step 5 and work from the Pulumi provider's schema directly.
+
+### New package checklist
+
+Every new project under `src/` must also be wired into the docs and the release pipeline:
+
+- **Root README**: add a row to the package table in [README.md](README.md) (`## Packages`) in the right area, linking to `src/<Package>` with a one-line "Provisions" description. Update the install/usage examples or pipeline notes there if the new package changes them.
+- **Package README**: create `src/<Package>/README.md` (it's packed into the NuGet package; without it the root README is used instead).
+- **Published**: packages are published by `.github/workflows/publish-packages.yml`, which packs every `src/*/*.csproj` when a `vX.Y.Z` tag is pushed. Keep the project under `src/` (`src/Directory.Build.props` sets `IsPackable`, `PackageId` = project name), don't set `IsPackable` to false, and confirm it appears via `dotnet pack src/<Package> -c Release -o <tmp>`. Make sure it's included in `Sheridan.Aspire.Pulumi.slnx`.
+- **Description**: give the csproj a descriptive `<Description>` (entry-point method, key `WithX` calls, outputs, link to the package README). GitHub Packages doesn't render the embedded README (it shows the repo README on the package page and only the description on the version page), so the description is the only per-package text visible there.
+- After a release tag, verify the new package shows up in the workflow's `ls -1 artifacts` output / the GitHub Packages feed.
+
+## Working on issues
+
+When asked to work on a GitHub issue:
+
+1. Branch off `main` (never commit to `main` directly) and implement the change, including tests under `tests/` where the affected project has them.
+2. Update the README of every package you touched (`src/<Package>/README.md`) in the same change: document new or changed `AddPulumiX` / `WithX` APIs, options, outputs and any behavior or breaking changes, with a usage snippet that matches the real extension-method signatures. For a brand-new package, create its README following the existing package READMEs as the template. If the change affects the pipeline model or package list, update the root [README.md](README.md) too.
+3. Build and run the relevant tests before opening the PR (`dotnet build` / `dotnet test`).
+4. Open a pull request with `gh pr create` that references the issue (`Closes #<n>`), summarizes what changed, and notes the README updates. Don't merge it yourself.
