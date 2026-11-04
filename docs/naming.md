@@ -111,6 +111,7 @@ names). Container-apps environment and Search are not on Microsoft's page and us
 | `RedisEnterpriseCluster` | `Microsoft.Cache/redisEnterprise` | 1-60 | Global | letters, digits, hyphen | letter/digit | letter/digit | yes | `redis` | Azure Managed Redis; the name is part of the host name. |
 | `DeploymentScript` | `Microsoft.Resources/deploymentScripts` | 1-90 | ResourceGroup | letters, digits, hyphen, underscore, period | letter/digit | any | no | `ds` | Generated names never end with a period. |
 | `ConnectorGateway` | `Microsoft.Web/connectorGateways` | 3-24 | ResourceGroup | lowercase letters, digits | letter | letter/digit | no | `conn` | Preview resource without published naming rules; conservative (the length and character set of the official Bicep's `conns<uniqueString>`). |
+| `ApiManagementService` | `Microsoft.ApiManagement/service` | 1-50 | Global | letters, digits, hyphen | letter | letter/digit | yes | `apim` | Global per gateway host name (`<name>.azure-api.net`). |
 
 Generated names are always lowercase even where Azure accepts upper case.
 
