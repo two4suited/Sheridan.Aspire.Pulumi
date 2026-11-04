@@ -68,7 +68,7 @@ The package id equals the folder name under `src/`, and namespaces match the pac
 | Config & security | [`Sheridan.Aspire.Pulumi.Azure.KeyVault`](src/Sheridan.Aspire.Pulumi.Azure.KeyVault) | Key Vault |
 |  | [`Sheridan.Aspire.Pulumi.Azure.AppConfiguration`](src/Sheridan.Aspire.Pulumi.Azure.AppConfiguration) | App Configuration |
 |  | [`Sheridan.Aspire.Pulumi.Azure.ApiManagement`](src/Sheridan.Aspire.Pulumi.Azure.ApiManagement) | API Management (core: APIs, backends, products, policies) |
-|  | [`Sheridan.Aspire.Pulumi.Azure.EntraId`](src/Sheridan.Aspire.Pulumi.Azure.EntraId) | Entra ID app registrations (`AddEntraIdApplication` API) |
+|  | [`Sheridan.Aspire.Pulumi.Azure.EntraId`](src/Sheridan.Aspire.Pulumi.Azure.EntraId) | Entra ID app registrations: scopes, app roles, API permissions and consent, federated credentials (`AddEntraIdApplication` API) |
 |  | [`Sheridan.Aspire.Pulumi.Entra`](src/Sheridan.Aspire.Pulumi.Entra) | Azure AD app registration through the `azuread` provider |
 | Networking | [`Sheridan.Aspire.Pulumi.Azure.Network`](src/Sheridan.Aspire.Pulumi.Azure.Network) | VNets, subnets, private endpoints, private DNS |
 | Monitoring | [`Sheridan.Aspire.Pulumi.Azure.OperationalInsights`](src/Sheridan.Aspire.Pulumi.Azure.OperationalInsights) | Log Analytics workspaces |
@@ -120,6 +120,10 @@ var acaEnv = builder.AddPulumiAzureContainerAppEnvironment("aca-env")
 - With more than one stack in the model, every stack-bound resource must call `.WithPulumiStack(...)` explicitly.
 - `.WithProjectName(...)` groups several stacks under one Pulumi project in the backend (here `my-org/my-app/identity-dev` and `my-org/my-app/azure-dev`, so stack names must differ); it defaults to the Aspire resource name.
 - `.DependsOnStack(...)` makes `aspire deploy` fully deploy the dependency before provisioning this stack. It only orders the provision/deploy steps and has no effect on `aspire publish`. References between resources in different stacks create the same ordering automatically.
+
+## Breaking changes
+
+- **Entra ID (`Sheridan.Aspire.Pulumi.Azure.EntraId`, issue #144):** `WithRedirectUris`, `WithApplicationOwners`, `WithServicePrincipalOwners`, `WithOwners` and `WithIdTokenIssuance` now throw `InvalidOperationException` on existing applications instead of silently doing nothing, and `AsExistingApplication` throws if such settings were applied first. `WithReference` gains optional connection and downstream-API key parameters. See [decision 0002](docs/decisions/0002-entraid-upstream-sync.md).
 
 ## Repository layout
 
