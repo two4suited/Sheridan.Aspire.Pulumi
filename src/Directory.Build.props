@@ -12,7 +12,7 @@
     <Description>Aspire hosting integration that provisions Azure infrastructure with Pulumi instead of Bicep/ARM.</Description>
     <PackageTags>aspire;pulumi;azure</PackageTags>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <RepositoryUrl>https://github.com/two4suited/aspire.pulumi.packages</RepositoryUrl>
+    <RepositoryUrl>https://github.com/two4suited/Sheridan.Aspire.Pulumi</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
     <PublishRepositoryUrl>true</PublishRepositoryUrl>
   </PropertyGroup>
