@@ -30,6 +30,8 @@ public sealed class AzureFrontDoorResource(string name) : PulumiAzureResource(na
 
     protected override Task ContributeResourcesAsync(PulumiProgram program, PipelineStepContext context, string rg, string location)
     {
+        var privateLinkEnvs = Origins.Select(o => (Origin: o, Env: PrivateLinkEnvironment(o))).Where(x => x.Env is not null).ToDictionary(x => x.Origin.Name, x => x.Env!);
+
         program.Resources[Id] = new Dictionary<string, object?>
         {
             ["type"] = "azure-native:cdn:Profile",
@@ -38,7 +40,7 @@ public sealed class AzureFrontDoorResource(string name) : PulumiAzureResource(na
                 ["profileName"] = NameFor(AzureNameKind.FrontDoorProfile),
                 ["resourceGroupName"] = rg,
                 ["location"] = "Global",
-                ["sku"] = new Dictionary<string, object?> { ["name"] = "Standard_AzureFrontDoor" },
+                ["sku"] = new Dictionary<string, object?> { ["name"] = privateLinkEnvs.Count > 0 ? "Premium_AzureFrontDoor" : "Standard_AzureFrontDoor" },
                 ["tags"] = new Dictionary<string, object?> { ["aspire-resource-name"] = Name },
             },
         };
@@ -76,10 +78,7 @@ public sealed class AzureFrontDoorResource(string name) : PulumiAzureResource(na
                     },
                 },
             };
-            program.Resources[OriginId(origin.Name)] = new Dictionary<string, object?>
-            {
-                ["type"] = "azure-native:cdn:AFDOrigin",
-                ["properties"] = new Dictionary<string, object?>
+            var originProps = new Dictionary<string, object?>
                 {
                     ["resourceGroupName"] = rg,
                     ["profileName"] = profileName,
@@ -87,7 +86,22 @@ public sealed class AzureFrontDoorResource(string name) : PulumiAzureResource(na
                     ["originName"] = AzureNaming.ComposeScoped(AzureNameKind.FrontDoorOrigin, origin.Name),
                     ["hostName"] = host,
                     ["originHostHeader"] = host,
-                },
+                };
+            if (privateLinkEnvs.TryGetValue(origin.Name, out var plEnv))
+            {
+                originProps["enforceCertificateNameCheck"] = true;
+                originProps["sharedPrivateLinkResource"] = new Dictionary<string, object?>
+                {
+                    ["privateLink"] = new Dictionary<string, object?> { ["id"] = $"${{{plEnv.Id}.id}}" },
+                    ["groupId"] = "managedEnvironments",
+                    ["privateLinkLocation"] = location,
+                    ["requestMessage"] = "Request access for Azure Front Door Private Link origin",
+                };
+            }
+            program.Resources[OriginId(origin.Name)] = new Dictionary<string, object?>
+            {
+                ["type"] = "azure-native:cdn:AFDOrigin",
+                ["properties"] = originProps,
             };
             program.Resources[RouteId(origin.Name)] = new Dictionary<string, object?>
             {
@@ -112,6 +126,13 @@ public sealed class AzureFrontDoorResource(string name) : PulumiAzureResource(na
         Provisioning.PulumiInfrastructureExtensions.ApplyInfrastructureCallbacks(this, program);
         return Task.CompletedTask;
     }
+
+    /// <summary>The Container Apps environment hosting the origin when it has a Private Link from this Front Door, else null.</summary>
+    private AzureContainerAppEnvironmentResource? PrivateLinkEnvironment(IResourceWithEndpoints origin) =>
+        (origin.GetComputeEnvironment() ?? origin.Annotations.OfType<DeploymentTargetAnnotation>().Select(a => a.ComputeEnvironment).FirstOrDefault())
+            is AzureContainerAppEnvironmentResource env
+        && env.Annotations.OfType<PulumiPrivateLinkTargetAnnotation>().Any(a => a.Source == this)
+            ? env : null;
 
     /// <summary>Resolves the origin host (a Pulumi expression), health probe path and protocol, as the official integration does.</summary>
     private static (string Host, string ProbePath, string ProbeProtocol) ResolveOrigin(IResourceWithEndpoints origin)

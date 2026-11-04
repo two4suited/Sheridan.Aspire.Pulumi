@@ -36,10 +36,18 @@ builder.Build().Run();
 - `GetEndpointUrl("api")` returns the Front Door URL for an origin, also output as `{frontdoor}{origin}EndpointUrl`.
 - `ConfigureInfrastructure` exposes `Profile` and `GetEndpoint/GetOriginGroup/GetOrigin/GetRoute(originName)`.
 
+## Private Link to Container Apps
+
+```csharp
+acaEnv.WithAzureFrontDoorPrivateLink(frontDoor);
+```
+
+Disables public network access on the Container Apps environment, switches the profile to `Premium_AzureFrontDoor`, and gives each origin hosted in that environment a `sharedPrivateLinkResource` (group `managedEnvironments`, `enforceCertificateNameCheck`). The private endpoint uses the environment's region; if Front Door Private Link isn't available there, override `sharedPrivateLinkResource.privateLinkLocation` in `ConfigureInfrastructure`. Front Door creates the connection as **Pending**: approve it on the environment in the portal or with `az network private-endpoint-connection approve`. Unlike upstream, there is no automatic region remapping.
+
 ## Notes
 
 - Origins must be hosted by a Container Apps or App Service environment in the **same Pulumi stack** and need an external HTTP(S) endpoint.
-- Not ported: custom domains, WAF/security policies, rule sets, Premium SKU, non-Aspire origins and Bicep's `uniqueString` names.
+- Not ported: custom domains, WAF/security policies, rule sets, non-Aspire origins and Bicep's `uniqueString` names.
 
 ## Learn more
 

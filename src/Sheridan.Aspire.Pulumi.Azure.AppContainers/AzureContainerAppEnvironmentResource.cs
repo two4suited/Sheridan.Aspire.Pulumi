@@ -279,6 +279,12 @@ public sealed class AzureContainerAppEnvironmentResource : PulumiAzureResource, 
             properties["vnetConfiguration"] = new Dictionary<string, object?> { ["infrastructureSubnetId"] = subnet.IdExpression };
         }
 
+        // Private Link from Front Door (WithAzureFrontDoorPrivateLink): the environment is only reachable privately.
+        if (Annotations.OfType<PulumiPrivateLinkTargetAnnotation>().Any())
+        {
+            properties["publicNetworkAccess"] = "Disabled";
+        }
+
         program.AddInfraResource(Id, "azure-native:app:ManagedEnvironment", new()
         {
             ["type"] = "azure-native:app:ManagedEnvironment",
@@ -304,6 +310,7 @@ public sealed class AzureContainerAppEnvironmentResource : PulumiAzureResource, 
         program.Outputs[$"{Id}Id"] = $"${{{Id}.id}}";
         program.Outputs[$"{Id}Name"] = $"${{{Id}.name}}";
         program.Outputs[$"{Id}DefaultDomain"] = $"${{{Id}.defaultDomain}}";
+        program.Outputs[$"{Id}Location"] = location;
         program.Outputs[$"{Id}ResourceGroup"] = rg;
         program.Outputs[$"{Id}SubscriptionId"] = PulumiAzureProgramExtensions.SubscriptionId;
         program.Outputs[$"{Id}RegistryName"] = $"${{{RegistryRef}.name}}";
