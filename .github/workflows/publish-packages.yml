@@ -15,7 +15,7 @@ env:
   BASE_VERSION: 1.0.0
 
 permissions:
-  contents: read
+  contents: write
   packages: write
 
 jobs:
@@ -56,6 +56,17 @@ jobs:
             --source "https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json" \
             --api-key "${{ secrets.GITHUB_TOKEN }}" \
             --skip-duplicate
+
+      - name: Create GitHub Release
+        if: github.ref_type == 'tag'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          PRERELEASE=""
+          if [[ "$VERSION" == *-* ]]; then PRERELEASE="--prerelease"; fi
+          gh release create "$GITHUB_REF_NAME" artifacts/*.nupkg \
+            --title "$GITHUB_REF_NAME" --generate-notes $PRERELEASE
 
       - uses: actions/upload-artifact@v4
         with:
