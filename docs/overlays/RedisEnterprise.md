@@ -1,7 +1,7 @@
 # RedisEnterprise overlay (issue #45)
 
 Port of `Aspire.Hosting.Azure.Provisioning.RedisEnterprise` (the Azure Managed Redis flavor). Packaging decision: **lives alongside the
-hosting project** (`AspirePulumiPackages.Pulumi.Azure.Redis`); there is no sibling `...RedisEnterprise.Provisioning` package.
+hosting project** (`Sheridan.Aspire.Pulumi.Azure.Redis`); there is no sibling `...RedisEnterprise.Provisioning` package.
 See `docs/provisioning.md` for the shared mechanism.
 
 ## Roots

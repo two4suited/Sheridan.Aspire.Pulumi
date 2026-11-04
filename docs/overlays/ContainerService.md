@@ -1,7 +1,7 @@
 # ContainerService overlay (issue #35)
 
 Pulumi counterpart of `Aspire.Hosting.Azure.Provisioning.ContainerService`. Overlays `AddPulumiKubernetes`
-(`AspirePulumiPackages.Pulumi.Azure.Kubernetes`). General mechanism: [../provisioning.md](../provisioning.md).
+(`Sheridan.Aspire.Pulumi.Azure.Kubernetes`). General mechanism: [../provisioning.md](../provisioning.md).
 
 **Packaging decision:** the overlay lives alongside the hosting project (no sibling `...ContainerService.Provisioning` package, no opt-in gate).
 The hook already existed (`PulumiKubernetesInfrastructure`) and is applied last in `ContributeResourcesAsync`.

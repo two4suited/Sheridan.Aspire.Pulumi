@@ -4,7 +4,7 @@ Pulumi port of `Aspire.Hosting.Azure.Provisioning.WebPubSub`. The overlay lets y
 `AddPulumiWebPubSub` before the Pulumi program is written. See [provisioning.md](../provisioning.md) for the shared
 `ConfigureInfrastructure` machinery.
 
-**Packaging decision:** the overlay lives alongside the hosting project (`AspirePulumiPackages.Pulumi.Azure.WebPubSub`), not in a
+**Packaging decision:** the overlay lives alongside the hosting project (`Sheridan.Aspire.Pulumi.Azure.WebPubSub`), not in a
 sibling opt-in package. It was added together with the hosting port (`PulumiWebPubSubInfrastructure.cs`); this issue only documents it.
 
 ## Roots
@@ -32,7 +32,7 @@ builder.AddPulumiWebPubSub("pubsub")
     });
 ```
 
-`AppHost.cs` demos `Set("tls.clientCertEnabled", false)`; `aspire publish` emits `tls: { clientCertEnabled: false }` under the
+For example, `Set("tls.clientCertEnabled", false)`; `aspire publish` emits `tls: { clientCertEnabled: false }` under the
 service's `properties` in `Pulumi.yaml`. Hub settings live under the hub's `properties` input (`WebPubSubHubProperties`).
 
 ## Unsupported / excluded

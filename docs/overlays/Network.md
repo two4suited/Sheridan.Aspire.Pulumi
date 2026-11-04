@@ -1,7 +1,7 @@
 # Network overlay (issue #40)
 
 Pulumi counterpart of `Aspire.Hosting.Azure.Provisioning.Network`. Overlays the Network hosting integration
-(`AspirePulumiPackages.Pulumi.Azure.Network`). General mechanism: [../provisioning.md](../provisioning.md).
+(`Sheridan.Aspire.Pulumi.Azure.Network`). General mechanism: [../provisioning.md](../provisioning.md).
 (The sibling private DNS overlay is documented in [PrivateDns.md](PrivateDns.md).)
 
 **Packaging decision:** the overlay lives alongside the hosting project (no sibling `...Provisioning` package, no opt-in gate).

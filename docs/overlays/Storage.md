@@ -4,7 +4,7 @@ Pulumi port of `Aspire.Hosting.Azure.Provisioning.Storage`. The overlay lets you
 `AddPulumiStorage` before the Pulumi program is written. See [provisioning.md](../provisioning.md) for the shared
 `ConfigureInfrastructure` machinery.
 
-**Packaging decision:** the overlay lives alongside the hosting project (`AspirePulumiPackages.Pulumi.Azure.Storage`), not in a
+**Packaging decision:** the overlay lives alongside the hosting project (`Sheridan.Aspire.Pulumi.Azure.Storage`), not in a
 sibling opt-in package.
 
 ## Roots

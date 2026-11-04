@@ -1,7 +1,7 @@
 # Redis overlay (issue #44)
 
 Port of `Aspire.Hosting.Azure.Provisioning.Redis`. Packaging decision: **lives alongside the hosting project**
-(`AspirePulumiPackages.Pulumi.Azure.Redis`); there is no sibling opt-in package. See `docs/provisioning.md` for the shared mechanism.
+(`Sheridan.Aspire.Pulumi.Azure.Redis`); there is no sibling opt-in package. See `docs/provisioning.md` for the shared mechanism.
 
 ## Roots
 

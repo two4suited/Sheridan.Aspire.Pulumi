@@ -1,7 +1,7 @@
 # ContainerRegistry overlay (issue #34)
 
 Pulumi counterpart of `Aspire.Hosting.Azure.Provisioning.ContainerRegistry`. Overlays `AddPulumiContainerRegistry`
-(`AspirePulumiPackages.Pulumi.Azure.ContainerRegistry`). General mechanism: [../provisioning.md](../provisioning.md).
+(`Sheridan.Aspire.Pulumi.Azure.ContainerRegistry`). General mechanism: [../provisioning.md](../provisioning.md).
 
 **Packaging decision:** the overlay lives alongside the hosting project (no sibling `...Provisioning` package, no opt-in gate).
 

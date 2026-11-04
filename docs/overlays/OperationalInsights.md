@@ -1,7 +1,7 @@
 # OperationalInsights overlay (issue #41)
 
 Port of `Aspire.Hosting.Azure.Provisioning.OperationalInsights`. Packaging decision: **lives alongside the hosting project**
-(`AspirePulumiPackages.Pulumi.Azure.OperationalInsights`); there is no sibling opt-in package. See `docs/provisioning.md` for the shared mechanism.
+(`Sheridan.Aspire.Pulumi.Azure.OperationalInsights`); there is no sibling opt-in package. See `docs/provisioning.md` for the shared mechanism.
 
 ## Roots
 

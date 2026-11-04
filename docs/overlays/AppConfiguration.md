@@ -3,7 +3,7 @@
 Pulumi counterpart of upstream `Aspire.Hosting.Azure.Provisioning.AppConfiguration`, which overlays the App Configuration
 hosting integration. General mechanics are in [../provisioning.md](../provisioning.md).
 
-**Packaging:** the overlay lives alongside the hosting project (`AspirePulumiPackages.Pulumi.Azure.AppConfiguration`,
+**Packaging:** the overlay lives alongside the hosting project (`Sheridan.Aspire.Pulumi.Azure.AppConfiguration`,
 `PulumiAppConfigurationInfrastructure.cs`). There is no sibling opt-in `...Provisioning` package.
 
 ## Roots

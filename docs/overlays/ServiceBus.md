@@ -4,7 +4,7 @@ Pulumi port of `Aspire.Hosting.Azure.Provisioning.ServiceBus`. The overlay lets 
 for `AddPulumiServiceBus` before the Pulumi program is written. See [provisioning.md](../provisioning.md) for the shared
 `ConfigureInfrastructure` machinery.
 
-**Packaging decision:** the overlay lives alongside the hosting project (`AspirePulumiPackages.Pulumi.Azure.ServiceBus`), not in a
+**Packaging decision:** the overlay lives alongside the hosting project (`Sheridan.Aspire.Pulumi.Azure.ServiceBus`), not in a
 sibling opt-in package.
 
 ## Roots

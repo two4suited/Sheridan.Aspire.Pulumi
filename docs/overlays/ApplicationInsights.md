@@ -3,7 +3,7 @@
 Pulumi counterpart of upstream `Aspire.Hosting.Azure.Provisioning.ApplicationInsights`, which overlays the Application Insights
 hosting integration. General mechanics are in [../provisioning.md](../provisioning.md).
 
-**Packaging:** the overlay lives alongside the hosting project (`AspirePulumiPackages.Pulumi.Azure.ApplicationInsights`,
+**Packaging:** the overlay lives alongside the hosting project (`Sheridan.Aspire.Pulumi.Azure.ApplicationInsights`,
 `PulumiApplicationInsightsInfrastructure.cs`). There is no sibling opt-in `...Provisioning` package.
 
 ## Roots

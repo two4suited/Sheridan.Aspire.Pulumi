@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <NoWarn>$(NoWarn);ASPIREPIPELINES001;ASPIREPIPELINES004</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Aspire.Hosting" Version="13.6.4" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Sheridan.Aspire.Pulumi\Sheridan.Aspire.Pulumi.csproj" />
+    <ProjectReference Include="..\Sheridan.Aspire.Pulumi.Provisioning\Sheridan.Aspire.Pulumi.Provisioning.csproj" />
+    <ProjectReference Include="..\Sheridan.Aspire.Pulumi.Azure.Base\Sheridan.Aspire.Pulumi.Azure.Base.csproj" />
+  </ItemGroup>
+
+</Project>

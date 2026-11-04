@@ -1,7 +1,7 @@
 # Search overlay (issue #46)
 
 Port of `Aspire.Hosting.Azure.Provisioning.Search`. Packaging decision: **lives alongside the hosting project**
-(`AspirePulumiPackages.Pulumi.Azure.Search`); there is no sibling opt-in package. See `docs/provisioning.md` for the shared mechanism.
+(`Sheridan.Aspire.Pulumi.Azure.Search`); there is no sibling opt-in package. See `docs/provisioning.md` for the shared mechanism.
 
 ## Roots
 
@@ -30,7 +30,6 @@ builder.AddPulumiSearch("search")
     });
 ```
 
-The demo `AppHost.cs` already exercises this overlay (`semanticSearch`).
 
 ## Not supported (and why)
 

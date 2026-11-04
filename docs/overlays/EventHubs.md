@@ -1,7 +1,7 @@
 # EventHubs overlay (issue #37)
 
 Pulumi counterpart of `Aspire.Hosting.Azure.Provisioning.EventHubs`. Overlays `AddPulumiEventHubs`
-(`AspirePulumiPackages.Pulumi.Azure.EventHubs`). General mechanism: [../provisioning.md](../provisioning.md).
+(`Sheridan.Aspire.Pulumi.Azure.EventHubs`). General mechanism: [../provisioning.md](../provisioning.md).
 
 **Packaging decision:** the overlay lives alongside the hosting project (no sibling `...Provisioning` package, no opt-in gate).
 The hook was missing and was added (`PulumiEventHubsInfrastructure`); callbacks run last in `ContributeResourcesAsync`.
