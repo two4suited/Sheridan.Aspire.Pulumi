@@ -24,6 +24,29 @@ public static partial class AzureKubernetesEnvironmentExtensions
         this IDistributedApplicationBuilder builder, string name) =>
         builder.AddPulumiAzureKubernetesEnvironment(name);
 
+    /// <summary>
+    /// Uses an existing AKS cluster instead of provisioning one. Its node pools, networking and add-ons are never changed, and
+    /// cluster-creation settings (<c>WithSystemNodePool</c>, <c>WithSubnet</c>, <c>WithNetworkProfile</c>, ...) are ignored. The registry,
+    /// AcrPull assignment for the cluster's kubelet identity and workload identity credentials are still provisioned. The cluster must have a
+    /// kubelet identity, and OIDC plus workload identity when workloads use them (otherwise call <c>WithWorkloadIdentity(false)</c>).
+    /// Mirrors <c>AsExisting</c>. <paramref name="resourceGroupName"/> selects the cluster's group independently of the group supporting
+    /// resources go to; null means the environment's own group.
+    /// </summary>
+    public static IResourceBuilder<AzureKubernetesEnvironmentResource> AsExisting(
+        this IResourceBuilder<AzureKubernetesEnvironmentResource> builder, string existingResourceName, string? resourceGroupName)
+    {
+        ArgumentNullException.ThrowIfNull(builder);
+        ArgumentException.ThrowIfNullOrEmpty(existingResourceName);
+        builder.Resource.ExistingClusterName = existingResourceName;
+        builder.Resource.ExistingClusterResourceGroup = resourceGroupName;
+        return builder;
+    }
+
+    /// <summary>Alias of <see cref="AsExisting"/> (the Pulumi resource has no separate local mode). Mirrors <c>PublishAsExisting</c>.</summary>
+    public static IResourceBuilder<AzureKubernetesEnvironmentResource> PublishAsExisting(
+        this IResourceBuilder<AzureKubernetesEnvironmentResource> builder, string existingResourceName, string? resourceGroupName) =>
+        builder.AsExisting(existingResourceName, resourceGroupName);
+
     /// <summary>Replaces the default system node pool. Mirrors <c>WithSystemNodePool</c> (defaults: Standard_D2s_v5, 1-3 nodes).</summary>
     public static IResourceBuilder<AzureKubernetesEnvironmentResource> WithSystemNodePool(
         this IResourceBuilder<AzureKubernetesEnvironmentResource> builder, string vmSize = "Standard_D2s_v5", int minCount = 1, int maxCount = 3)

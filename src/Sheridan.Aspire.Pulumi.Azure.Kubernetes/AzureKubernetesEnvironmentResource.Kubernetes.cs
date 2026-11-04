@@ -118,7 +118,8 @@ public sealed partial class AzureKubernetesEnvironmentResource
         };
 
         // Everything below needs the cluster, its registry pull access and (for AGC) the controller's subnet permissions.
-        var clusterReady = new List<string> { Id, $"{Id}AcrPull" };
+        // An existing cluster is a lookup variable, not a resource, so only the role assignment is a dependency.
+        var clusterReady = IsExisting ? new List<string> { $"{Id}AcrPull" } : new List<string> { Id, $"{Id}AcrPull" };
         clusterReady.AddRange(albJoins);
 
         var volumeIds = new Dictionary<string, string>(); // claim name -> pulumi id
@@ -401,8 +402,10 @@ public sealed partial class AzureKubernetesEnvironmentResource
         {
             ["containers"] = new List<object?> { container },
             // Upstream pins workloads to the first user node pool.
-            ["nodeSelector"] = new Dictionary<string, object?> { ["agentpool"] = EffectivePools().First(p => p.Config.Mode == AksNodePoolMode.User).Config.Name },
         };
+        // An existing cluster's pools are not ours to assume: only pin when the user named a pool with AddNodePool.
+        if (!IsExisting || NodePools.Count > 0)
+            podSpec["nodeSelector"] = new Dictionary<string, object?> { ["agentpool"] = EffectivePools().First(p => p.Config.Mode == AksNodePoolMode.User).Config.Name };
         if (serviceAccount is not null) podSpec["serviceAccountName"] = serviceAccount;
         if (volumes.Count > 0)
         {

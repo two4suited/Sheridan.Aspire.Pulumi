@@ -43,6 +43,15 @@ builder.Build().Run();
 - `AddIngress`, `AddGateway` (Gateway API), `AddLoadBalancer` (Application Gateway for Containers), `AddCertManager` / `AddIssuer`, `AddHelmChart` and `AddPersistentVolume`.
 - Networking: `WithSubnet`, `WithNetworkProfile` and `AsPrivateCluster` (optionally with a Pulumi private DNS zone). Also `WithWorkloadIdentity` and `WithContainerInsights`.
 
+## Existing clusters
+
+```csharp
+var aks = builder.AddPulumiKubernetes("aks")
+    .AsExisting("shared-aks", "platform-rg");   // or PublishAsExisting; null group = the environment's own
+```
+
+The cluster is looked up with `getManagedCluster` and never modified; cluster-creation options (`WithSystemNodePool`, `WithSubnet`, `WithNetworkProfile`, `AsPrivateCluster(zone)`, ...) are ignored. The registry, `AcrPull` for the cluster's kubelet identity and per-workload federated credentials are still provisioned, so the deploying identity needs rights for those. Prerequisites: a kubelet identity; OIDC and workload identity enabled (or call `WithWorkloadIdentity(false)`); any Gateway/ALB add-ons already installed with their permissions. Workloads are only pinned to a node pool when you name one with `AddNodePool`. For a cluster whose public name is disabled, also call `AsPrivateCluster()` so the FQDN output uses the private name. Cross-subscription clusters are not supported. `pulumi destroy` never deletes the cluster, but the application's resource group is deleted, so keep the cluster in another group.
+
 ## Notes
 
 - Resource types keep the upstream names (`KubernetesIngressResource`, ...) but are Pulumi-side types: do not reference `Aspire.Hosting.Kubernetes` in the same AppHost.
