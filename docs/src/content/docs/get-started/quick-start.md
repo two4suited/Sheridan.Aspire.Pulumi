@@ -3,15 +3,9 @@ title: Quick start
 description: Install the packages and deploy an Aspire app with Pulumi.
 ---
 
-## Add the package feed
-
-Packages are published to GitHub Packages (NuGet) when a `vX.Y.Z` tag is pushed. Add the feed with a token that has `read:packages`:
-
-```bash
-dotnet nuget add source "https://nuget.pkg.github.com/two4suited/index.json" --name github-two4suited --username <github-user> --password <token> --store-password-in-clear-text
-```
-
 ## Install packages
+
+Packages are published to [nuget.org](https://www.nuget.org/profiles/two4suited) when a `vX.Y.Z` tag is pushed, so no extra feed is needed:
 
 ```bash
 dotnet add package Sheridan.Aspire.Pulumi.Azure.AppContainers
