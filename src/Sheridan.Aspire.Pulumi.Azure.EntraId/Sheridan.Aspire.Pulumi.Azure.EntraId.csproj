@@ -9,11 +9,18 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <InternalsVisibleTo Include="Sheridan.Aspire.Pulumi.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="Aspire.Hosting" Version="13.6.4" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\Sheridan.Aspire.Pulumi\Sheridan.Aspire.Pulumi.csproj" />
+    <ProjectReference Include="..\Sheridan.Aspire.Pulumi.Provisioning\Sheridan.Aspire.Pulumi.Provisioning.csproj" />
+    <!-- Only for IPulumiManagedIdentityResource (federated credentials / app-role assignments for managed identities). -->
+    <ProjectReference Include="..\Sheridan.Aspire.Pulumi.Azure\Sheridan.Aspire.Pulumi.Azure.csproj" />
   </ItemGroup>
 
 </Project>
