@@ -4,6 +4,7 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <Description>Azure Cache for Redis and Azure Managed Redis provisioned by Pulumi, drop-ins for AddAzureRedis and AddAzureManagedRedis.</Description>
     <RootNamespace>Sheridan.Aspire.Pulumi.Azure.Redis</RootNamespace>
     <NoWarn>$(NoWarn);ASPIREPIPELINES001;ASPIREPIPELINES004</NoWarn>
   </PropertyGroup>

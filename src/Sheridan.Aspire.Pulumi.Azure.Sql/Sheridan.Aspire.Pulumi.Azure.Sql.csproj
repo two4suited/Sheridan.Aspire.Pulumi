@@ -4,6 +4,7 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <Description>Azure SQL Database provisioned by Pulumi, a drop-in for AddAzureSqlServer.</Description>
     <RootNamespace>Sheridan.Aspire.Pulumi.Azure.Sql</RootNamespace>
     <NoWarn>$(NoWarn);ASPIREPIPELINES001;ASPIREPIPELINES004</NoWarn>
   </PropertyGroup>

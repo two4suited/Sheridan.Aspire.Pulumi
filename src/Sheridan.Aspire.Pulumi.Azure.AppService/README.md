@@ -18,7 +18,7 @@ var builder = DistributedApplication.CreateBuilder(args);
 builder.AddPulumiStack("my-app", "dev").WithOrganization("my-org");
 
 var appSvc = builder.AddPulumiAzureAppServiceEnvironment("appsvc")
-    .WithSku("P1V3")
+    .WithSku("P1V3", "Premium")
     .WithDashboard(false);
 
 builder.AddProject<Projects.MyApi>("api")
@@ -30,7 +30,7 @@ builder.Build().Run();
 
 ## Features
 
-- `WithSku` sets the App Service plan SKU (default P0V3 / Premium).
+- `WithSku(skuName, skuTier)` sets the App Service plan SKU (default P0V3 / Premium).
 - `WithDashboard` enables or disables the Aspire dashboard site (default enabled).
 - `WithAzureApplicationInsights` wires the environment to Application Insights.
 - Reachable through `ConfigureInfrastructure`: the registry, dashboard site, Log Analytics, App Insights and identities.

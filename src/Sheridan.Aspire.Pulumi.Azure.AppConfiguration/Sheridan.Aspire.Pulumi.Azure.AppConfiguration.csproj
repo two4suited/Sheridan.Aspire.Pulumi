@@ -4,6 +4,7 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <Description>Azure App Configuration provisioned by Pulumi, a drop-in for AddAzureAppConfiguration.</Description>
     <RootNamespace>Sheridan.Aspire.Pulumi.Azure.AppConfiguration</RootNamespace>
     <NoWarn>$(NoWarn);ASPIREPIPELINES001;ASPIREPIPELINES004</NoWarn>
   </PropertyGroup>

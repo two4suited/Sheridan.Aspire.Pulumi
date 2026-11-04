@@ -4,6 +4,7 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <Description>Azure Data Explorer (Kusto) clusters provisioned by Pulumi, a drop-in for AddAzureKustoCluster.</Description>
     <RootNamespace>Sheridan.Aspire.Pulumi.Azure.Kusto</RootNamespace>
     <NoWarn>$(NoWarn);ASPIREPIPELINES001;ASPIREPIPELINES004</NoWarn>
   </PropertyGroup>
