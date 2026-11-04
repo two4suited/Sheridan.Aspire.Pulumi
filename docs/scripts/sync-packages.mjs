@@ -31,6 +31,8 @@ for (const r of rows) {
   let body = readFileSync(readme, 'utf8').replace(/^# .+\n+/, '');
   // Rewrite repo-relative links to GitHub so they work on the site.
   body = body.replace(/\]\((?!https?:|#|\/)([^)]+)\)/g, (_, p) => `](${REPO}/blob/main/src/${r.id}/${p})`);
+  // Like aspire.dev, link the package from its Install section.
+  body = body.replace(/^## Install\n\n/m, `## Install\n\nAdd the [\`${r.id}\`](https://www.nuget.org/packages/${r.id}) NuGet package to your AppHost:\n\n`);
   const dir = join(out, slugify(r.area));
   mkdirSync(dir, { recursive: true });
   const short = r.id.replace(/^Sheridan\.Aspire\.Pulumi\.?(Azure\.)?/, '') || 'Core';
