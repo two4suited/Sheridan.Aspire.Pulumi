@@ -10,6 +10,7 @@ on:
 permissions:
   contents: read
   issues: read
+  pull-requests: read
 engine:
   id: claude
   model: claude-sonnet-5-5
