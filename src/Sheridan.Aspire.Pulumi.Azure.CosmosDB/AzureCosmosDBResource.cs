@@ -276,4 +276,6 @@ public sealed class AzureCosmosDBEmulatorResource(AzureCosmosDBResource innerRes
 
     /// <summary>True for the classic (Windows-derived) emulator image, false for the Linux vNext one.</summary>
     public bool IsClassic { get; internal set; }
+
+    internal bool DataExplorerUrlSubscribed { get; set; }
 }

@@ -119,6 +119,10 @@ public static class AzureCosmosDBExtensions
         {
             emulatorBuilder
                 .WithHttpEndpoint(targetPort: 8080, name: "emulatorhealth")
+                .WithUrls(c =>
+                {
+                    foreach (var u in c.Urls.Where(u => u.Endpoint?.EndpointName == "emulatorhealth")) u.DisplayLocation = UrlDisplayLocation.DetailsOnly;
+                })
                 .WithEnvironment("PROTOCOL", "https")
                 .WithEnvironment("ENABLE_EXPLORER", "false");
         }
@@ -184,6 +188,37 @@ public static class AzureCosmosDBExtensions
         return builder
             .WithEnvironment("ENABLE_EXPLORER", "true")
             .WithEnvironment("EXPLORER_PROTOCOL", "http")
-            .WithHttpEndpoint(port: port, targetPort: 1234, name: "data-explorer");
+            .WithHttpEndpoint(port: port, targetPort: 1234, name: "data-explorer")
+            .WithUrls(c =>
+            {
+                foreach (var u in c.Urls.Where(u => u.Endpoint?.EndpointName == "data-explorer")) u.DisplayText = "Data Explorer";
+            })
+            .PublishDataExplorerUrlOnCosmos();
+    }
+
+    private static IResourceBuilder<AzureCosmosDBEmulatorResource> PublishDataExplorerUrlOnCosmos(this IResourceBuilder<AzureCosmosDBEmulatorResource> builder)
+    {
+        // Url callbacks only run for container/executable resources, so the cosmos account (not a container) gets its link
+        // pushed onto its snapshot once the emulator's endpoints are allocated. Idempotent if WithDataExplorer is called twice.
+        var emulator = builder.Resource;
+        if (emulator.DataExplorerUrlSubscribed) return builder;
+        emulator.DataExplorerUrlSubscribed = true;
+        builder.ApplicationBuilder.Eventing.Subscribe<ResourceEndpointsAllocatedEvent>(emulator, async (@event, ct) =>
+        {
+            var notifications = @event.Services.GetRequiredService<ResourceNotificationService>();
+            await PublishDataExplorerUrlAsync(notifications, emulator).ConfigureAwait(false);
+        });
+        return builder;
+    }
+
+    internal static async Task PublishDataExplorerUrlAsync(ResourceNotificationService notifications, AzureCosmosDBEmulatorResource emulator)
+    {
+        var url = emulator.GetEndpoint("data-explorer").Url;
+        if (string.IsNullOrEmpty(url)) return;
+        await notifications.PublishUpdateAsync(emulator.InnerResource, s =>
+            s.Urls.Any(u => u.Name == "data-explorer")
+                ? s
+                : s with { Urls = s.Urls.Add(new UrlSnapshot("data-explorer", url, IsInternal: false) { DisplayProperties = new UrlDisplayPropertiesSnapshot("Data Explorer", 0) }) })
+            .ConfigureAwait(false);
     }
 }

@@ -34,7 +34,7 @@ builder.Build().Run();
 
 - `AddCosmosDatabase(name, databaseName?)` / `AddContainer(name, partitionKeyPath(s), containerName?)` with per-database and per-container connection strings.
 - `WithReference(cosmos)` is enough for data access: the hosting compute environment's identity gets *Cosmos DB Built-in Data Contributor* scoped to the account.
-- `RunAsEmulator`, `RunAsPreviewEmulator`, `RunAsClassicEmulator` plus `WithDataVolume`, `WithGatewayPort`, `WithPartitionCount`, `WithDataExplorer`.
+- `RunAsEmulator`, `RunAsPreviewEmulator`, `RunAsClassicEmulator` plus `WithDataVolume`, `WithGatewayPort`, `WithPartitionCount`, `WithDataExplorer` (adds a "Data Explorer" link on both the `cosmos` resource and the emulator container in the dashboard; the emulator's health endpoint is shown in details only).
 - With `RunAsEmulator()` (vNext), the declared databases and containers (including partition key paths) are created in the emulator once its `/ready` probe passes, and projects that reference the account, a database or a container wait until that has finished. `RunAsClassicEmulator()` (image tag `stable`, as in the official integration) has no probe endpoint, so it is considered ready once the data plane answers a signed request, and the databases and containers are created then. Creation uses the emulator's REST API, so there is no extra SDK dependency and it works on arm64.
 - `WithDefaultAzureSku()` switches from serverless; `WithAccessKeyAuthentication()` keeps local auth on and stores the connection strings and key as secrets in a Key Vault created for the account.
 - `ConfigureInfrastructure(i => i.CosmosDBAccount.Set(...))` edits the generated resources. Alias: `AddPulumiAzureCosmosDB`.
