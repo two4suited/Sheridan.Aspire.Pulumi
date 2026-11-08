@@ -31,6 +31,7 @@ export default defineConfig({
         {
           label: 'Reference',
           items: [
+            { slug: 'reference/release-notes' },
             { label: 'Overlay notes', collapsed: true, items: [{ autogenerate: { directory: 'reference/overlays' } }] },
             { label: 'Design decisions', collapsed: true, items: [{ autogenerate: { directory: 'reference/decisions' } }] },
           ],
