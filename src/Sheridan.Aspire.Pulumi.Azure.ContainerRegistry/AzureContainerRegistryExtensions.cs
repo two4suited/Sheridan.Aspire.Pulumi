@@ -1,3 +1,4 @@
+using Sheridan.Aspire.Pulumi;
 using System.Text;
 using Aspire.Hosting.ApplicationModel;
 using Sheridan.Aspire.Pulumi.Azure.ContainerRegistry;
@@ -13,7 +14,7 @@ public static class AzureContainerRegistryExtensions
     {
         ArgumentNullException.ThrowIfNull(builder);
         ArgumentException.ThrowIfNullOrEmpty(name);
-        return builder.AddResource(new AzureContainerRegistryResource(name)).ExcludeFromManifest();
+        return builder.AddResource(new AzureContainerRegistryResource(name)).ExcludeFromManifest().HideInRunMode();
     }
 
     /// <summary>Alias for <see cref="AddPulumiAzureContainerRegistry"/>.</summary>
