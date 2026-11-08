@@ -18,6 +18,10 @@ public sealed class AzureServiceBusEmulatorResource(AzureServiceBusResource inne
     /// <summary>The SQL Server container that stores the emulator's state.</summary>
     public ContainerResource? SqlServer { get; internal set; }
 
+    internal SqlServerServerResource? SqlServerResource => SqlServer as SqlServerServerResource;
+    internal IResourceBuilder<SqlServerServerResource>? ExistingSqlServer { get; set; }
+    internal List<Action<IResourceBuilder<SqlServerServerResource>>> SqlServerConfigurations { get; } = [];
+
     internal string? ConfigurationFilePath { get; set; }
     internal List<Action<JsonNode>> ConfigurationCallbacks { get; } = [];
 }
@@ -26,6 +30,8 @@ public static class AzureServiceBusEmulatorExtensions
 {
     internal const string EmulatorImage = "azure-messaging/servicebus-emulator";
     internal const string EmulatorTag = "2.0.0";
+    private const string SqlServerEndpointName = "tcp";
+    private const string SqlServerConflictMessage = "The Azure Service Bus emulator cannot use both an existing SQL Server resource and a customized built-in SQL Server resource. Remove either the 'WithSqlServer(sqlServer)' call or the 'WithSqlServer(configureSqlServer)' call.";
 
     /// <summary>
     /// Runs the Azure Service Bus emulator (and the SQL Server container it needs) locally instead of connecting to the
@@ -38,33 +44,32 @@ public static class AzureServiceBusEmulatorExtensions
         Action<IResourceBuilder<AzureServiceBusEmulatorResource>>? configureContainer = null)
     {
         ArgumentNullException.ThrowIfNull(builder);
-        if (builder.Resource.Emulator is not null)
+        // Tracked regardless of execution mode so the same AppHost fails the same way in run and publish mode.
+        if (builder.Resource.EmulatorRequested)
             throw new InvalidOperationException("The Azure Service Bus resource is already configured to run as an emulator.");
-        if (builder.Resource.RunEndpoint is not null)
+        if (builder.Resource.RunAsExistingRequested)
             throw new InvalidOperationException("The Azure Service Bus resource is already configured with RunAsExisting.");
+        builder.Resource.EmulatorRequested = true;
         if (builder.ApplicationBuilder.ExecutionContext.IsPublishMode) return builder;
 
         var app = builder.ApplicationBuilder;
-        var password = ParameterResourceBuilderExtensions.CreateDefaultPasswordParameter(
-            app, $"{builder.Resource.Name}-sql-pwd", minLower: 1, minUpper: 1, minNumeric: 1);
-
-        var sql = app.AddSqlServer($"{builder.Resource.Name}-mssql", app.CreateResourceBuilder(password))
-            .WithParentRelationship(builder)
-            .ExcludeFromManifest();
-        var sqlEndpoint = sql.Resource.PrimaryEndpoint;
-
-        var emulator = new AzureServiceBusEmulatorResource(builder.Resource) { SqlServer = sql.Resource };
+        var emulator = new AzureServiceBusEmulatorResource(builder.Resource);
         var emulatorBuilder = app.AddResource(emulator)
             .WithImage(EmulatorImage, EmulatorTag)
             .WithImageRegistry("mcr.microsoft.com")
             .WithEndpoint(targetPort: 5672, name: AzureServiceBusEmulatorResource.EndpointName)
             .WithHttpEndpoint(targetPort: 5300, name: AzureServiceBusEmulatorResource.HealthEndpointName)
-            .WithEnvironment("ACCEPT_EULA", "Y")
-            .WithEnvironment("SQL_SERVER", sqlEndpoint.Property(EndpointProperty.HostAndPort))
-            .WithEnvironment("MSSQL_SA_PASSWORD", password)
+            .WithEnvironment(context =>
+            {
+                // Defaults only, so values set by the caller always win.
+                var sql = emulator.SqlServerResource
+                    ?? throw new InvalidOperationException("The SQL Server instance for the Azure Service Bus emulator was not configured. This indicates that 'RunAsEmulator' did not complete successfully.");
+                context.EnvironmentVariables.TryAdd("ACCEPT_EULA", "Y");
+                context.EnvironmentVariables.TryAdd("SQL_SERVER", sql.PrimaryEndpoint.Property(EndpointProperty.HostAndPort));
+                context.EnvironmentVariables.TryAdd("MSSQL_SA_PASSWORD", sql.PasswordParameter);
+            })
             .WithHttpHealthCheck("/health", endpointName: AzureServiceBusEmulatorResource.HealthEndpointName)
             .WithParentRelationship(builder)
-            .WaitFor(sql)
             .ExcludeFromManifest();
         emulatorBuilder.WithEndpoint(AzureServiceBusEmulatorResource.HealthEndpointName, e => e.ExcludeReferenceEndpoint = true);
 
@@ -83,6 +88,71 @@ public static class AzureServiceBusEmulatorExtensions
 
         builder.Resource.Emulator = emulator;
         configureContainer?.Invoke(emulatorBuilder);
+
+        // The SQL Server is resolved after the callback so WithSqlServer customizations take precedence over the defaults.
+        if (emulator.ExistingSqlServer is { } existing)
+        {
+            emulator.SqlServer = existing.Resource;
+            emulatorBuilder.WaitFor(existing);
+        }
+        else
+        {
+            var password = ParameterResourceBuilderExtensions.CreateDefaultPasswordParameter(
+                app, $"{builder.Resource.Name}-sql-pwd", minLower: 1, minUpper: 1, minNumeric: 1);
+            var sql = app.AddSqlServer($"{builder.Resource.Name}-mssql", app.CreateResourceBuilder(password))
+                .WithParentRelationship(builder)
+                .ExcludeFromManifest()
+                // The SQL Server lives and dies with the emulator that owns it.
+                .WithLifetimeOf(emulatorBuilder);
+            foreach (var configureSql in emulator.SqlServerConfigurations) configureSql(sql);
+            if (!sql.Resource.Annotations.OfType<EndpointAnnotation>().Any(e => e.Name == SqlServerEndpointName))
+                throw new InvalidOperationException($"The SQL Server resource for the Azure Service Bus emulator must keep its '{SqlServerEndpointName}' endpoint. Update the 'WithSqlServer' callback so it does not remove or rename the endpoint.");
+            emulator.SqlServer = sql.Resource;
+            // The emulator fails to start when its backing store is not accepting connections yet.
+            emulatorBuilder.WaitFor(sql);
+        }
+
+        ServiceBusStateInitializer.Register(app, builder.Resource);
+        return builder;
+    }
+
+    /// <summary>
+    /// Stores the emulator's state in the SQL Server container created for it (the default). Only states the intent
+    /// explicitly; cannot be combined with <see cref="WithSqlServer(IResourceBuilder{AzureServiceBusEmulatorResource}, IResourceBuilder{SqlServerServerResource})"/>.
+    /// </summary>
+    public static IResourceBuilder<AzureServiceBusEmulatorResource> WithSqlServer(this IResourceBuilder<AzureServiceBusEmulatorResource> builder)
+    {
+        ArgumentNullException.ThrowIfNull(builder);
+        return builder.WithSqlServer(static _ => { });
+    }
+
+    /// <summary>
+    /// Customizes the SQL Server container that backs the emulator (data volume, host port, password, container name...).
+    /// Callable several times; callbacks apply in order. The <c>tcp</c> endpoint must not be removed or renamed.
+    /// Cannot be combined with <see cref="WithSqlServer(IResourceBuilder{AzureServiceBusEmulatorResource}, IResourceBuilder{SqlServerServerResource})"/>.
+    /// </summary>
+    public static IResourceBuilder<AzureServiceBusEmulatorResource> WithSqlServer(
+        this IResourceBuilder<AzureServiceBusEmulatorResource> builder, Action<IResourceBuilder<SqlServerServerResource>> configureSqlServer)
+    {
+        ArgumentNullException.ThrowIfNull(builder);
+        ArgumentNullException.ThrowIfNull(configureSqlServer);
+        if (builder.Resource.ExistingSqlServer is not null) throw new InvalidOperationException(SqlServerConflictMessage);
+        builder.Resource.SqlServerConfigurations.Add(configureSqlServer);
+        return builder;
+    }
+
+    /// <summary>
+    /// Uses an existing SQL Server resource for the emulator's state instead of creating one. The emulator waits for it to be
+    /// healthy and connects over the container network with its primary endpoint and password. The last call wins; cannot be
+    /// combined with the callback overload.
+    /// </summary>
+    public static IResourceBuilder<AzureServiceBusEmulatorResource> WithSqlServer(
+        this IResourceBuilder<AzureServiceBusEmulatorResource> builder, IResourceBuilder<SqlServerServerResource> sqlServer)
+    {
+        ArgumentNullException.ThrowIfNull(builder);
+        ArgumentNullException.ThrowIfNull(sqlServer);
+        if (builder.Resource.SqlServerConfigurations.Count > 0) throw new InvalidOperationException(SqlServerConflictMessage);
+        builder.Resource.ExistingSqlServer = sqlServer;
         return builder;
     }
 
@@ -141,9 +211,14 @@ public static class AzureServiceBusEmulatorExtensions
     private static IResourceBuilder<AzureServiceBusResource> RunAsExistingCore(
         this IResourceBuilder<AzureServiceBusResource> builder, ReferenceExpression endpoint)
     {
-        if (builder.Resource.Emulator is not null)
+        if (builder.Resource.EmulatorRequested)
             throw new InvalidOperationException("The Azure Service Bus resource is already configured to run as an emulator.");
-        if (builder.ApplicationBuilder.ExecutionContext.IsRunMode) builder.Resource.RunEndpoint = endpoint;
+        builder.Resource.RunAsExistingRequested = true;
+        if (builder.ApplicationBuilder.ExecutionContext.IsRunMode)
+        {
+            builder.Resource.RunEndpoint = endpoint;
+            ServiceBusStateInitializer.Register(builder.ApplicationBuilder, builder.Resource);
+        }
         return builder;
     }
 }
