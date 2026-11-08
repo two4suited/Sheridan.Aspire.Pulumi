@@ -1,6 +1,8 @@
 using Aspire.Hosting;
 using Aspire.Hosting.ApplicationModel;
 using Azure.Identity;
+using HealthChecks.Azure.Storage.Blobs;
+using HealthChecks.Azure.Storage.Queues;
 using Azure.Storage.Blobs;
 using Azure.Storage.Queues;
 using Microsoft.Extensions.DependencyInjection;
@@ -23,6 +25,36 @@ internal static class StorageClients
         Uri.TryCreate(connection, UriKind.Absolute, out var uri) ? new QueueServiceClient(uri, new DefaultAzureCredential()) : new QueueServiceClient(connection);
 }
 
+/// <summary>Health checks on storage resources, using the official <c>AspNetCore.HealthChecks.Azure.Storage.*</c> checks like Aspire.Hosting.Azure.Storage.</summary>
+internal static class StorageHealthChecks
+{
+    /// <summary>Registers a <c>{name}_check</c> blob service check (optionally for one container) against the account and attaches it to the resource.</summary>
+    internal static IResourceBuilder<T> WithBlobHealthCheck<T>(this IResourceBuilder<T> builder, AzureStorageResource storage, string? containerName = null)
+        where T : IResource
+    {
+        var key = $"{builder.Resource.Name}_check";
+        BlobServiceClient? client = null;
+        builder.ApplicationBuilder.Services.AddHealthChecks().AddAzureBlobStorage(
+            clientFactory: _ => client ??= StorageClients.Blob(StorageClients.Resolve(storage.BlobConnection)),
+            optionsFactory: containerName is null ? null : _ => new AzureBlobStorageHealthCheckOptions { ContainerName = containerName },
+            name: key);
+        return builder.WithHealthCheck(key);
+    }
+
+    /// <summary>Registers a <c>{name}_check</c> queue service check (optionally for one queue) against the account and attaches it to the resource.</summary>
+    internal static IResourceBuilder<T> WithQueueHealthCheck<T>(this IResourceBuilder<T> builder, AzureStorageResource storage, string? queueName = null)
+        where T : IResource
+    {
+        var key = $"{builder.Resource.Name}_check";
+        QueueServiceClient? client = null;
+        builder.ApplicationBuilder.Services.AddHealthChecks().AddAzureQueueStorage(
+            clientFactory: _ => client ??= StorageClients.Queue(StorageClients.Resolve(storage.QueueConnection)),
+            optionsFactory: queueName is null ? null : _ => new AzureQueueStorageHealthCheckOptions { QueueName = queueName },
+            name: key);
+        return builder.WithHealthCheck(key);
+    }
+}
+
 /// <summary>
 /// Creates the declared blob containers and queues in the local Azurite emulator once it is ready (like the official
 /// <c>RunAsEmulator</c>), publishes the state of the account and its children, and makes referencing resources wait for it.
@@ -37,18 +69,10 @@ internal static class AzureStorageEmulatorInitializer
         var storage = storageBuilder.Resource;
 
         // The emulator is ready (and its ResourceReadyEvent fires) once the blob service answers.
-        var emulatorCheck = $"{emulator.Name}_check";
-        BlobServiceClient? probe = null;
-        appBuilder.Services.AddHealthChecks().AddAzureBlobStorage(
-            _ => probe ??= StorageClients.Blob(StorageClients.Resolve(storage.BlobConnection)), name: emulatorCheck);
-        emulatorBuilder.WithHealthCheck(emulatorCheck);
+        emulatorBuilder.WithBlobHealthCheck(storage);
 
         // The account is Running once the declared containers and queues exist; its own check makes WaitFor(storage) meaningful.
-        var accountCheck = $"{storage.Name}_check";
-        BlobServiceClient? client = null;
-        appBuilder.Services.AddHealthChecks().AddAzureBlobStorage(
-            _ => client ??= StorageClients.Blob(StorageClients.Resolve(storage.BlobConnection)), name: accountCheck);
-        storageBuilder.WithHealthCheck(accountCheck);
+        storageBuilder.WithBlobHealthCheck(storage);
 
         appBuilder.Eventing.Subscribe<ResourceReadyEvent>(emulator, async (@event, ct) =>
         {
@@ -96,11 +120,7 @@ internal static class AzureStorageExistingInitializer
     {
         var storage = storageBuilder.Resource;
 
-        var accountCheck = $"{storage.Name}_check";
-        BlobServiceClient? client = null;
-        appBuilder.Services.AddHealthChecks().AddAzureBlobStorage(
-            _ => client ??= StorageClients.Blob(StorageClients.Resolve(storage.BlobConnection)), name: accountCheck);
-        storageBuilder.WithHealthCheck(accountCheck);
+        storageBuilder.WithBlobHealthCheck(storage);
 
         appBuilder.Eventing.Subscribe<InitializeResourceEvent>(storage, async (@event, ct) =>
         {

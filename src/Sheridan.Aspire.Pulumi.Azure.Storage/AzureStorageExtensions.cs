@@ -9,7 +9,7 @@ public static class AzureStorageExtensions
 {
     /// <summary>Adds an Azure Storage account provisioned by the Pulumi stack (the equivalent of AddAzureStorage).</summary>
     public static IResourceBuilder<AzureStorageResource> AddPulumiStorage(this IDistributedApplicationBuilder builder, string name) =>
-        builder.AddResource(new AzureStorageResource(name)).ExcludeFromManifest();
+        builder.AddResource(new AzureStorageResource(name)).WithIconName("HardDrive").ExcludeFromManifest();
 
     /// <summary>Alias of <see cref="AddPulumiStorage"/> following the <c>AddPulumiAzureX</c> naming used by the other Azure integrations.</summary>
     public static IResourceBuilder<AzureStorageResource> AddPulumiAzureStorage(this IDistributedApplicationBuilder builder, string name) =>
@@ -219,7 +219,8 @@ public static class AzureStorageExtensions
     {
         var resource = new AzureBlobStorageResource(name, builder.Resource);
         builder.Resource.BlobServices.Add(resource);
-        return builder.ApplicationBuilder.AddResource(resource).WithParentRelationship(builder).ExcludeFromManifest();
+        return builder.ApplicationBuilder.AddResource(resource).WithParentRelationship(builder).WithIconName("DocumentMultiple")
+            .WithBlobHealthCheck(builder.Resource).ExcludeFromManifest();
     }
 
     /// <summary>Adds the queue service of the storage account.</summary>
@@ -227,7 +228,8 @@ public static class AzureStorageExtensions
     {
         var resource = new AzureQueueStorageResource(name, builder.Resource);
         builder.Resource.QueueServices.Add(resource);
-        return builder.ApplicationBuilder.AddResource(resource).WithParentRelationship(builder).ExcludeFromManifest();
+        return builder.ApplicationBuilder.AddResource(resource).WithParentRelationship(builder).WithIconName("Mail")
+            .WithQueueHealthCheck(builder.Resource).ExcludeFromManifest();
     }
 
     /// <summary>Adds the table service of the storage account.</summary>
@@ -235,7 +237,7 @@ public static class AzureStorageExtensions
     {
         var resource = new AzureTableStorageResource(name, builder.Resource);
         builder.Resource.TableServices.Add(resource);
-        return builder.ApplicationBuilder.AddResource(resource).WithParentRelationship(builder).ExcludeFromManifest();
+        return builder.ApplicationBuilder.AddResource(resource).WithParentRelationship(builder).WithIconName("TableSimple").ExcludeFromManifest();
     }
 
     /// <summary>
@@ -256,7 +258,7 @@ public static class AzureStorageExtensions
         EnableDataLake(builder.Resource);
         var resource = new AzureDataLakeStorageResource(name, builder.Resource);
         builder.Resource.DataLakeServices.Add(resource);
-        return builder.ApplicationBuilder.AddResource(resource).WithParentRelationship(builder).ExcludeFromManifest();
+        return builder.ApplicationBuilder.AddResource(resource).WithParentRelationship(builder).WithIconName("HardDrive").ExcludeFromManifest();
     }
 
     private static void EnableDataLake(AzureStorageResource storage)
@@ -281,7 +283,7 @@ public static class AzureStorageExtensions
         var parent = builder.Resource.ImplicitDataLakeService ??= CreateDataLakeService(builder, builder.Resource.Name + "-data-lake");
         var resource = new AzureDataLakeStorageFileSystemResource(name, dataLakeFileSystemName ?? name, parent.Resource);
         builder.Resource.DataLakeFileSystems.Add(resource);
-        return builder.ApplicationBuilder.AddResource(resource).WithParentRelationship(parent).ExcludeFromManifest();
+        return builder.ApplicationBuilder.AddResource(resource).WithParentRelationship(parent).WithIconName("FolderOpen").ExcludeFromManifest();
     }
 
     /// <summary>
@@ -309,7 +311,8 @@ public static class AzureStorageExtensions
     {
         var resource = new AzureBlobStorageContainerResource(name, blobContainerName ?? name, builder.Resource);
         builder.Resource.BlobContainers.Add(resource);
-        return builder.ApplicationBuilder.AddResource(resource).WithParentRelationship(builder).ExcludeFromManifest();
+        return builder.ApplicationBuilder.AddResource(resource).WithParentRelationship(builder).WithIconName("FolderOpen")
+            .WithBlobHealthCheck(builder.Resource, resource.BlobContainerName).ExcludeFromManifest();
     }
 
     /// <summary>Adds a blob container to the storage account through its blob service.</summary>
@@ -318,7 +321,8 @@ public static class AzureStorageExtensions
     {
         var resource = new AzureBlobStorageContainerResource(name, blobContainerName ?? name, builder.Resource.Parent);
         builder.Resource.Parent.BlobContainers.Add(resource);
-        return builder.ApplicationBuilder.AddResource(resource).WithParentRelationship(builder).ExcludeFromManifest();
+        return builder.ApplicationBuilder.AddResource(resource).WithParentRelationship(builder).WithIconName("FolderOpen")
+            .WithBlobHealthCheck(builder.Resource.Parent, resource.BlobContainerName).ExcludeFromManifest();
     }
 
     /// <summary>Adds a queue to the storage account (<paramref name="queueName"/> defaults to <paramref name="name"/>).</summary>
@@ -327,7 +331,8 @@ public static class AzureStorageExtensions
     {
         var resource = new AzureQueueStorageQueueResource(name, queueName ?? name, builder.Resource);
         builder.Resource.Queues.Add(resource);
-        return builder.ApplicationBuilder.AddResource(resource).WithParentRelationship(builder).ExcludeFromManifest();
+        return builder.ApplicationBuilder.AddResource(resource).WithParentRelationship(builder).WithIconName("Mail")
+            .WithQueueHealthCheck(builder.Resource, resource.QueueName).ExcludeFromManifest();
     }
 
     /// <summary>Adds a queue to the storage account through its queue service.</summary>
@@ -336,6 +341,7 @@ public static class AzureStorageExtensions
     {
         var resource = new AzureQueueStorageQueueResource(name, queueName ?? name, builder.Resource.Parent);
         builder.Resource.Parent.Queues.Add(resource);
-        return builder.ApplicationBuilder.AddResource(resource).WithParentRelationship(builder).ExcludeFromManifest();
+        return builder.ApplicationBuilder.AddResource(resource).WithParentRelationship(builder).WithIconName("Mail")
+            .WithQueueHealthCheck(builder.Resource.Parent, resource.QueueName).ExcludeFromManifest();
     }
 }
