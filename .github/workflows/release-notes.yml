@@ -2,7 +2,8 @@ name: Release notes
 
 # After the "Publish packages" workflow has published a vX.Y.Z tag (nuget.org + GitHub Release),
 # copy that GitHub Release's notes into the docs site (docs/.../reference/release-notes.md) and
-# open a PR against main and enable auto-merge on it. Merging the PR triggers the Docs workflow, which redeploys the site.
+# open a PR against main and enable auto-merge on it. Merges made with the Actions token don't trigger
+# push workflows, so the last step waits for the merge and dispatches the Docs workflow itself.
 #
 # One-time setup: repo Settings > Actions > General > Workflow permissions:
 #   "Allow GitHub Actions to create and approve pull requests".
@@ -21,6 +22,7 @@ on:
 permissions:
   contents: write
   pull-requests: write
+  actions: write
 
 jobs:
   release-notes:
@@ -85,3 +87,20 @@ jobs:
           fi
           # Merge automatically once any required checks pass (needs "Allow auto-merge" in repo settings).
           gh pr merge "$BRANCH" --auto --squash
+
+      - name: Redeploy docs after merge
+        run: |
+          BRANCH="release-notes/$TAG"
+          # Auto-merge is asynchronous; wait up to ~10 minutes for the PR to land.
+          for _ in $(seq 1 60); do
+            STATE=$(gh pr view "$BRANCH" --json state --jq '.state')
+            if [ "$STATE" = "MERGED" ]; then
+              # The bot's merge doesn't trigger the Docs push workflow, so dispatch it explicitly.
+              gh workflow run docs.yml --ref main
+              exit 0
+            fi
+            if [ "$STATE" = "CLOSED" ]; then echo "PR closed without merging" >&2; exit 1; fi
+            sleep 10
+          done
+          echo "PR not merged after 10 minutes; run the Docs workflow manually once it merges." >&2
+          exit 1
