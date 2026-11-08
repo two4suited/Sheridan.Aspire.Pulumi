@@ -1,8 +1,6 @@
 using System.Text.Json.Nodes;
 using Aspire.Hosting;
 using Aspire.Hosting.ApplicationModel;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Diagnostics.HealthChecks;
 
 namespace Sheridan.Aspire.Pulumi.Azure.ServiceBus;
 
@@ -24,25 +22,6 @@ public sealed class AzureServiceBusEmulatorResource(AzureServiceBusResource inne
     internal List<Action<JsonNode>> ConfigurationCallbacks { get; } = [];
 }
 
-/// <summary>Opens a TCP connection to a container endpoint; the emulator fails to start while its SQL Server is not accepting connections.</summary>
-internal sealed class TcpEndpointHealthCheck(EndpointReference endpoint) : IHealthCheck
-{
-    public async Task<HealthCheckResult> CheckHealthAsync(HealthCheckContext context, CancellationToken cancellationToken = default)
-    {
-        if (!endpoint.IsAllocated) return HealthCheckResult.Unhealthy("endpoint not allocated yet");
-        try
-        {
-            using var client = new System.Net.Sockets.TcpClient();
-            await client.ConnectAsync(endpoint.Host, endpoint.Port, cancellationToken);
-            return HealthCheckResult.Healthy();
-        }
-        catch (Exception e) when (e is System.Net.Sockets.SocketException or IOException)
-        {
-            return HealthCheckResult.Unhealthy(e.Message);
-        }
-    }
-}
-
 public static class AzureServiceBusEmulatorExtensions
 {
     internal const string EmulatorImage = "azure-messaging/servicebus-emulator";
@@ -61,22 +40,18 @@ public static class AzureServiceBusEmulatorExtensions
         ArgumentNullException.ThrowIfNull(builder);
         if (builder.Resource.Emulator is not null)
             throw new InvalidOperationException("The Azure Service Bus resource is already configured to run as an emulator.");
+        if (builder.Resource.RunEndpoint is not null)
+            throw new InvalidOperationException("The Azure Service Bus resource is already configured with RunAsExisting.");
         if (builder.ApplicationBuilder.ExecutionContext.IsPublishMode) return builder;
 
         var app = builder.ApplicationBuilder;
         var password = ParameterResourceBuilderExtensions.CreateDefaultPasswordParameter(
             app, $"{builder.Resource.Name}-sql-pwd", minLower: 1, minUpper: 1, minNumeric: 1);
 
-        var sql = app.AddContainer($"{builder.Resource.Name}-mssql", "mcr.microsoft.com/mssql/server", "2022-latest")
-            .WithEnvironment("ACCEPT_EULA", "Y")
-            .WithEnvironment("MSSQL_SA_PASSWORD", password)
-            .WithEndpoint(targetPort: 1433, name: "tcp")
+        var sql = app.AddSqlServer($"{builder.Resource.Name}-mssql", app.CreateResourceBuilder(password))
             .WithParentRelationship(builder)
             .ExcludeFromManifest();
-        var sqlEndpoint = sql.GetEndpoint("tcp");
-        var sqlHealthKey = $"{sql.Resource.Name}_tcp";
-        app.Services.AddHealthChecks().Add(new HealthCheckRegistration(sqlHealthKey, _ => new TcpEndpointHealthCheck(sqlEndpoint), null, null));
-        sql.WithAnnotation(new HealthCheckAnnotation(sqlHealthKey));
+        var sqlEndpoint = sql.Resource.PrimaryEndpoint;
 
         var emulator = new AzureServiceBusEmulatorResource(builder.Resource) { SqlServer = sql.Resource };
         var emulatorBuilder = app.AddResource(emulator)
@@ -141,7 +116,7 @@ public static class AzureServiceBusEmulatorExtensions
 
     /// <summary>
     /// For an <c>AsExisting</c>/<c>PublishAsExisting</c> namespace: uses <paramref name="endpoint"/> (e.g.
-    /// <c>mynamespace.servicebus.windows.net</c> or <c>https://mynamespace.servicebus.windows.net:443/</c>) as the connection value
+    /// <c>mynamespace.servicebus.windows.net</c>, or just the namespace name, or <c>https://mynamespace.servicebus.windows.net:443/</c>) as the connection value
     /// when running locally, so no generated Pulumi project or deployed stack output is needed. No effect in publish mode.
     /// </summary>
     public static IResourceBuilder<AzureServiceBusResource> RunAsExisting(
@@ -149,6 +124,8 @@ public static class AzureServiceBusEmulatorExtensions
     {
         ArgumentNullException.ThrowIfNull(builder);
         ArgumentException.ThrowIfNullOrEmpty(endpoint);
+        // A bare namespace name (as passed to the official RunAsExisting) expands to its host name.
+        if (!endpoint.Contains('.') && !endpoint.Contains(':')) endpoint += ".servicebus.windows.net";
         return builder.RunAsExistingCore(ReferenceExpression.Create($"{endpoint}"));
     }
 

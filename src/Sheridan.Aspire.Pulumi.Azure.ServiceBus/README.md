@@ -60,7 +60,7 @@ sb.AddServiceBusQueue("orders");
 sb.AddServiceBusTopic("events").AddServiceBusSubscription("audit");
 ```
 
-`RunAsEmulator` (run mode only; no effect when publishing) starts the Service Bus emulator plus the SQL Server container it stores state in. Queues, topics, subscriptions and rules declared on the resource are written to the emulator's `Config.json`, and `WithReference` resolves to the emulator's connection string, so no Pulumi output is read. The optional callback configures the emulator container:
+`RunAsEmulator` (run mode only; no effect when publishing) starts the Service Bus emulator plus the SQL Server container it stores state in. Queues, topics, subscriptions and rules declared on the resource are written to the emulator's `Config.json`, and `WithReference` resolves to the emulator's connection string, so no Pulumi output is read. Consumers should `WaitFor(sb.Resource.Emulator!)` (the emulator is a separate container resource and the SQL Server behind it is slow to start). The optional callback configures the emulator container:
 
 - `WithHostPort(int?)` pins the AMQP port.
 - `WithConfigurationFile(path)` supplies your own `Config.json`; `WithConfiguration(json => ...)` edits the generated one.
@@ -69,7 +69,7 @@ sb.AddServiceBusTopic("events").AddServiceBusSubscription("audit");
 
 ### Existing namespace
 
-For an `AsExisting` namespace, `RunAsExisting` supplies the endpoint to use when running locally (a string or a parameter), instead of the deployed stack output:
+For an `AsExisting` namespace, `RunAsExisting` supplies the endpoint to use when running locally (a string or a parameter; a bare namespace name is expanded to `<name>.servicebus.windows.net`), instead of the deployed stack output:
 
 ```csharp
 var endpoint = builder.AddParameter("sb-endpoint");

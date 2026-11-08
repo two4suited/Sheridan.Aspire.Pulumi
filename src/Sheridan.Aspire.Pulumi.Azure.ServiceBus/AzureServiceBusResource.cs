@@ -348,7 +348,7 @@ public sealed class AzureServiceBusSubscriptionResource(string name, string subs
     internal string PulumiId => Parent.Parent.ChildId(Parent.Name, Name);
 
     public ReferenceExpression ConnectionStringExpression =>
-        Parent.Parent.EntityConnectionString($";EntityPath={Parent.TopicName};SubscriptionName={SubscriptionName}");
+        Parent.Parent.EntityConnectionString($";EntityPath={Parent.TopicName}/Subscriptions/{SubscriptionName}");
 
     internal JsonObject ToEmulatorJson()
     {
