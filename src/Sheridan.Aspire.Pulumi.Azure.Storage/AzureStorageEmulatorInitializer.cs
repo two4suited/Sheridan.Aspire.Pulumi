@@ -43,6 +43,13 @@ internal static class AzureStorageEmulatorInitializer
             _ => probe ??= StorageClients.Blob(StorageClients.Resolve(storage.BlobConnection)), name: emulatorCheck);
         emulatorBuilder.WithHealthCheck(emulatorCheck);
 
+        // The account is Running once the declared containers and queues exist; its own check makes WaitFor(storage) meaningful.
+        var accountCheck = $"{storage.Name}_check";
+        BlobServiceClient? client = null;
+        appBuilder.Services.AddHealthChecks().AddAzureBlobStorage(
+            _ => client ??= StorageClients.Blob(StorageClients.Resolve(storage.BlobConnection)), name: accountCheck);
+        storageBuilder.WithHealthCheck(accountCheck);
+
         appBuilder.Eventing.Subscribe<ResourceReadyEvent>(emulator, async (@event, ct) =>
         {
             var notifications = @event.Services.GetRequiredService<ResourceNotificationService>();
@@ -78,5 +85,35 @@ internal static class AzureStorageEmulatorInitializer
 
         foreach (var queue in storage.Queues)
             await queues.GetQueueClient(queue.QueueName).CreateIfNotExistsAsync(cancellationToken: ct).ConfigureAwait(false);
+    }
+}
+
+/// <summary>Run-mode wiring for an account that is not emulated: <c>RunAsExisting</c> points the app at a real account, so there is nothing to create.</summary>
+internal static class AzureStorageExistingInitializer
+{
+    /// <summary>Publishes Running for the account and its children once the supplied endpoint resolves, and adds the account health check.</summary>
+    internal static void Register(IDistributedApplicationBuilder appBuilder, IResourceBuilder<AzureStorageResource> storageBuilder)
+    {
+        var storage = storageBuilder.Resource;
+
+        var accountCheck = $"{storage.Name}_check";
+        BlobServiceClient? client = null;
+        appBuilder.Services.AddHealthChecks().AddAzureBlobStorage(
+            _ => client ??= StorageClients.Blob(StorageClients.Resolve(storage.BlobConnection)), name: accountCheck);
+        storageBuilder.WithHealthCheck(accountCheck);
+
+        appBuilder.Eventing.Subscribe<InitializeResourceEvent>(storage, async (@event, ct) =>
+        {
+            try
+            {
+                await storage.BlobConnection.GetValueAsync(ct).ConfigureAwait(false);
+                await storage.PublishStateAsync(@event.Notifications, KnownResourceStates.Running).ConfigureAwait(false);
+            }
+            catch (Exception ex) when (!ct.IsCancellationRequested)
+            {
+                @event.Logger.LogError(ex, "The storage endpoint for '{Resource}' could not be resolved.", storage.Name);
+                await storage.PublishStateAsync(@event.Notifications, KnownResourceStates.FailedToStart).ConfigureAwait(false);
+            }
+        });
     }
 }

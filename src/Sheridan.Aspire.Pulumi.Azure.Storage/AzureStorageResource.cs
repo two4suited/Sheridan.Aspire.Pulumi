@@ -21,6 +21,15 @@ public sealed class AzureStorageResource(string name) : PulumiAzureResource(name
 
     public AzureStorageEmulatorResource? Emulator { get; set; }
 
+    /// <summary>Name of an existing storage account (set by <c>AsExisting</c>/<c>PublishAsExisting</c>); when set, the account itself is not created.</summary>
+    public string? ExistingAccountName { get; internal set; }
+
+    /// <summary>Resource group of the existing account (set by <c>AsExisting</c>); null means the resource group configured for this resource.</summary>
+    public string? ExistingAccountResourceGroup { get; internal set; }
+
+    /// <summary>Service endpoints supplied by <c>RunAsExisting</c> for local runs (run mode only); used instead of the deployed stack outputs.</summary>
+    internal StorageRunEndpoints? RunEndpoints { get; set; }
+
     public List<AzureBlobStorageResource> BlobServices { get; } = [];
     public List<AzureQueueStorageResource> QueueServices { get; } = [];
     public List<AzureTableStorageResource> TableServices { get; } = [];
@@ -65,15 +74,37 @@ public sealed class AzureStorageResource(string name) : PulumiAzureResource(name
     public PulumiOutputReference NameOutput => OutputRef("Name");
 
     /// <summary>Connection value of a service: the Azurite connection string when emulated, otherwise the service endpoint.</summary>
-    internal ReferenceExpression BlobConnection => Emulator is { } e ? EmulatorConnection(e, "blob") : ReferenceExpression.Create($"{BlobEndpoint}");
-    internal ReferenceExpression QueueConnection => Emulator is { } e ? EmulatorConnection(e, "queue") : ReferenceExpression.Create($"{QueueEndpoint}");
-    internal ReferenceExpression TableConnection => Emulator is { } e ? EmulatorConnection(e, "table") : ReferenceExpression.Create($"{TableEndpoint}");
+    internal ReferenceExpression BlobConnection => Emulator is { } e ? EmulatorConnection(e, "blob") : RunEndpoints?.Blob ?? ReferenceExpression.Create($"{BlobEndpoint}");
+    internal ReferenceExpression QueueConnection => Emulator is { } e ? EmulatorConnection(e, "queue") : RunEndpoints?.Queue ?? ReferenceExpression.Create($"{QueueEndpoint}");
+    internal ReferenceExpression TableConnection => Emulator is { } e ? EmulatorConnection(e, "table") : RunEndpoints?.Table ?? ReferenceExpression.Create($"{TableEndpoint}");
 
     private static ReferenceExpression EmulatorConnection(AzureStorageEmulatorResource e, string service) =>
         ReferenceExpression.Create($"DefaultEndpointsProtocol=http;AccountName={AzureStorageEmulatorResource.AccountName};AccountKey={AzureStorageEmulatorResource.AccountKey};{char.ToUpperInvariant(service[0]) + service[1..]}Endpoint={e.GetEndpoint(service)}/{AzureStorageEmulatorResource.AccountName};");
 
+    /// <summary>Emits the <c>getStorageAccount</c> lookup (under the account's id) and returns the resource group the account and its children live in.</summary>
+    internal string AddExistingLookup(PulumiProgram program, string rg)
+    {
+        if (ExistingAccountResourceGroup is null && !HasConfiguredResourceGroup)
+            throw new InvalidOperationException(
+                $"'{Name}' is an existing storage account but no resource group is known. Pass resourceGroupName to AsExisting/PublishAsExisting, or call WithExistingResourceGroup/WithResourceGroup.");
+        rg = ExistingAccountResourceGroup ?? rg;
+        // The lookup variable shares the account's id, so ${id}.name / .id / .primaryEndpoints.* resolve as for a created account.
+        program.Variables[Id] = new Dictionary<string, object?>
+        {
+            ["fn::invoke"] = new Dictionary<string, object?>
+            {
+                ["function"] = "azure-native:storage:getStorageAccount",
+                ["arguments"] = new Dictionary<string, object?> { ["resourceGroupName"] = rg, ["accountName"] = ExistingAccountName },
+            },
+        };
+        return rg;
+    }
+
     protected override Task ContributeResourcesAsync(PulumiProgram program, PipelineStepContext context, string rg, string location)
     {
+        if (ExistingAccountName is not null)
+            rg = AddExistingLookup(program, rg);
+        else
         // Account names are global, 3-24 lowercase alphanumerics: {project}{name}{stack}, shortened with a hash when too long.
         // An infra target: role assignments are created in the targeted provision pass and depend on the account.
         program.AddInfraResource(Id, "azure-native:storage:StorageAccount", new Dictionary<string, object?>
@@ -217,7 +248,7 @@ public sealed class AzureBlobStorageContainerResource(string name, string blobCo
 
     public ReferenceExpression ConnectionStringExpression => Parent.Emulator is { } e
         ? ReferenceExpression.Create($"Endpoint={e.GetEndpoint("blob")}/{AzureStorageEmulatorResource.AccountName};ContainerName={BlobContainerName};")
-        : ReferenceExpression.Create($"Endpoint={Parent.BlobEndpoint};ContainerName={BlobContainerName};");
+        : ReferenceExpression.Create($"Endpoint={Parent.BlobConnection};ContainerName={BlobContainerName};");
 }
 
 /// <summary>A queue in the account (connection string = <c>Endpoint=...;QueueName=...</c>).</summary>
@@ -229,5 +260,8 @@ public sealed class AzureQueueStorageQueueResource(string name, string queueName
 
     public ReferenceExpression ConnectionStringExpression => Parent.Emulator is { } e
         ? ReferenceExpression.Create($"Endpoint={e.GetEndpoint("queue")}/{AzureStorageEmulatorResource.AccountName};QueueName={QueueName};")
-        : ReferenceExpression.Create($"Endpoint={Parent.QueueEndpoint};QueueName={QueueName};");
+        : ReferenceExpression.Create($"Endpoint={Parent.QueueConnection};QueueName={QueueName};");
 }
+
+/// <summary>The service endpoints of an existing account, used for local runs.</summary>
+internal sealed record StorageRunEndpoints(ReferenceExpression Blob, ReferenceExpression Queue, ReferenceExpression Table, ReferenceExpression DataLake);

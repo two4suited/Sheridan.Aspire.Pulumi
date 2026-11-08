@@ -61,6 +61,23 @@ var storage = builder.AddPulumiStorage("storage")
 
 Blob containers added with `AddBlobContainer` and queues added with `AddQueue` (also through `AddBlobs(...).AddBlobContainer` / `AddQueues(...).AddQueue`) are created in the emulator with `CreateIfNotExistsAsync` once Azurite is healthy, the way the official `RunAsEmulator` does. The emulator container has a health check, and anything that references the storage account or one of its children waits for the account to be `Running`, i.e. for that creation step to finish. If creation fails, the account and its children are marked `FailedToStart` and the error is written to the account's log.
 
+## Emulator, existing account or deployed account
+
+| Mode | Call | In `aspire run` | When publishing |
+| --- | --- | --- | --- |
+| Emulator | `RunAsEmulator()` | Azurite container; containers and queues are created in it | Pulumi creates the account |
+| Existing | `AsExisting(name, resourceGroup?)` / `PublishAsExisting(...)` plus `RunAsExisting(...)` | the endpoints you supply, nothing to deploy | Pulumi looks the account up (`azure-native:storage:getStorageAccount`) instead of creating it; containers, queues and role assignments are still applied to it |
+| Deployed | none | endpoints from the deployed Pulumi stack outputs, so the stack has to be generated and deployed first | Pulumi creates the account |
+
+```csharp
+// Publish against a shared account; use the same account when running locally.
+var storage = builder.AddPulumiStorage("storage")
+    .AsExisting("sharedacct", "shared-rg")   // PublishAsExisting is the same call
+    .RunAsExisting("sharedacct");            // or a ParameterResource builder with the account name
+```
+
+`RunAsExisting` takes a bare account name, a host such as `sharedacct.blob.core.windows.net`, or a service URL; the account name (and the cloud's endpoint suffix) are taken from it and the blob, queue, table and Data Lake endpoints derived. With a `ParameterResource` the parameter value is the account name. Clients use the developer's Azure credentials (`DefaultAzureCredential`) against the real account, so the account has to grant them a data-plane role. `RunAsExisting` and `RunAsEmulator` are mutually exclusive, and `RunAsExisting` has no effect when publishing. Without either, referencing a storage child in `aspire run` fails with `Pulumi project for '...' has not been generated yet`.
+
 ## Learn more
 
 - Mirrors the official [`Aspire.Hosting.Azure.Storage`](https://www.nuget.org/packages/Aspire.Hosting.Azure.Storage) integration, so moving from Bicep to Pulumi is a drop-in change in your AppHost.

@@ -15,6 +15,89 @@ public static class AzureStorageExtensions
     public static IResourceBuilder<AzureStorageResource> AddPulumiAzureStorage(this IDistributedApplicationBuilder builder, string name) =>
         builder.AddPulumiStorage(name);
 
+    /// <summary>
+    /// Uses an existing storage account instead of creating one: it is looked up by name and resource group, and the containers,
+    /// queues and role assignments are still applied to it. Mirrors <c>PublishAsExisting</c>.
+    /// </summary>
+    /// <param name="existingResourceName">Name of the existing storage account.</param>
+    /// <param name="resourceGroupName">Resource group of the account; when omitted, the resource group configured for this resource (<c>WithResourceGroup</c>/<c>WithExistingResourceGroup</c>) is used.</param>
+    public static IResourceBuilder<AzureStorageResource> PublishAsExisting(
+        this IResourceBuilder<AzureStorageResource> builder, string existingResourceName, string? resourceGroupName = null)
+    {
+        ArgumentNullException.ThrowIfNull(builder);
+        ArgumentException.ThrowIfNullOrEmpty(existingResourceName);
+        if (resourceGroupName is not null) ArgumentException.ThrowIfNullOrEmpty(resourceGroupName);
+        builder.Resource.ExistingAccountName = existingResourceName;
+        builder.Resource.ExistingAccountResourceGroup = resourceGroupName;
+        // Also marks a resource group as configured so none is created just for the lookup.
+        if (resourceGroupName is not null) builder.Resource.ExistingResourceGroup = resourceGroupName;
+        return builder;
+    }
+
+    /// <summary>Alias of <see cref="PublishAsExisting"/>. For local runs, add <c>RunAsExisting</c> or <c>RunAsEmulator</c>. Mirrors <c>AsExisting</c>.</summary>
+    public static IResourceBuilder<AzureStorageResource> AsExisting(
+        this IResourceBuilder<AzureStorageResource> builder, string existingResourceName, string? resourceGroupName = null) =>
+        builder.PublishAsExisting(existingResourceName, resourceGroupName);
+
+    /// <summary>
+    /// For an <c>AsExisting</c>/<c>PublishAsExisting</c> account: uses the blob, queue and table endpoints of <paramref name="accountNameOrEndpoint"/>
+    /// (a bare account name, a host such as <c>myaccount.blob.core.windows.net</c>, or a service URL) when running locally,
+    /// so no generated Pulumi project or deployed stack output is needed. Clients authenticate with the developer's Azure credentials.
+    /// No effect in publish mode.
+    /// </summary>
+    public static IResourceBuilder<AzureStorageResource> RunAsExisting(
+        this IResourceBuilder<AzureStorageResource> builder, string accountNameOrEndpoint)
+    {
+        ArgumentNullException.ThrowIfNull(builder);
+        ArgumentException.ThrowIfNullOrEmpty(accountNameOrEndpoint);
+        var (account, suffix) = ParseAccount(accountNameOrEndpoint);
+        return builder.RunAsExistingCore(Endpoints(account, suffix));
+    }
+
+    /// <summary>Like <see cref="RunAsExisting(IResourceBuilder{AzureStorageResource}, string)"/> with the storage account name supplied by a parameter.</summary>
+    public static IResourceBuilder<AzureStorageResource> RunAsExisting(
+        this IResourceBuilder<AzureStorageResource> builder, IResourceBuilder<ParameterResource> accountName)
+    {
+        ArgumentNullException.ThrowIfNull(builder);
+        ArgumentNullException.ThrowIfNull(accountName);
+        var name = accountName.Resource;
+        return builder.RunAsExistingCore(new StorageRunEndpoints(
+            ReferenceExpression.Create($"https://{name}.blob.core.windows.net/"),
+            ReferenceExpression.Create($"https://{name}.queue.core.windows.net/"),
+            ReferenceExpression.Create($"https://{name}.table.core.windows.net/"),
+            ReferenceExpression.Create($"https://{name}.dfs.core.windows.net/")));
+    }
+
+    private static IResourceBuilder<AzureStorageResource> RunAsExistingCore(
+        this IResourceBuilder<AzureStorageResource> builder, StorageRunEndpoints endpoints)
+    {
+        if (builder.Resource.Emulator is not null)
+            throw new InvalidOperationException("The Azure Storage resource is already configured to run as an emulator.");
+        if (builder.Resource.RunEndpoints is not null)
+            throw new InvalidOperationException("The Azure Storage resource is already configured with RunAsExisting.");
+        if (builder.ApplicationBuilder.ExecutionContext.IsRunMode)
+        {
+            builder.Resource.RunEndpoints = endpoints;
+            AzureStorageExistingInitializer.Register(builder.ApplicationBuilder, builder);
+        }
+        return builder;
+    }
+
+    private static StorageRunEndpoints Endpoints(string account, string suffix)
+    {
+        ReferenceExpression Url(string service) { var url = $"https://{account}.{service}.{suffix}/"; return ReferenceExpression.Create($"{url}"); }
+        return new(Url("blob"), Url("queue"), Url("table"), Url("dfs"));
+    }
+
+    /// <summary>Splits an account name, a host (<c>acct.blob.core.windows.net</c>) or a URL into the account name and the endpoint suffix (<c>core.windows.net</c>).</summary>
+    internal static (string Account, string Suffix) ParseAccount(string value)
+    {
+        var host = value.Contains("://", StringComparison.Ordinal) ? new Uri(value).Host : value.Trim().TrimEnd('/');
+        var labels = host.Split('.');
+        // acct.<service>.<suffix...>: keep the cloud's suffix (core.windows.net, core.chinacloudapi.cn, ...).
+        return labels.Length >= 4 ? (labels[0], string.Join('.', labels.Skip(2))) : (labels[0], "core.windows.net");
+    }
+
     /// <summary>Overrides the storage SKU (default Standard_GRS).</summary>
     public static IResourceBuilder<AzureStorageResource> WithSku(this IResourceBuilder<AzureStorageResource> builder, string sku)
     {
@@ -38,6 +121,8 @@ public static class AzureStorageExtensions
         ArgumentNullException.ThrowIfNull(builder);
         if (builder.Resource.Emulator is not null)
             throw new InvalidOperationException("The Azure Storage resource is already configured to run as an emulator.");
+        if (builder.Resource.RunEndpoints is not null)
+            throw new InvalidOperationException("The Azure Storage resource is already configured with RunAsExisting.");
         if (builder.ApplicationBuilder.ExecutionContext.IsPublishMode) return builder;
 
         var emulator = new AzureStorageEmulatorResource(builder.Resource);
