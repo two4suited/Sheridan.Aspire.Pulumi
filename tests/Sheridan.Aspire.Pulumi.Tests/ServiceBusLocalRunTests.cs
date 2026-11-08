@@ -29,21 +29,6 @@ public sealed class ServiceBusLocalRunTests
     }
 
     [Fact]
-    public void RunAsEmulator_makes_referencing_resources_wait_for_the_namespace()
-    {
-        var builder = DistributedApplication.CreateBuilder();
-        var sb = builder.AddPulumiServiceBus("messaging").RunAsEmulator();
-        var queue = sb.AddServiceBusQueue("orders");
-        var api = builder.AddContainer("api", "img").WithReference(queue);
-        var other = builder.AddContainer("other", "img");
-
-        AzureServiceBusEmulatorLifecycle.AddWaits(builder.Resources, sb.Resource, sb.Resource.Emulator!);
-
-        Assert.Contains(api.Resource.Annotations.OfType<WaitAnnotation>(), w => w.Resource == sb.Resource);
-        Assert.DoesNotContain(other.Resource.Annotations.OfType<WaitAnnotation>(), w => w.Resource == sb.Resource);
-    }
-
-    [Fact]
     public void RunAsEmulator_twice_throws()
     {
         var builder = DistributedApplication.CreateBuilder();

@@ -60,7 +60,7 @@ sb.AddServiceBusQueue("orders");
 sb.AddServiceBusTopic("events").AddServiceBusSubscription("audit");
 ```
 
-`RunAsEmulator` (run mode only; no effect when publishing) starts the Service Bus emulator plus the SQL Server container it stores state in. Queues, topics, subscriptions and rules declared on the resource are written to the emulator's `Config.json`, and `WithReference` resolves to the emulator's connection string, so no Pulumi output is read. The `messaging` resource (and its queues and topics) reports Running/Healthy once the emulator and its SQL Server are ready, so `WaitFor(sb)` works as with the official integration, and anything that references the namespace or an entity waits for it automatically. The generated `Config.json` uses the emulator's fixed namespace name `sbemulatorns` (the connection string does not include a namespace name). The optional callback configures the emulator container:
+`RunAsEmulator` (run mode only; no effect when publishing) starts the Service Bus emulator plus the SQL Server container it stores state in. Queues, topics, subscriptions and rules declared on the resource are written to the emulator's `Config.json`, and the namespace name in it is the emulator's fixed `sbemulatorns` (the emulator rejects any other), and `WithReference` resolves to the emulator's connection string, so no Pulumi output is read. Consumers should `WaitFor(sb.Resource.Emulator!)` (the emulator is a separate container resource and the SQL Server behind it is slow to start). The optional callback configures the emulator container:
 
 - `WithHostPort(int?)` pins the AMQP port.
 - `WithConfigurationFile(path)` supplies your own `Config.json`; `WithConfiguration(json => ...)` edits the generated one.

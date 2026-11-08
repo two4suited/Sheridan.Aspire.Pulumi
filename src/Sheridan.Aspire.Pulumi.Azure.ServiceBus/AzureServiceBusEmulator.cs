@@ -89,7 +89,6 @@ public static class AzureServiceBusEmulatorExtensions
         });
 
         builder.Resource.Emulator = emulator;
-        AzureServiceBusEmulatorLifecycle.Register(app, builder.Resource, emulator);
         configureContainer?.Invoke(emulatorBuilder);
 
         // The SQL Server is resolved after the callback so WithSqlServer customizations take precedence over the defaults.
