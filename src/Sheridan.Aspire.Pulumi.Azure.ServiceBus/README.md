@@ -60,10 +60,10 @@ sb.AddServiceBusQueue("orders");
 sb.AddServiceBusTopic("events").AddServiceBusSubscription("audit");
 ```
 
-`RunAsEmulator` (run mode only; no effect when publishing) starts the Service Bus emulator plus the SQL Server container it stores state in. Queues, topics, subscriptions and rules declared on the resource are written to the emulator's `Config.json`, and `WithReference` resolves to the emulator's connection string, so no Pulumi output is read. Consumers should `WaitFor(sb.Resource.Emulator!)` (the emulator is a separate container resource and the SQL Server behind it is slow to start). The optional callback configures the emulator container:
+`RunAsEmulator` (run mode only; no effect when publishing) starts the Service Bus emulator plus the SQL Server container it stores state in. Queues, topics, subscriptions and rules declared on the resource are written to the emulator's `Config.json`, and the namespace name in it is the emulator's fixed `sbemulatorns` (the emulator rejects any other), and `WithReference` resolves to the emulator's connection string, so no Pulumi output is read. Consumers should `WaitFor(sb.Resource.Emulator!)` (the emulator is a separate container resource and the SQL Server behind it is slow to start). The optional callback configures the emulator container:
 
 - `WithHostPort(int?)` pins the AMQP port.
-- `WithConfigurationFile(path)` supplies your own `Config.json`; `WithConfiguration(json => ...)` edits the generated one.
+- `WithConfigurationFile(path)` supplies your own `Config.json`; `WithConfiguration(json => ...)` edits the generated one (its namespace entry is named `sbemulatorns`, not the resource name, so look it up by that).
 - `WithSqlServer()` / `WithSqlServer(sql => sql.WithDataVolume().WithHostPort(14330))` customize the SQL Server container created for the emulator (it can be called several times, callbacks apply in order, and the `tcp` endpoint must be kept); `WithSqlServer(existingSql)` reuses an `IResourceBuilder<SqlServerServerResource>` instead (last call wins). The callback and existing-server forms cannot be combined. The created SQL Server follows the emulator's container lifetime (`WithLifetimeOf`), and the emulator waits for whichever SQL Server it uses.
 
 ```csharp

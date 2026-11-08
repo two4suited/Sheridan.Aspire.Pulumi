@@ -183,7 +183,7 @@ public sealed class ServiceBusLocalRunTests
         });
 
         var ns = sb.Resource.ToEmulatorConfig()["UserConfig"]!["Namespaces"]![0]!;
-        Assert.Equal("messaging", (string?)ns["Name"]);
+        Assert.Equal("sbemulatorns", (string?)ns["Name"]);
         var queue = ns["Queues"]![0]!;
         Assert.Equal("orders", (string?)queue["Name"]);
         Assert.Equal(5, (int?)queue["Properties"]!["MaxDeliveryCount"]);
