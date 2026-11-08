@@ -22,6 +22,9 @@ public sealed class AzureContainerRegistryRoleAssignmentAnnotation(
 /// </summary>
 public sealed class AzureContainerRegistryResource(string name) : PulumiAzureResource(name), IContainerRegistry
 {
+    /// <summary>Name of an existing registry (set by <c>AsExisting</c>/<c>PublishAsExisting</c>); when set, the registry itself is not created.</summary>
+    public string? ExistingRegistryName { get; internal set; }
+
     public List<AzureContainerRegistryPurgeTask> PurgeTasks { get; } = [];
 
     public PulumiOutputReference NameOutputReference => Output(Stack ?? throw Unbound(), "Name");
@@ -35,6 +38,20 @@ public sealed class AzureContainerRegistryResource(string name) : PulumiAzureRes
 
     protected override Task ContributeResourcesAsync(PulumiProgram program, PipelineStepContext context, string resourceGroup, string location)
     {
+        if (ExistingRegistryName is { } existing)
+        {
+            // Look the registry up instead of creating it; the lookup variable shares the registry's id, so
+            // ${id}.name / .id / .loginServer resolve exactly as they do for a created registry.
+            program.Variables[Id] = new Dictionary<string, object?>
+            {
+                ["fn::invoke"] = new Dictionary<string, object?>
+                {
+                    ["function"] = "azure-native:containerregistry:getRegistry",
+                    ["arguments"] = new Dictionary<string, object?> { ["resourceGroupName"] = resourceGroup, ["registryName"] = existing },
+                },
+            };
+        }
+        else
         // Registry names are global and alphanumeric only: {project}{name}{stack}, shortened with a hash when too long.
         program.AddInfraResource(Id, "azure-native:containerregistry:Registry", new()
         {
@@ -48,6 +65,9 @@ public sealed class AzureContainerRegistryResource(string name) : PulumiAzureRes
                 ["tags"] = new Dictionary<string, object?> { ["aspire-resource-name"] = Name },
             },
         });
+
+        if (ExistingRegistryName is not null && PurgeTasks.Count > 0)
+            throw new InvalidOperationException($"'{Name}' is an existing registry; purge tasks are not applied to existing registries. Remove WithPurgeTask.");
 
         for (var i = 0; i < PurgeTasks.Count; i++)
         {

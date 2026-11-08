@@ -32,6 +32,17 @@ builder.Build().Run();
 - `WithRoleAssignments(...)` grants roles on the registry using `AzureContainerRegistryRole`.
 - Alias: `AddPulumiContainerRegistry`.
 
+## Using an existing registry
+
+`AsExisting` (alias `PublishAsExisting`) looks up a registry created elsewhere with `azure-native:containerregistry:getRegistry` instead of creating one. The name, id and login server outputs work as usual, so `WithRoleAssignments`, `WithAzureContainerRegistry` (Container Apps) and AcrPull keep working. `WithPurgeTask` isn't supported on an existing registry.
+
+```csharp
+var acr = builder.AddPulumiAzureContainerRegistry("acr")
+    .AsExisting("sharedacr", "shared-rg");   // name, resource group
+```
+
+`resourceGroupName` is optional; when omitted the resource group configured for the resource (`WithResourceGroup` / `WithExistingResourceGroup`) is used.
+
 ## Learn more
 
 - Mirrors the official [`Aspire.Hosting.Azure.ContainerRegistry`](https://www.nuget.org/packages/Aspire.Hosting.Azure.ContainerRegistry) integration, so moving from Bicep to Pulumi is a drop-in change in your AppHost.

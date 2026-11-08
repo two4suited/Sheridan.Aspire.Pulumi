@@ -18,6 +18,28 @@ public static class AzureServiceBusExtensions
     public static IResourceBuilder<AzureServiceBusResource> AddPulumiAzureServiceBus(this IDistributedApplicationBuilder builder, string name) =>
         builder.AddPulumiServiceBus(name);
 
+    /// <summary>
+    /// Uses an existing namespace instead of creating one: it is looked up by name and resource group, and the queues, topics,
+    /// subscriptions and role assignments are still applied to it. Mirrors <c>PublishAsExisting</c>.
+    /// </summary>
+    /// <param name="existingResourceName">Name of the existing Service Bus namespace.</param>
+    /// <param name="resourceGroupName">Resource group of the namespace; when omitted, the resource group configured for this resource (<c>WithResourceGroup</c>/<c>WithExistingResourceGroup</c>) is used.</param>
+    public static IResourceBuilder<AzureServiceBusResource> PublishAsExisting(
+        this IResourceBuilder<AzureServiceBusResource> builder, string existingResourceName, string? resourceGroupName = null)
+    {
+        ArgumentNullException.ThrowIfNull(builder);
+        ArgumentException.ThrowIfNullOrEmpty(existingResourceName);
+        if (resourceGroupName is not null) ArgumentException.ThrowIfNullOrEmpty(resourceGroupName);
+        builder.Resource.ExistingNamespaceName = existingResourceName;
+        if (resourceGroupName is not null) builder.Resource.ExistingResourceGroup = resourceGroupName;
+        return builder;
+    }
+
+    /// <summary>Alias of <see cref="PublishAsExisting"/> (this resource has no local run mode). Mirrors <c>AsExisting</c>.</summary>
+    public static IResourceBuilder<AzureServiceBusResource> AsExisting(
+        this IResourceBuilder<AzureServiceBusResource> builder, string existingResourceName, string? resourceGroupName = null) =>
+        builder.PublishAsExisting(existingResourceName, resourceGroupName);
+
     /// <summary>Overrides the namespace SKU (default Standard). Pulumi-specific; upstream exposes this as a Bicep parameter.</summary>
     public static IResourceBuilder<AzureServiceBusResource> WithSku(this IResourceBuilder<AzureServiceBusResource> builder, string sku)
     {

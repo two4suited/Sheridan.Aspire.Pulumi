@@ -34,6 +34,19 @@ builder.Build().Run();
 - The environment's shared identity is granted data-plane roles by the data integrations (Cosmos DB, Storage, Service Bus, Key Vault, ...) automatically when an app references them.
 - Images are tagged with a per-deploy timestamp so every deploy creates a new revision.
 
+## Deploying into an existing environment
+
+`AsExisting` (alias `PublishAsExisting`) looks up a managed environment created elsewhere with `azure-native:app:getManagedEnvironment` instead of creating it (no managed environment, Log Analytics workspace or dashboard is created). Container apps and jobs, the ACR pull identity and its AcrPull assignment are still created. The environment has no registry of its own in this mode, so pair it with `WithAzureContainerRegistry` (typically an `AsExisting` registry from the ContainerRegistry package). `WithAzureLogAnalyticsWorkspace`, `WithDelegatedSubnet` and Front Door private link aren't allowed with an existing environment.
+
+```csharp
+var acr = builder.AddPulumiAzureContainerRegistry("acr").AsExisting("sharedacr", "shared-rg");
+var env = builder.AddPulumiAzureContainerAppEnvironment("aca-env")
+    .AsExisting("shared-env", "shared-rg")   // name, resource group of the environment
+    .WithAzureContainerRegistry(acr);
+```
+
+The apps and identity are created in the resource group configured for the resource (`WithResourceGroup` / `WithExistingResourceGroup`; by default a new one), which can differ from the environment's.
+
 ## Learn more
 
 - Mirrors the official [`Aspire.Hosting.Azure.AppContainers`](https://www.nuget.org/packages/Aspire.Hosting.Azure.AppContainers) integration, so moving from Bicep to Pulumi is a drop-in change in your AppHost.

@@ -19,6 +19,9 @@ public sealed class AzureServiceBusResource(string name) : PulumiAzureResource(n
     /// <summary>Namespace SKU (default Standard, as in the official integration).</summary>
     public string Sku { get; set; } = "Standard";
 
+    /// <summary>Name of an existing namespace (set by <c>AsExisting</c>/<c>PublishAsExisting</c>); when set, the namespace itself is not created.</summary>
+    public string? ExistingNamespaceName { get; internal set; }
+
     public List<AzureServiceBusQueueResource> Queues { get; } = [];
     public List<AzureServiceBusTopicResource> Topics { get; } = [];
 
@@ -36,6 +39,20 @@ public sealed class AzureServiceBusResource(string name) : PulumiAzureResource(n
 
     protected override Task ContributeResourcesAsync(PulumiProgram program, PipelineStepContext context, string rg, string location)
     {
+        if (ExistingNamespaceName is { } existing)
+        {
+            // Look the namespace up instead of creating it; the lookup variable shares the namespace's id, so
+            // ${id}.name / .id / .serviceBusEndpoint resolve exactly as they do for a created namespace.
+            program.Variables[Id] = new Dictionary<string, object?>
+            {
+                ["fn::invoke"] = new Dictionary<string, object?>
+                {
+                    ["function"] = "azure-native:servicebus:getNamespace",
+                    ["arguments"] = new Dictionary<string, object?> { ["resourceGroupName"] = rg, ["namespaceName"] = existing },
+                },
+            };
+        }
+        else
         // Named by the naming layer ({project}-{resource}-{stack}, normalised for ServiceBusNamespace); override with WithAzureName.
         program.AddInfraResource(Id, "azure-native:servicebus:Namespace", new()
         {
