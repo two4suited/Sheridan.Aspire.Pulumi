@@ -38,21 +38,24 @@ internal static class ServiceBusStateInitializer
         }
         else
         {
-            appBuilder.Eventing.Subscribe<AfterResourcesCreatedEvent>(async (@event, ct) =>
+            appBuilder.Eventing.Subscribe<AfterResourcesCreatedEvent>((@event, ct) =>
             {
                 var notifications = @event.Services.GetRequiredService<ResourceNotificationService>();
-                string state;
-                try
+                var stopping = @event.Services.GetRequiredService<IHostApplicationLifetime>().ApplicationStopping;
+                // In the background: a parameter without a value can wait for the user to enter it, and must not stall startup.
+                _ = Task.Run(async () =>
                 {
-                    // Throws when a parameter supplying the endpoint has no value.
-                    await sb.EndpointExpression.GetValueAsync(ct).ConfigureAwait(false);
-                    state = KnownResourceStates.Running;
-                }
-                catch (Exception) when (!ct.IsCancellationRequested)
-                {
-                    state = KnownResourceStates.FailedToStart;
-                }
-                await PublishAsync(notifications, Related(sb), state).ConfigureAwait(false);
+                    string state;
+                    try
+                    {
+                        await sb.EndpointExpression.GetValueAsync(stopping).ConfigureAwait(false);
+                        state = KnownResourceStates.Running;
+                    }
+                    catch (OperationCanceledException) { return; }
+                    catch (Exception) { state = KnownResourceStates.FailedToStart; }
+                    await PublishAsync(notifications, Related(sb), state).ConfigureAwait(false);
+                }, CancellationToken.None);
+                return Task.CompletedTask;
             });
         }
 
@@ -93,12 +96,16 @@ internal static class ServiceBusStateInitializer
     {
         try
         {
+            var failed = false;
             await foreach (var e in notifications.WatchAsync(ct).ConfigureAwait(false))
             {
                 if (e.Resource != emulator) continue;
                 var state = e.Snapshot.State?.Text;
-                if (state is "FailedToStart" or "Exited" or "RuntimeUnhealthy")
+                var isFailure = state is "FailedToStart" or "Exited" or "RuntimeUnhealthy";
+                // Only on the transition, not for every snapshot update while the emulator stays failed.
+                if (isFailure && !failed)
                     await PublishAsync(notifications, Related(sb), KnownResourceStates.FailedToStart).ConfigureAwait(false);
+                failed = isFailure;
             }
         }
         catch (OperationCanceledException) { }

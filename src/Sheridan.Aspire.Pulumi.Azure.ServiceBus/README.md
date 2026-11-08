@@ -64,14 +64,14 @@ sb.AddServiceBusTopic("events").AddServiceBusSubscription("audit");
 
 - `WithHostPort(int?)` pins the AMQP port.
 - `WithConfigurationFile(path)` supplies your own `Config.json`; `WithConfiguration(json => ...)` edits the generated one.
-- `WithSqlServer()` / `WithSqlServer(sql => sql.WithDataVolume().WithHostPort(14330))` customize the SQL Server container created for the emulator (the callback may run several times and must keep the `tcp` endpoint); `WithSqlServer(existingSql)` reuses an `IResourceBuilder<SqlServerServerResource>` instead (last call wins). The callback and existing-server forms cannot be combined. The created SQL Server follows the emulator's container lifetime (`WithLifetimeOf`), and the emulator waits for whichever SQL Server it uses.
+- `WithSqlServer()` / `WithSqlServer(sql => sql.WithDataVolume().WithHostPort(14330))` customize the SQL Server container created for the emulator (it can be called several times, callbacks apply in order, and the `tcp` endpoint must be kept); `WithSqlServer(existingSql)` reuses an `IResourceBuilder<SqlServerServerResource>` instead (last call wins). The callback and existing-server forms cannot be combined. The created SQL Server follows the emulator's container lifetime (`WithLifetimeOf`), and the emulator waits for whichever SQL Server it uses.
 
 ```csharp
 var sql = builder.AddSqlServer("shared-sql");
 builder.AddPulumiServiceBus("messaging").RunAsEmulator(e => e.WithSqlServer(sql));
 ```
 
-Dashboard state: the namespace and every queue, topic and subscription show `MailMultiple`/`Mail` icons and are published as `Running` once the emulator is healthy (it reports healthy after loading `Config.json`), or `FailedToStart` if the emulator fails. Resources that `WithReference` a namespace, queue, topic or subscription wait for that resource to be `Running`. With `RunAsExisting` they are `Running` once the endpoint resolves (`FailedToStart` if a parameter has no value).
+Dashboard state: the namespace and every queue, topic and subscription show `MailMultiple`/`Mail` icons and are published as `Running` once the emulator is healthy (it reports healthy after loading `Config.json`), or `FailedToStart` if the emulator fails. Resources that `WithReference` a namespace, queue, topic or subscription wait for that resource to be `Running`. With `RunAsExisting` they are `Running` once the endpoint resolves (`FailedToStart` if it cannot be resolved; a parameter without a value waits until it is entered).
 
 `RunAsEmulator` and `RunAsExisting` are mutually exclusive: calling the second one throws in either order, in run and publish mode alike.
 
