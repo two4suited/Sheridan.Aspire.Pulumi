@@ -122,6 +122,12 @@ public static class AzureCosmosDBExtensions
         }
 
         builder.Resource.Emulator = emulator;
+        if (!classic)
+        {
+            // The vNext emulator exposes a readiness probe; the databases and containers are created once it passes.
+            emulatorBuilder.WithHttpHealthCheck("/ready", endpointName: "emulatorhealth");
+        }
+        CosmosDBEmulatorInitializer.Register(builder.ApplicationBuilder, builder.Resource, emulator);
         configureContainer?.Invoke(emulatorBuilder);
         return builder;
     }
