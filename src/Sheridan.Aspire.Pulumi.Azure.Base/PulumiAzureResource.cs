@@ -35,6 +35,9 @@ public abstract class PulumiAzureResource(string name) : Resource(name), IPulumi
     /// <summary>A Pulumi-provisioned resource group (see <see cref="PulumiAzureExtensions.WithResourceGroup{T}"/>) to use instead of creating one.</summary>
     public PulumiAzureResourceGroupResource? ResourceGroup { get; set; }
 
+    /// <summary>True when a resource group was configured explicitly (<c>WithResourceGroup</c> or <c>WithExistingResourceGroup</c>) rather than being created for this resource.</summary>
+    protected bool HasConfiguredResourceGroup => ResourceGroup is not null || ExistingResourceGroup is not null;
+
     /// <summary>Pulumi YAML identifier derived from the resource name.</summary>
     public string Id => PulumiAzureProgramExtensions.ToPulumiId(Name);
 

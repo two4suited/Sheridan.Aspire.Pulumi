@@ -11,8 +11,10 @@ namespace Sheridan.Aspire.Pulumi.Azure.ContainerRegistry;
 /// </summary>
 public sealed class PulumiContainerRegistryInfrastructure(PulumiInfrastructure inner, AzureContainerRegistryResource owner) : PulumiInfrastructure(inner.Program)
 {
-    /// <summary>The <c>azure-native:containerregistry:Registry</c>.</summary>
-    public PulumiResourceNode ContainerRegistryService => GetResource(owner.Id);
+    /// <summary>The <c>azure-native:containerregistry:Registry</c>. Throws for registries declared with AsExisting/PublishAsExisting.</summary>
+    public PulumiResourceNode ContainerRegistryService => owner.ExistingRegistryName is null
+        ? GetResource(owner.Id)
+        : throw new InvalidOperationException($"'{owner.Name}' is an existing registry; there is no Registry resource to configure.");
 }
 
 public static class PulumiContainerRegistryInfrastructureExtensions

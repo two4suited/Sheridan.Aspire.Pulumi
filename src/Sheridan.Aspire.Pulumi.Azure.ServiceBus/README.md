@@ -36,6 +36,18 @@ builder.Build().Run();
 - `WithReference` of the namespace, a queue, a topic or a subscription grants the compute environment's identity *Azure Service Bus Data Owner*; `WithRoleAssignments(sb, AzureServiceBusRole....)` replaces it.
 - Alias: `AddPulumiAzureServiceBus`.
 
+## Using an existing namespace
+
+`AsExisting` (alias `PublishAsExisting`) looks up a namespace created elsewhere (e.g. by another Pulumi stack) with `azure-native:servicebus:getNamespace` instead of creating one. Queues, topics, subscriptions and role assignments are still created inside it, and the endpoint/name outputs work as usual, so `WithReference` and `WithRoleAssignments` are unchanged.
+
+```csharp
+var sb = builder.AddPulumiServiceBus("messaging")
+    .AsExisting("shared-sb", "shared-rg");   // name, resource group
+sb.AddServiceBusQueue("orders");
+```
+
+`resourceGroupName` is optional, but a group must be resolvable: when omitted, call `WithExistingResourceGroup` / `WithResourceGroup`, otherwise program generation throws. A group passed to `AsExisting` is always the one used for the lookup and the child entities. `ConfigureInfrastructure(...).ServiceBusNamespace` throws for an existing namespace, and `WithSku` is ignored.
+
 ## Notes
 
 - Not ported: `RunAsEmulator` (the Service Bus emulator) and its configuration APIs.

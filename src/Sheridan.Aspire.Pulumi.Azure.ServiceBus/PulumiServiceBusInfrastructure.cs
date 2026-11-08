@@ -10,8 +10,10 @@ namespace Sheridan.Aspire.Pulumi.Azure.ServiceBus;
 /// </summary>
 public sealed class PulumiServiceBusInfrastructure(PulumiInfrastructure inner, AzureServiceBusResource owner) : PulumiInfrastructure(inner.Program)
 {
-    /// <summary>The <c>azure-native:servicebus:Namespace</c> resource.</summary>
-    public PulumiResourceNode ServiceBusNamespace => GetResource(owner.Id);
+    /// <summary>The <c>azure-native:servicebus:Namespace</c> resource. Throws for namespaces declared with AsExisting/PublishAsExisting.</summary>
+    public PulumiResourceNode ServiceBusNamespace => owner.ExistingNamespaceName is null
+        ? GetResource(owner.Id)
+        : throw new InvalidOperationException($"'{owner.Name}' is an existing namespace; there is no Namespace resource to configure.");
 }
 
 public static class PulumiServiceBusInfrastructureExtensions

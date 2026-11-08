@@ -10,8 +10,10 @@ namespace Sheridan.Aspire.Pulumi.Azure.AppContainers;
 /// </summary>
 public sealed class PulumiContainerAppsInfrastructure(PulumiInfrastructure inner, AzureContainerAppEnvironmentResource owner) : PulumiInfrastructure(inner.Program)
 {
-    /// <summary>The <c>azure-native:app:ManagedEnvironment</c>.</summary>
-    public PulumiResourceNode ContainerAppManagedEnvironment => GetResource(owner.Id);
+    /// <summary>The <c>azure-native:app:ManagedEnvironment</c>. Throws for environments declared with AsExisting/PublishAsExisting.</summary>
+    public PulumiResourceNode ContainerAppManagedEnvironment => owner.ExistingEnvironmentName is null
+        ? GetResource(owner.Id)
+        : throw new InvalidOperationException($"'{owner.Name}' is an existing environment; there is no ManagedEnvironment resource to configure.");
 
     /// <summary>The <c>azure-native:app:ContainerApp</c> (or <c>azure-native:app:Job</c>) emitted for the compute resource with the given Aspire name.</summary>
     public PulumiResourceNode GetContainerApp(string computeResourceName) => GetResource(AzureContainerAppEnvironmentResource.AppId(computeResourceName));

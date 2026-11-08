@@ -32,6 +32,30 @@ public static class AzureContainerAppEnvironmentExtensions
         this IDistributedApplicationBuilder builder, string name) =>
         builder.AddPulumiAzureContainerAppEnvironment(name);
 
+    /// <summary>
+    /// Deploys into an existing Container Apps environment instead of creating one: the managed environment is looked up by
+    /// name and resource group (nothing is created for it, nor its Log Analytics workspace or dashboard), while the container
+    /// apps and jobs, the ACR pull identity and its AcrPull assignment are still created. Because the environment has no registry of
+    /// its own here, pair this with <c>WithAzureContainerRegistry</c>. Mirrors <c>PublishAsExisting</c>.
+    /// </summary>
+    /// <param name="existingResourceName">Name of the existing managed environment.</param>
+    /// <param name="resourceGroupName">Resource group of the environment; when omitted, the resource group configured for this resource is used. The container apps are created in the resource group configured for this resource, not necessarily the environment's.</param>
+    public static IResourceBuilder<AzureContainerAppEnvironmentResource> PublishAsExisting(
+        this IResourceBuilder<AzureContainerAppEnvironmentResource> builder, string existingResourceName, string? resourceGroupName = null)
+    {
+        ArgumentNullException.ThrowIfNull(builder);
+        ArgumentException.ThrowIfNullOrEmpty(existingResourceName);
+        if (resourceGroupName is not null) ArgumentException.ThrowIfNullOrEmpty(resourceGroupName);
+        builder.Resource.ExistingEnvironmentName = existingResourceName;
+        builder.Resource.ExistingEnvironmentResourceGroup = resourceGroupName;
+        return builder;
+    }
+
+    /// <summary>Alias of <see cref="PublishAsExisting"/> (this resource has no local run mode). Mirrors <c>AsExisting</c>.</summary>
+    public static IResourceBuilder<AzureContainerAppEnvironmentResource> AsExisting(
+        this IResourceBuilder<AzureContainerAppEnvironmentResource> builder, string existingResourceName, string? resourceGroupName = null) =>
+        builder.PublishAsExisting(existingResourceName, resourceGroupName);
+
     /// <summary>Uses an existing Pulumi container registry instead of provisioning one for the environment. Mirrors <c>WithAzureContainerRegistry</c>.</summary>
     public static IResourceBuilder<AzureContainerAppEnvironmentResource> WithAzureContainerRegistry(
         this IResourceBuilder<AzureContainerAppEnvironmentResource> builder, IResourceBuilder<AzureContainerRegistryResource> registry)
@@ -73,6 +97,7 @@ public static class AzureContainerAppEnvironmentExtensions
     {
         ArgumentNullException.ThrowIfNull(builder);
         builder.Resource.DashboardEnabled = enable;
+        builder.Resource.DashboardConfigured = true;
         return builder;
     }
 

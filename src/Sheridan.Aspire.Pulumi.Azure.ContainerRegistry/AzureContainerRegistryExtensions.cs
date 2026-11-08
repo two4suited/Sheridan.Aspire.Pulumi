@@ -22,6 +22,30 @@ public static class AzureContainerRegistryExtensions
         builder.AddPulumiAzureContainerRegistry(name);
 
     /// <summary>
+    /// Uses an existing registry instead of creating one: it is looked up by name and resource group (login server and id
+    /// are exposed as usual) and role assignments are still applied to it. Mirrors <c>PublishAsExisting</c>.
+    /// </summary>
+    /// <param name="existingResourceName">Name of the existing registry.</param>
+    /// <param name="resourceGroupName">Resource group of the registry; when omitted, the resource group configured for this resource (<c>WithResourceGroup</c>/<c>WithExistingResourceGroup</c>) is used.</param>
+    public static IResourceBuilder<AzureContainerRegistryResource> PublishAsExisting(
+        this IResourceBuilder<AzureContainerRegistryResource> builder, string existingResourceName, string? resourceGroupName = null)
+    {
+        ArgumentNullException.ThrowIfNull(builder);
+        ArgumentException.ThrowIfNullOrEmpty(existingResourceName);
+        if (resourceGroupName is not null) ArgumentException.ThrowIfNullOrEmpty(resourceGroupName);
+        builder.Resource.ExistingRegistryName = existingResourceName;
+        builder.Resource.ExistingRegistryResourceGroup = resourceGroupName;
+        // Also marks a resource group as configured so none is created just for the lookup.
+        if (resourceGroupName is not null) builder.Resource.ExistingResourceGroup = resourceGroupName;
+        return builder;
+    }
+
+    /// <summary>Alias of <see cref="PublishAsExisting"/> (this resource has no local run mode). Mirrors <c>AsExisting</c>.</summary>
+    public static IResourceBuilder<AzureContainerRegistryResource> AsExisting(
+        this IResourceBuilder<AzureContainerRegistryResource> builder, string existingResourceName, string? resourceGroupName = null) =>
+        builder.PublishAsExisting(existingResourceName, resourceGroupName);
+
+    /// <summary>
     /// Adds a scheduled <c>acr purge</c> task. Mirrors <c>WithPurgeTask</c>: <paramref name="schedule"/> is a five-part cron
     /// expression, <paramref name="filter"/> defaults to <c>.*:.*</c>, <paramref name="ago"/> to <c>0d</c>, <paramref name="keep"/> to 3.
     /// </summary>
