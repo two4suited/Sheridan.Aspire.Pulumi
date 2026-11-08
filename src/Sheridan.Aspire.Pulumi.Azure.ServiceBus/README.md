@@ -64,6 +64,16 @@ sb.AddServiceBusTopic("events").AddServiceBusSubscription("audit");
 
 - `WithHostPort(int?)` pins the AMQP port.
 - `WithConfigurationFile(path)` supplies your own `Config.json`; `WithConfiguration(json => ...)` edits the generated one.
+- `WithSqlServer()` / `WithSqlServer(sql => sql.WithDataVolume().WithHostPort(14330))` customize the SQL Server container created for the emulator (the callback may run several times and must keep the `tcp` endpoint); `WithSqlServer(existingSql)` reuses an `IResourceBuilder<SqlServerServerResource>` instead (last call wins). The callback and existing-server forms cannot be combined. The created SQL Server follows the emulator's container lifetime (`WithLifetimeOf`), and the emulator waits for whichever SQL Server it uses.
+
+```csharp
+var sql = builder.AddSqlServer("shared-sql");
+builder.AddPulumiServiceBus("messaging").RunAsEmulator(e => e.WithSqlServer(sql));
+```
+
+Dashboard state: the namespace and every queue, topic and subscription show `MailMultiple`/`Mail` icons and are published as `Running` once the emulator is healthy (it reports healthy after loading `Config.json`), or `FailedToStart` if the emulator fails. Resources that `WithReference` a namespace, queue, topic or subscription wait for that resource to be `Running`. With `RunAsExisting` they are `Running` once the endpoint resolves (`FailedToStart` if a parameter has no value).
+
+`RunAsEmulator` and `RunAsExisting` are mutually exclusive: calling the second one throws in either order, in run and publish mode alike.
 
 > **Apple Silicon:** the SQL Server image crashes (segfault) under QEMU. Enable Docker Desktop's *Use Rosetta for x86_64/amd64 emulation*.
 
@@ -79,10 +89,6 @@ var sb = builder.AddPulumiServiceBus("messaging")
 ```
 
 The namespace has local auth disabled, so the app authenticates with `DefaultAzureCredential`. In publish mode `RunAsExisting` has no effect.
-
-## Notes
-
-- Not ported: the emulator's `WithSqlServer` overloads (the SQL Server container is always created for you).
 
 ## Learn more
 
