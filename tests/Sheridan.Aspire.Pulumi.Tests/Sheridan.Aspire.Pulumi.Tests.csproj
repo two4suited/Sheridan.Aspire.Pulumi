@@ -28,6 +28,7 @@
     <ProjectReference Include="../../src/Sheridan.Aspire.Pulumi.Azure.AppContainers/Sheridan.Aspire.Pulumi.Azure.AppContainers.csproj" />
     <ProjectReference Include="../../src/Sheridan.Aspire.Pulumi.Azure.ContainerRegistry/Sheridan.Aspire.Pulumi.Azure.ContainerRegistry.csproj" />
     <ProjectReference Include="../../src/Sheridan.Aspire.Pulumi.Azure.CosmosDB/Sheridan.Aspire.Pulumi.Azure.CosmosDB.csproj" />
+    <ProjectReference Include="../../src/Sheridan.Aspire.Pulumi.Azure.Storage/Sheridan.Aspire.Pulumi.Azure.Storage.csproj" />
   </ItemGroup>
 
 </Project>

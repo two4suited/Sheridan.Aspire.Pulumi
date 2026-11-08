@@ -32,6 +32,9 @@ public static class AzureStorageExtensions
         builder.ApplicationBuilder.AddResource(emulator)
             .WithImage("azure-storage/azurite", "3.35.0")
             .WithImageRegistry("mcr.microsoft.com")
+            // Same command line as the image default plus --skipApiVersionCheck (as the official integration does), so Azure SDKs
+            // newer than this Azurite release keep working instead of failing with "API version ... is not supported".
+            .WithArgs("azurite", "-l", "/data", "--blobHost", "0.0.0.0", "--queueHost", "0.0.0.0", "--tableHost", "0.0.0.0", "--skipApiVersionCheck")
             .WithHttpEndpoint(targetPort: 10000, name: "blob")
             .WithHttpEndpoint(targetPort: 10001, name: "queue")
             .WithHttpEndpoint(targetPort: 10002, name: "table")
