@@ -1,5 +1,7 @@
 using Aspire.Hosting.ApplicationModel;
 using Aspire.Hosting.Utils;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Sheridan.Aspire.Pulumi.Azure.Base;
 using Sheridan.Aspire.Pulumi.Azure.CosmosDB;
 
@@ -93,7 +95,7 @@ public static class AzureCosmosDBExtensions
     /// <summary>Runs the classic Cosmos DB emulator locally instead of the Pulumi-provisioned account. No effect in publish mode.</summary>
     public static IResourceBuilder<AzureCosmosDBResource> RunAsClassicEmulator(
         this IResourceBuilder<AzureCosmosDBResource> builder, Action<IResourceBuilder<AzureCosmosDBEmulatorResource>>? configureContainer = null) =>
-        RunAs(builder, classic: true, tag: "latest", configureContainer);
+        RunAs(builder, classic: true, tag: "stable", configureContainer);
 
     private static IResourceBuilder<AzureCosmosDBResource> RunAs(
         IResourceBuilder<AzureCosmosDBResource> builder, bool classic, string tag, Action<IResourceBuilder<AzureCosmosDBEmulatorResource>>? configureContainer)
@@ -126,6 +128,16 @@ public static class AzureCosmosDBExtensions
         {
             // The vNext emulator exposes a readiness probe; the databases and containers are created once it passes.
             emulatorBuilder.WithHttpHealthCheck("/ready", endpointName: "emulatorhealth");
+        }
+        else
+        {
+            // The classic emulator has no probe endpoint: ready means the data plane answers a signed request.
+            var checkName = $"{emulator.Name}_ready";
+            builder.ApplicationBuilder.Services.AddHealthChecks().AddAsyncCheck(checkName, async ct =>
+                await CosmosDBEmulatorInitializer.ProbeAsync(new Uri(emulator.GetEndpoint("emulator").Url), ct).ConfigureAwait(false)
+                    ? HealthCheckResult.Healthy()
+                    : HealthCheckResult.Unhealthy("The Cosmos DB emulator is not accepting requests yet."));
+            emulatorBuilder.WithHealthCheck(checkName);
         }
         CosmosDBEmulatorInitializer.Register(builder.ApplicationBuilder, builder.Resource, emulator);
         configureContainer?.Invoke(emulatorBuilder);

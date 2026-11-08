@@ -82,6 +82,27 @@ internal static class CosmosDBEmulatorInitializer
         }
     }
 
+    /// <summary>True when the emulator's data plane answers a signed request to list databases.</summary>
+    internal static async Task<bool> ProbeAsync(Uri endpoint, CancellationToken ct)
+    {
+        try
+        {
+            using var handler = new HttpClientHandler { ServerCertificateCustomValidationCallback = HttpClientHandler.DangerousAcceptAnyServerCertificateValidator };
+            using var http = new HttpClient(handler) { BaseAddress = endpoint, Timeout = TimeSpan.FromSeconds(5) };
+            var date = DateTime.UtcNow.ToString("r");
+            using var request = new HttpRequestMessage(HttpMethod.Get, "dbs");
+            request.Headers.TryAddWithoutValidation("x-ms-date", date);
+            request.Headers.TryAddWithoutValidation("x-ms-version", ApiVersion);
+            request.Headers.TryAddWithoutValidation("Authorization", Authorization("get", "dbs", "", date, AzureCosmosDBEmulatorResource.WellKnownKey));
+            using var response = await http.SendAsync(request, ct).ConfigureAwait(false);
+            return response.IsSuccessStatusCode;
+        }
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException && !ct.IsCancellationRequested)
+        {
+            return false;
+        }
+    }
+
     internal static string BuildDatabaseBody(AzureCosmosDBDatabaseResource db) =>
         JsonSerializer.Serialize(new { id = db.DatabaseName });
 
