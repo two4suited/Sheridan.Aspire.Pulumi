@@ -33,3 +33,4 @@ When asked to work on a GitHub issue:
 2. Update the README of every package you touched (`src/<Package>/README.md`) in the same change: document new or changed `AddPulumiX` / `WithX` APIs, options, outputs and any behavior or breaking changes, with a usage snippet that matches the real extension-method signatures. For a brand-new package, create its README following the existing package READMEs as the template. If the change affects the pipeline model or package list, update the root [README.md](README.md) too.
 3. Build and run the relevant tests before opening the PR (`dotnet build` / `dotnet test`).
 4. Open a pull request with `gh pr create` that references the issue (`Closes #<n>`), summarizes what changed, and notes the README updates. Don't merge it yourself.
+5. Review the PR with an Opus subagent (`Agent` with `model: "opus"`, read-only) and address its findings before handing off.
