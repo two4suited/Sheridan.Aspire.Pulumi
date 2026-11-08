@@ -10,6 +10,19 @@ after a `vX.Y.Z` tag has been published. Packages are on
 
 <!-- releases:start -->
 
+## v1.5.2
+
+_2026-11-08_ · [GitHub release](https://github.com/two4suited/Sheridan.Aspire.Pulumi/releases/tag/v1.5.2)
+
+#### What's Changed
+* Docs: release notes for v1.5.1 by @github-actions[bot] in https://github.com/two4suited/Sheridan.Aspire.Pulumi/pull/185
+* Docs workflow: scope pages/id-token write to the deploy job by @two4suited in https://github.com/two4suited/Sheridan.Aspire.Pulumi/pull/187
+* Hide Pulumi-only resources from the dashboard in run mode by @two4suited in https://github.com/two4suited/Sheridan.Aspire.Pulumi/pull/188
+
+
+**Full Changelog**: https://github.com/two4suited/Sheridan.Aspire.Pulumi/compare/v1.5.1...v1.5.2
+
+
 ## v1.5.1
 
 _2026-11-08_ · [GitHub release](https://github.com/two4suited/Sheridan.Aspire.Pulumi/releases/tag/v1.5.1)
