@@ -11,7 +11,8 @@ public sealed class ContainerRegistryPurgeTests
         var content = AzureContainerRegistryResource.BuildPurgeTaskContent(
             new AzureContainerRegistryPurgeTask("0 1 * * *", "api:.*", "7d", 5));
 
-        Assert.Contains("acr purge --filter 'api:.*' --ago 7d --keep 5", content);
-        Assert.Contains("--untagged --max-untagged-manifests 0", content);
+        Assert.Equal(
+            "version: v1.1.0\nsteps:\n- cmd: mcr.microsoft.com/acr/acr-cli:0.21 purge --filter 'api:.*' --ago 7d --min-tags 5 --untagged --max-untagged-manifests 0",
+            content);
     }
 }

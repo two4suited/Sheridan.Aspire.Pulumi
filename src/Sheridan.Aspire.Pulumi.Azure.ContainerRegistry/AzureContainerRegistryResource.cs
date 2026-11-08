@@ -91,10 +91,12 @@ public sealed class AzureContainerRegistryResource(string name) : PulumiAzureRes
     /// <summary>
     /// The ACR task YAML for a purge task. Matching tags older than <c>Ago</c> are deleted while the newest <c>Keep</c> per
     /// repository are kept; eligible untagged manifests in matching repositories are always removed too (irreversible, and
-    /// can break digest-based pulls), mirroring upstream Aspire.
+    /// can break digest-based pulls), mirroring upstream Aspire. The acr-cli image is pinned because the built-in <c>acr</c>
+    /// alias may predate <c>--max-untagged-manifests</c>, and <c>--min-tags</c> replaces <c>--keep</c>, which acr-cli rejects
+    /// together with the manifest-count flags.
     /// </summary>
     internal static string BuildPurgeTaskContent(AzureContainerRegistryPurgeTask t) =>
-        $"version: v1.1.0\nsteps:\n- cmd: acr purge --filter '{t.Filter}' --ago {t.Ago} --keep {t.Keep} --untagged --max-untagged-manifests 0";
+        $"version: v1.1.0\nsteps:\n- cmd: mcr.microsoft.com/acr/acr-cli:0.21 purge --filter '{t.Filter}' --ago {t.Ago} --min-tags {t.Keep} --untagged --max-untagged-manifests 0";
 
     private void AddRoleAssignments(PulumiProgram program, PipelineStepContext context)
     {
