@@ -42,6 +42,10 @@ public sealed class AzureServiceBusResource(string name) : PulumiAzureResource(n
     /// <summary>The local emulator container, when <c>RunAsEmulator</c> was called (run mode only).</summary>
     public AzureServiceBusEmulatorResource? Emulator { get; internal set; }
 
+    internal bool EmulatorRequested { get; set; }
+    internal bool StateInitializerRegistered { get; set; }
+    internal bool RunAsExistingRequested { get; set; }
+
     /// <summary>Endpoint supplied by <c>RunAsExisting</c> for local runs (run mode only); used instead of the deployed stack output.</summary>
     internal ReferenceExpression? RunEndpoint { get; set; }
 

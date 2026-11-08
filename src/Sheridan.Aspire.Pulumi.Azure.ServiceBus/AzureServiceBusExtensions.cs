@@ -11,7 +11,7 @@ public static class AzureServiceBusExtensions
     {
         ArgumentNullException.ThrowIfNull(builder);
         ArgumentException.ThrowIfNullOrEmpty(name);
-        return builder.AddResource(new AzureServiceBusResource(name)).ExcludeFromManifest();
+        return builder.AddResource(new AzureServiceBusResource(name)).WithIconName("MailMultiple").ExcludeFromManifest();
     }
 
     /// <summary>Alias of <see cref="AddPulumiServiceBus"/> following the <c>AddPulumiAzureX</c> naming used by the other Azure integrations.</summary>
@@ -58,7 +58,7 @@ public static class AzureServiceBusExtensions
         ArgumentException.ThrowIfNullOrEmpty(name);
         var queue = new AzureServiceBusQueueResource(name, queueName ?? name, builder.Resource);
         builder.Resource.Queues.Add(queue);
-        return builder.ApplicationBuilder.AddResource(queue).WithParentRelationship(builder).ExcludeFromManifest();
+        return builder.ApplicationBuilder.AddResource(queue).WithIconName("Mail").WithParentRelationship(builder).ExcludeFromManifest();
     }
 
     /// <summary>Adds a queue named <paramref name="name"/>.</summary>
@@ -85,7 +85,7 @@ public static class AzureServiceBusExtensions
         ArgumentException.ThrowIfNullOrEmpty(name);
         var topic = new AzureServiceBusTopicResource(name, topicName ?? name, builder.Resource);
         builder.Resource.Topics.Add(topic);
-        return builder.ApplicationBuilder.AddResource(topic).WithParentRelationship(builder).ExcludeFromManifest();
+        return builder.ApplicationBuilder.AddResource(topic).WithIconName("Mail").WithParentRelationship(builder).ExcludeFromManifest();
     }
 
     /// <summary>Adds a topic named <paramref name="name"/>.</summary>
@@ -121,7 +121,7 @@ public static class AzureServiceBusExtensions
         ArgumentException.ThrowIfNullOrEmpty(name);
         var subscription = new AzureServiceBusSubscriptionResource(name, subscriptionName ?? name, builder.Resource);
         builder.Resource.Subscriptions.Add(subscription);
-        return builder.ApplicationBuilder.AddResource(subscription).WithParentRelationship(builder).ExcludeFromManifest();
+        return builder.ApplicationBuilder.AddResource(subscription).WithIconName("Mail").WithParentRelationship(builder).ExcludeFromManifest();
     }
 
     /// <summary>Adds a subscription named <paramref name="subscriptionName"/> to the topic named <paramref name="topicName"/>, creating the topic if needed.</summary>
