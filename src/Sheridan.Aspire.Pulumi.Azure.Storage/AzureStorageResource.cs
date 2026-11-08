@@ -21,6 +21,12 @@ public sealed class AzureStorageResource(string name) : PulumiAzureResource(name
 
     public AzureStorageEmulatorResource? Emulator { get; set; }
 
+    /// <summary>True once <c>AddDataLake</c>/<c>AddDataLakeFileSystem</c> was called: the account is created with a hierarchical namespace (Data Lake Storage Gen2). Not supported by the emulator.</summary>
+    public bool IsHnsEnabled { get; internal set; }
+
+    /// <summary>The first Data Lake service added (or created on demand by <c>AddDataLakeFileSystem</c>); the parent of file systems added to the account.</summary>
+    internal IResourceBuilder<AzureDataLakeStorageResource>? ImplicitDataLakeService { get; set; }
+
     /// <summary>Name of an existing storage account (set by <c>AsExisting</c>/<c>PublishAsExisting</c>); when set, the account itself is not created.</summary>
     public string? ExistingAccountName { get; internal set; }
 
@@ -33,12 +39,15 @@ public sealed class AzureStorageResource(string name) : PulumiAzureResource(name
     public List<AzureBlobStorageResource> BlobServices { get; } = [];
     public List<AzureQueueStorageResource> QueueServices { get; } = [];
     public List<AzureTableStorageResource> TableServices { get; } = [];
+    public List<AzureDataLakeStorageResource> DataLakeServices { get; } = [];
+    public List<AzureDataLakeStorageFileSystemResource> DataLakeFileSystems { get; } = [];
     public List<AzureBlobStorageContainerResource> BlobContainers { get; } = [];
     public List<AzureQueueStorageQueueResource> Queues { get; } = [];
 
     /// <summary>Every child resource added to the account (services, containers and queues).</summary>
     internal IEnumerable<IResource> Children =>
-        BlobServices.Cast<IResource>().Concat(QueueServices).Concat(TableServices).Concat(BlobContainers).Concat(Queues);
+        BlobServices.Cast<IResource>().Concat(QueueServices).Concat(TableServices).Concat(DataLakeServices)
+            .Concat(BlobContainers).Concat(Queues).Concat(DataLakeFileSystems);
 
     /// <summary>Publishes <paramref name="state"/> for the account and each of its children (the dashboard shows Unknown otherwise).</summary>
     internal async Task PublishStateAsync(ResourceNotificationService notifications, ResourceStateSnapshot state)
@@ -78,6 +87,10 @@ public sealed class AzureStorageResource(string name) : PulumiAzureResource(name
     internal ReferenceExpression QueueConnection => Emulator is { } e ? EmulatorConnection(e, "queue") : RunEndpoints?.Queue ?? ReferenceExpression.Create($"{QueueEndpoint}");
     internal ReferenceExpression TableConnection => Emulator is { } e ? EmulatorConnection(e, "table") : RunEndpoints?.Table ?? ReferenceExpression.Create($"{TableEndpoint}");
 
+    internal ReferenceExpression DataLakeConnection => Emulator is not null
+        ? throw new InvalidOperationException("Emulator currently does not support data lake.")
+        : RunEndpoints?.DataLake ?? ReferenceExpression.Create($"{DataLakeEndpoint}");
+
     private static ReferenceExpression EmulatorConnection(AzureStorageEmulatorResource e, string service) =>
         ReferenceExpression.Create($"DefaultEndpointsProtocol=http;AccountName={AzureStorageEmulatorResource.AccountName};AccountKey={AzureStorageEmulatorResource.AccountKey};{char.ToUpperInvariant(service[0]) + service[1..]}Endpoint={e.GetEndpoint(service)}/{AzureStorageEmulatorResource.AccountName};");
 
@@ -102,6 +115,15 @@ public sealed class AzureStorageResource(string name) : PulumiAzureResource(name
 
     protected override Task ContributeResourcesAsync(PulumiProgram program, PipelineStepContext context, string rg, string location)
     {
+        EmitResources(program, rg, location);
+        AddRoleAssignments(program, context);
+        Provisioning.PulumiInfrastructureExtensions.ApplyInfrastructureCallbacks(this, program);
+        return Task.CompletedTask;
+    }
+
+    /// <summary>Emits the account (or its lookup), its services, containers, queues and outputs.</summary>
+    internal void EmitResources(PulumiProgram program, string rg, string location)
+    {
         if (ExistingAccountName is not null)
             rg = AddExistingLookup(program, rg);
         else
@@ -119,7 +141,7 @@ public sealed class AzureStorageResource(string name) : PulumiAzureResource(name
                 ["sku"] = new Dictionary<string, object?> { ["name"] = Sku },
                 ["accessTier"] = "Hot",
                 ["allowSharedKeyAccess"] = false,
-                ["isHnsEnabled"] = false,
+                ["isHnsEnabled"] = IsHnsEnabled,
                 ["minimumTlsVersion"] = "TLS1_2",
                 ["networkRuleSet"] = new Dictionary<string, object?> { ["defaultAction"] = "Allow" },
                 ["tags"] = new Dictionary<string, object?> { ["aspire-resource-name"] = Name },
@@ -134,7 +156,7 @@ public sealed class AzureStorageResource(string name) : PulumiAzureResource(name
         }
 
         // The default service resources exist whenever the corresponding child is added (as in the official Bicep).
-        if (BlobServices.Count > 0 || BlobContainers.Count > 0)
+        if (BlobServices.Count > 0 || BlobContainers.Count > 0 || DataLakeFileSystems.Count > 0)
             program.Resources[$"{Id}BlobService"] = Child("azure-native:storage:BlobServiceProperties", new() { ["blobServicesName"] = "default" });
         if (QueueServices.Count > 0 || Queues.Count > 0)
             program.Resources[$"{Id}QueueService"] = Child("azure-native:storage:QueueServiceProperties", new() { ["queueServiceName"] = "default" });
@@ -146,6 +168,14 @@ public sealed class AzureStorageResource(string name) : PulumiAzureResource(name
             var d = Child("azure-native:storage:BlobContainer", new() { ["containerName"] = c.BlobContainerName });
             d["options"] = new Dictionary<string, object?> { ["dependsOn"] = new List<object?> { $"${{{Id}BlobService}}" } };
             program.Resources[$"{Id}{c.Id}"] = d;
+        }
+
+        // Data Lake file systems are blob containers of a hierarchical-namespace account.
+        foreach (var fs in DataLakeFileSystems)
+        {
+            var d = Child("azure-native:storage:BlobContainer", new() { ["containerName"] = fs.DataLakeFileSystemName });
+            d["options"] = new Dictionary<string, object?> { ["dependsOn"] = new List<object?> { $"${{{Id}BlobService}}" } };
+            program.Resources[$"{Id}{fs.Id}"] = d;
         }
 
         foreach (var q in Queues)
@@ -161,47 +191,65 @@ public sealed class AzureStorageResource(string name) : PulumiAzureResource(name
         program.Outputs[$"{Id}TableEndpoint"] = $"${{{Id}.primaryEndpoints.table}}";
         program.Outputs[$"{Id}Name"] = $"${{{Id}.name}}";
         program.Outputs[$"{Id}Id"] = $"${{{Id}.id}}";
-
-        AddRoleAssignments(program, context);
-        Provisioning.PulumiInfrastructureExtensions.ApplyInfrastructureCallbacks(this, program);
-        return Task.CompletedTask;
     }
 
-    /// <summary>Grants each compute environment hosting a referencing app the data-plane roles for the referenced services.</summary>
+    /// <summary>The short names (kept stable for existing stacks) of the roles granted by default.</summary>
+    private static readonly Dictionary<string, string> DefaultRoleNames = new()
+    {
+        [BlobDataContributorRoleId] = "Blob",
+        [QueueDataContributorRoleId] = "Queue",
+        [TableDataContributorRoleId] = "Table",
+    };
+
+    /// <summary>
+    /// Grants each compute environment hosting a referencing app the data-plane roles for the referenced services: the Blob, Queue
+    /// and Table Data Contributor roles matching what is referenced, or the roles given to <c>WithRoleAssignments</c> instead.
+    /// </summary>
     private void AddRoleAssignments(PulumiProgram program, PipelineStepContext ctx)
     {
-        var children = new List<(IResource Resource, string RoleId, string RoleName)>();
-        children.AddRange(BlobServices.Select(s => ((IResource)s, BlobDataContributorRoleId, "Blob")));
-        children.AddRange(BlobContainers.Select(s => ((IResource)s, BlobDataContributorRoleId, "Blob")));
-        children.AddRange(QueueServices.Select(s => ((IResource)s, QueueDataContributorRoleId, "Queue")));
-        children.AddRange(Queues.Select(s => ((IResource)s, QueueDataContributorRoleId, "Queue")));
-        children.AddRange(TableServices.Select(s => ((IResource)s, TableDataContributorRoleId, "Table")));
-
-        var wanted = new Dictionary<(IPulumiManagedIdentityResource Env, string Role), string>();
-        foreach (var app in ctx.Model.GetComputeResources())
-        {
-            var referenced = app.Annotations.OfType<ResourceRelationshipAnnotation>().Select(a => a.Resource).ToList();
-            var envs = app.Annotations.OfType<DeploymentTargetAnnotation>()
-                .Select(a => a.ComputeEnvironment).OfType<IPulumiManagedIdentityResource>();
-            foreach (var env in envs)
-            {
-                if (referenced.Contains(this))
-                {
-                    // Referencing the account itself grants all three data-plane roles.
-                    wanted[(env, "Blob")] = BlobDataContributorRoleId;
-                    wanted[(env, "Queue")] = QueueDataContributorRoleId;
-                    wanted[(env, "Table")] = TableDataContributorRoleId;
-                }
-                foreach (var (res, roleId, roleName) in children)
-                    if (referenced.Contains(res)) wanted[(env, roleName)] = roleId;
-            }
-        }
-
-        foreach (var ((env, roleName), roleId) in wanted)
+        foreach (var ((env, roleId), roleName) in ComputeRoleGrants(ctx.Model.GetComputeResources()))
         {
             var envId = PulumiAzureProgramExtensions.ToPulumiId(env.Name);
             program.AddRoleAssignment($"{Id}{envId}{roleName}RoleAssignment", env.PrincipalIdExpression, roleId, $"${{{Id}.id}}");
         }
+    }
+
+    /// <summary>The (compute environment identity, role definition id) pairs to grant, with the name used for each assignment.</summary>
+    internal Dictionary<(IPulumiManagedIdentityResource Env, string RoleId), string> ComputeRoleGrants(IEnumerable<IResource> computeResources)
+    {
+        var children = new List<(IResource Resource, string RoleId)>();
+        children.AddRange(BlobServices.Select(s => ((IResource)s, BlobDataContributorRoleId)));
+        children.AddRange(BlobContainers.Select(s => ((IResource)s, BlobDataContributorRoleId)));
+        children.AddRange(DataLakeServices.Select(s => ((IResource)s, BlobDataContributorRoleId)));
+        children.AddRange(DataLakeFileSystems.Select(s => ((IResource)s, BlobDataContributorRoleId)));
+        children.AddRange(QueueServices.Select(s => ((IResource)s, QueueDataContributorRoleId)));
+        children.AddRange(Queues.Select(s => ((IResource)s, QueueDataContributorRoleId)));
+        children.AddRange(TableServices.Select(s => ((IResource)s, TableDataContributorRoleId)));
+
+        // Keyed by role definition so two consumers (or a default and a custom grant) never create the same assignment twice.
+        var wanted = new Dictionary<(IPulumiManagedIdentityResource Env, string RoleId), string>();
+        foreach (var app in computeResources)
+        {
+            var referenced = app.Annotations.OfType<ResourceRelationshipAnnotation>().Select(a => a.Resource).ToList();
+            var referencesAccount = referenced.Contains(this);
+            var referencedChildren = children.Where(c => referenced.Contains(c.Resource)).ToList();
+            if (!referencesAccount && referencedChildren.Count == 0) continue;
+
+            var custom = app.Annotations.OfType<AzureStorageRoleAnnotation>().Where(a => a.Storage == this).ToList();
+            var roleIds = custom.Count > 0
+                ? custom.SelectMany(a => a.Roles).Select(r => (Id: AzureStorageRoles.RoleDefinitionId(r), Name: r.ToString())).ToList()
+                : (referencesAccount
+                    // Referencing the account itself grants all three data-plane roles.
+                    ? DefaultRoleNames.Select(kv => (Id: kv.Key, Name: kv.Value))
+                    : referencedChildren.Select(c => (Id: c.RoleId, Name: DefaultRoleNames[c.RoleId]))).ToList();
+
+            foreach (var env in app.Annotations.OfType<DeploymentTargetAnnotation>()
+                         .Select(a => a.ComputeEnvironment).OfType<IPulumiManagedIdentityResource>())
+                foreach (var (roleId, roleName) in roleIds)
+                    wanted.TryAdd((env, roleId), DefaultRoleNames.GetValueOrDefault(roleId, roleName));
+        }
+
+        return wanted;
     }
 }
 
@@ -265,3 +313,26 @@ public sealed class AzureQueueStorageQueueResource(string name, string queueName
 
 /// <summary>The service endpoints of an existing account, used for local runs.</summary>
 internal sealed record StorageRunEndpoints(ReferenceExpression Blob, ReferenceExpression Queue, ReferenceExpression Table, ReferenceExpression DataLake);
+
+/// <summary>Azure Data Lake Storage service of an <see cref="AzureStorageResource"/> (connection string = dfs endpoint). Not available with the emulator.</summary>
+public sealed class AzureDataLakeStorageResource(string name, AzureStorageResource parent) : Resource(name), IResourceWithConnectionString, IResourceWithParent<AzureStorageResource>
+{
+    public AzureStorageResource Parent { get; } = parent;
+
+    public ReferenceExpression ConnectionStringExpression => Parent.DataLakeConnection;
+
+    internal ReferenceExpression GetConnectionString(string? fileSystemName) =>
+        string.IsNullOrEmpty(fileSystemName)
+            ? ConnectionStringExpression
+            : ReferenceExpression.Create($"Endpoint={ConnectionStringExpression};FileSystemName={fileSystemName}");
+}
+
+/// <summary>A Data Lake file system, a blob container of a hierarchical-namespace account (connection string = <c>Endpoint=...;FileSystemName=...</c>).</summary>
+public sealed class AzureDataLakeStorageFileSystemResource(string name, string dataLakeFileSystemName, AzureDataLakeStorageResource parent) : Resource(name), IResourceWithConnectionString, IResourceWithParent<AzureDataLakeStorageResource>
+{
+    public AzureDataLakeStorageResource Parent { get; } = parent;
+    public string DataLakeFileSystemName { get; } = dataLakeFileSystemName;
+    internal string Id => PulumiAzureProgramExtensions.ToPulumiId(Name);
+
+    public ReferenceExpression ConnectionStringExpression => Parent.GetConnectionString(DataLakeFileSystemName);
+}

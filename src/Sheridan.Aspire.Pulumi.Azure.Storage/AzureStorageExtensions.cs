@@ -123,6 +123,8 @@ public static class AzureStorageExtensions
             throw new InvalidOperationException("The Azure Storage resource is already configured to run as an emulator.");
         if (builder.Resource.RunEndpoints is not null)
             throw new InvalidOperationException("The Azure Storage resource is already configured with RunAsExisting.");
+        if (builder.Resource.IsHnsEnabled)
+            throw new InvalidOperationException("Emulator currently does not support data lake.");
         if (builder.ApplicationBuilder.ExecutionContext.IsPublishMode) return builder;
 
         var emulator = new AzureStorageEmulatorResource(builder.Resource);
@@ -234,6 +236,71 @@ public static class AzureStorageExtensions
         var resource = new AzureTableStorageResource(name, builder.Resource);
         builder.Resource.TableServices.Add(resource);
         return builder.ApplicationBuilder.AddResource(resource).WithParentRelationship(builder).ExcludeFromManifest();
+    }
+
+    /// <summary>
+    /// Adds the Data Lake service of the storage account. This enables the account's hierarchical namespace (Data Lake Storage Gen2),
+    /// which the emulator does not support.
+    /// </summary>
+    public static IResourceBuilder<AzureDataLakeStorageResource> AddDataLake(this IResourceBuilder<AzureStorageResource> builder, string name)
+    {
+        ArgumentNullException.ThrowIfNull(builder);
+        ArgumentException.ThrowIfNullOrEmpty(name);
+        var service = CreateDataLakeService(builder, name);
+        builder.Resource.ImplicitDataLakeService ??= service;
+        return service;
+    }
+
+    private static IResourceBuilder<AzureDataLakeStorageResource> CreateDataLakeService(IResourceBuilder<AzureStorageResource> builder, string name)
+    {
+        EnableDataLake(builder.Resource);
+        var resource = new AzureDataLakeStorageResource(name, builder.Resource);
+        builder.Resource.DataLakeServices.Add(resource);
+        return builder.ApplicationBuilder.AddResource(resource).WithParentRelationship(builder).ExcludeFromManifest();
+    }
+
+    private static void EnableDataLake(AzureStorageResource storage)
+    {
+        if (storage.Emulator is not null)
+            throw new InvalidOperationException("Emulator currently does not support data lake.");
+        storage.IsHnsEnabled = true;
+    }
+
+    /// <summary>
+    /// Adds a Data Lake file system to the storage account (<paramref name="dataLakeFileSystemName"/> defaults to <paramref name="name"/>).
+    /// It is provisioned as a blob container of the hierarchical-namespace account. A Data Lake service named
+    /// <c>{storage name}-data-lake</c> is added when <see cref="AddDataLake"/> was not called.
+    /// </summary>
+    public static IResourceBuilder<AzureDataLakeStorageFileSystemResource> AddDataLakeFileSystem(
+        this IResourceBuilder<AzureStorageResource> builder, string name, string? dataLakeFileSystemName = null)
+    {
+        ArgumentNullException.ThrowIfNull(builder);
+        ArgumentException.ThrowIfNullOrEmpty(name);
+        EnableDataLake(builder.Resource);
+
+        var parent = builder.Resource.ImplicitDataLakeService ??= CreateDataLakeService(builder, builder.Resource.Name + "-data-lake");
+        var resource = new AzureDataLakeStorageFileSystemResource(name, dataLakeFileSystemName ?? name, parent.Resource);
+        builder.Resource.DataLakeFileSystems.Add(resource);
+        return builder.ApplicationBuilder.AddResource(resource).WithParentRelationship(parent).ExcludeFromManifest();
+    }
+
+    /// <summary>
+    /// Assigns <paramref name="roles"/> on the storage account to the compute environment identity hosting <paramref name="builder"/>,
+    /// replacing the default Blob, Queue and Table Data Contributor assignments. Pass no roles to assign none.
+    /// Mirrors <c>WithRoleAssignments</c>.
+    /// </summary>
+    public static IResourceBuilder<T> WithRoleAssignments<T>(
+        this IResourceBuilder<T> builder, IResourceBuilder<AzureStorageResource> target, params AzureStorageRole[] roles)
+        where T : IResource
+    {
+        ArgumentNullException.ThrowIfNull(builder);
+        ArgumentNullException.ThrowIfNull(target);
+        roles ??= [];
+        foreach (var role in roles)
+        {
+            if (!Enum.IsDefined(role)) throw new ArgumentException($"'{role}' is not a valid {nameof(AzureStorageRole)} value.", nameof(roles));
+        }
+        return builder.WithAnnotation(new AzureStorageRoleAnnotation(target.Resource, roles));
     }
 
     /// <summary>Adds a blob container to the storage account (<paramref name="blobContainerName"/> defaults to <paramref name="name"/>).</summary>
