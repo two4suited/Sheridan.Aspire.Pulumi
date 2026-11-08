@@ -53,7 +53,7 @@ The package id equals the folder name under `src/`, and namespaces match the pac
 |  | [`Sheridan.Aspire.Pulumi.Azure.Sql`](src/Sheridan.Aspire.Pulumi.Azure.Sql) | Azure SQL |
 |  | [`Sheridan.Aspire.Pulumi.Azure.PostgreSQL`](src/Sheridan.Aspire.Pulumi.Azure.PostgreSQL) | PostgreSQL flexible server |
 |  | [`Sheridan.Aspire.Pulumi.Azure.Redis`](src/Sheridan.Aspire.Pulumi.Azure.Redis) | Azure Cache for Redis / Managed Redis |
-|  | [`Sheridan.Aspire.Pulumi.Azure.Storage`](src/Sheridan.Aspire.Pulumi.Azure.Storage) | Blobs, queues, tables |
+|  | [`Sheridan.Aspire.Pulumi.Azure.Storage`](src/Sheridan.Aspire.Pulumi.Azure.Storage) | Blobs, queues, tables, Data Lake (Azurite emulator or existing account for local runs) |
 |  | [`Sheridan.Aspire.Pulumi.Azure.Kusto`](src/Sheridan.Aspire.Pulumi.Azure.Kusto) | Azure Data Explorer |
 |  | [`Sheridan.Aspire.Pulumi.Azure.Search`](src/Sheridan.Aspire.Pulumi.Azure.Search) | Azure AI Search |
 | Messaging | [`Sheridan.Aspire.Pulumi.Azure.ServiceBus`](src/Sheridan.Aspire.Pulumi.Azure.ServiceBus) | Service Bus |

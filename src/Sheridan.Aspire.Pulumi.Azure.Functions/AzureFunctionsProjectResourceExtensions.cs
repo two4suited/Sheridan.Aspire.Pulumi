@@ -75,7 +75,13 @@ public static class AzureFunctionsProjectResourceExtensions
             {
                 if (fn.HostStorage == storage) implicitStorageUsed = true;
                 // Referencing the account is what makes the Storage integration grant the compute identity the data roles.
-                if (fn.HostStorage is not null) builder.CreateResourceBuilder(fn).WithReferenceRelationship(fn.HostStorage);
+                if (fn.HostStorage is not null)
+                {
+                    builder.CreateResourceBuilder(fn).WithReferenceRelationship(fn.HostStorage);
+                    // The storage package's own wait runs before this relationship exists, so wait for Azurite here.
+                    if (fn.HostStorage.Emulator is not null && !fn.Annotations.OfType<WaitAnnotation>().Any(w => w.Resource == fn.HostStorage))
+                        fn.Annotations.Add(new WaitAnnotation(fn.HostStorage, WaitType.WaitUntilHealthy));
+                }
             }
 
             if (!implicitStorageUsed)
