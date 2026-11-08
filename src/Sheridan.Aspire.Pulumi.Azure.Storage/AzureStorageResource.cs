@@ -24,6 +24,9 @@ public sealed class AzureStorageResource(string name) : PulumiAzureResource(name
     /// <summary>True once <c>AddDataLake</c>/<c>AddDataLakeFileSystem</c> was called: the account is created with a hierarchical namespace (Data Lake Storage Gen2). Not supported by the emulator.</summary>
     public bool IsHnsEnabled { get; internal set; }
 
+    /// <summary>True once <c>RunAsEmulator</c> was called, also when publishing (where no emulator resource is created).</summary>
+    internal bool EmulatorRequested { get; set; }
+
     /// <summary>The first Data Lake service added (or created on demand by <c>AddDataLakeFileSystem</c>); the parent of file systems added to the account.</summary>
     internal IResourceBuilder<AzureDataLakeStorageResource>? ImplicitDataLakeService { get; set; }
 
@@ -233,9 +236,10 @@ public sealed class AzureStorageResource(string name) : PulumiAzureResource(name
             var referenced = app.Annotations.OfType<ResourceRelationshipAnnotation>().Select(a => a.Resource).ToList();
             var referencesAccount = referenced.Contains(this);
             var referencedChildren = children.Where(c => referenced.Contains(c.Resource)).ToList();
-            if (!referencesAccount && referencedChildren.Count == 0) continue;
-
             var custom = app.Annotations.OfType<AzureStorageRoleAnnotation>().Where(a => a.Storage == this).ToList();
+            // Explicit WithRoleAssignments applies on its own (as upstream); the defaults need a reference.
+            if (!referencesAccount && referencedChildren.Count == 0 && custom.Count == 0) continue;
+
             var roleIds = custom.Count > 0
                 ? custom.SelectMany(a => a.Roles).Select(r => (Id: AzureStorageRoles.RoleDefinitionId(r), Name: r.ToString())).ToList()
                 : (referencesAccount

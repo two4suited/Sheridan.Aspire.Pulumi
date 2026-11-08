@@ -83,6 +83,8 @@ public sealed class StorageExistingTests
     [InlineData("acct.blob.core.windows.net", "acct", "core.windows.net")]
     [InlineData("https://acct.queue.core.windows.net/", "acct", "core.windows.net")]
     [InlineData("https://acct.blob.core.chinacloudapi.cn:443/", "acct", "core.chinacloudapi.cn")]
+    [InlineData("Acct.privatelink.blob.core.windows.net", "acct", "core.windows.net")]
+    [InlineData("acct.dfs.core.usgovcloudapi.net", "acct", "core.usgovcloudapi.net")]
     public void RunAsExisting_accepts_a_name_host_or_url(string value, string account, string suffix)
     {
         Assert.Equal((account, suffix), AzureStorageExtensions.ParseAccount(value));

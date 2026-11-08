@@ -45,8 +45,9 @@ public static class AzureStorageExtensions
     /// so no generated Pulumi project or deployed stack output is needed. Clients authenticate with the developer's Azure credentials.
     /// No effect in publish mode.
     /// </summary>
+    /// <param name="resourceGroup">Accepted for signature parity with the official <c>RunAsExisting</c>; the data plane is addressed by account name, so it is not used.</param>
     public static IResourceBuilder<AzureStorageResource> RunAsExisting(
-        this IResourceBuilder<AzureStorageResource> builder, string accountNameOrEndpoint)
+        this IResourceBuilder<AzureStorageResource> builder, string accountNameOrEndpoint, string? resourceGroup = null)
     {
         ArgumentNullException.ThrowIfNull(builder);
         ArgumentException.ThrowIfNullOrEmpty(accountNameOrEndpoint);
@@ -54,7 +55,7 @@ public static class AzureStorageExtensions
         return builder.RunAsExistingCore(Endpoints(account, suffix));
     }
 
-    /// <summary>Like <see cref="RunAsExisting(IResourceBuilder{AzureStorageResource}, string)"/> with the storage account name supplied by a parameter.</summary>
+    /// <summary>Like <see cref="RunAsExisting(IResourceBuilder{AzureStorageResource}, string, string)"/> with the storage account name supplied by a parameter.</summary>
     public static IResourceBuilder<AzureStorageResource> RunAsExisting(
         this IResourceBuilder<AzureStorageResource> builder, IResourceBuilder<ParameterResource> accountName)
     {
@@ -92,10 +93,11 @@ public static class AzureStorageExtensions
     /// <summary>Splits an account name, a host (<c>acct.blob.core.windows.net</c>) or a URL into the account name and the endpoint suffix (<c>core.windows.net</c>).</summary>
     internal static (string Account, string Suffix) ParseAccount(string value)
     {
-        var host = value.Contains("://", StringComparison.Ordinal) ? new Uri(value).Host : value.Trim().TrimEnd('/');
+        var host = (value.Contains("://", StringComparison.Ordinal) ? new Uri(value).Host : value.Trim().TrimEnd('/')).ToLowerInvariant();
         var labels = host.Split('.');
-        // acct.<service>.<suffix...>: keep the cloud's suffix (core.windows.net, core.chinacloudapi.cn, ...).
-        return labels.Length >= 4 ? (labels[0], string.Join('.', labels.Skip(2))) : (labels[0], "core.windows.net");
+        // acct[.privatelink].<service>.<suffix...>: keep the cloud's suffix (core.windows.net, core.chinacloudapi.cn, ...).
+        var service = labels.Length > 1 ? Array.FindIndex(labels, 1, l => l is "blob" or "queue" or "table" or "dfs" or "file" or "web") : -1;
+        return service > 0 && service < labels.Length - 1 ? (labels[0], string.Join('.', labels.Skip(service + 1))) : (labels[0], "core.windows.net");
     }
 
     /// <summary>Overrides the storage SKU (default Standard_GRS).</summary>
@@ -125,6 +127,7 @@ public static class AzureStorageExtensions
             throw new InvalidOperationException("The Azure Storage resource is already configured with RunAsExisting.");
         if (builder.Resource.IsHnsEnabled)
             throw new InvalidOperationException("Emulator currently does not support data lake.");
+        builder.Resource.EmulatorRequested = true;
         if (builder.ApplicationBuilder.ExecutionContext.IsPublishMode) return builder;
 
         var emulator = new AzureStorageEmulatorResource(builder.Resource);
@@ -263,7 +266,7 @@ public static class AzureStorageExtensions
 
     private static void EnableDataLake(AzureStorageResource storage)
     {
-        if (storage.Emulator is not null)
+        if (storage.Emulator is not null || storage.EmulatorRequested)
             throw new InvalidOperationException("Emulator currently does not support data lake.");
         storage.IsHnsEnabled = true;
     }

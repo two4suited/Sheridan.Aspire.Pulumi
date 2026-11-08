@@ -188,6 +188,23 @@ public sealed class StorageResourcesTests
     }
 
     [Fact]
+    public void WithRoleAssignments_applies_without_a_reference()
+    {
+        var builder = DistributedApplication.CreateBuilder();
+        var storage = Storage(builder);
+        var app = HostedApp(builder, "app", new FakeEnvironment("env")).App.WithRoleAssignments(storage, AzureStorageRole.StorageBlobDataReader);
+        Assert.Equal(["env:StorageBlobDataReader"], Grants(storage.Resource, app.Resource));
+    }
+
+    [Fact]
+    public void RunAsEmulator_then_data_lake_throws_even_when_publishing()
+    {
+        var builder = DistributedApplication.CreateBuilder(new DistributedApplicationOptions { Args = ["--publisher", "manifest"], DisableDashboard = true });
+        var storage = builder.AddPulumiStorage("storage").RunAsEmulator();
+        Assert.Throws<InvalidOperationException>(() => storage.AddDataLake("lake"));
+    }
+
+    [Fact]
     public void Role_definitions_are_distinct_and_cover_every_role()
     {
         var ids = Enum.GetValues<AzureStorageRole>().Select(AzureStorageRoles.RoleDefinitionId).ToList();
