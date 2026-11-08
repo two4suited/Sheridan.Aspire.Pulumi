@@ -46,7 +46,7 @@ var sb = builder.AddPulumiServiceBus("messaging")
 sb.AddServiceBusQueue("orders");
 ```
 
-`resourceGroupName` is optional; when omitted the resource group configured for the resource (`WithResourceGroup` / `WithExistingResourceGroup`) is used. `ConfigureInfrastructure(...).ServiceBusNamespace` throws for an existing namespace, and `WithSku` is ignored.
+`resourceGroupName` is optional, but a group must be resolvable: when omitted, call `WithExistingResourceGroup` / `WithResourceGroup`, otherwise program generation throws. A group passed to `AsExisting` is always the one used for the lookup and the child entities. `ConfigureInfrastructure(...).ServiceBusNamespace` throws for an existing namespace, and `WithSku` is ignored.
 
 ## Notes
 

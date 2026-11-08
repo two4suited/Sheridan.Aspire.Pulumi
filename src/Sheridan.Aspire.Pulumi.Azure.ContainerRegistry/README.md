@@ -41,7 +41,7 @@ var acr = builder.AddPulumiAzureContainerRegistry("acr")
     .AsExisting("sharedacr", "shared-rg");   // name, resource group
 ```
 
-`resourceGroupName` is optional; when omitted the resource group configured for the resource (`WithResourceGroup` / `WithExistingResourceGroup`) is used.
+`resourceGroupName` is optional, but a group must be resolvable: when omitted, call `WithExistingResourceGroup` / `WithResourceGroup`, otherwise program generation throws. A group passed to `AsExisting` is always the one used for the lookup.
 
 ## Learn more
 

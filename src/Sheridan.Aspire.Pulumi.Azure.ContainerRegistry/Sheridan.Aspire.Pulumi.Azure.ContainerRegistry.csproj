@@ -20,4 +20,8 @@
     <ProjectReference Include="..\Sheridan.Aspire.Pulumi.Azure\Sheridan.Aspire.Pulumi.Azure.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="Sheridan.Aspire.Pulumi.Tests" />
+  </ItemGroup>
+
 </Project>

@@ -22,6 +22,9 @@ public sealed class AzureServiceBusResource(string name) : PulumiAzureResource(n
     /// <summary>Name of an existing namespace (set by <c>AsExisting</c>/<c>PublishAsExisting</c>); when set, the namespace itself is not created.</summary>
     public string? ExistingNamespaceName { get; internal set; }
 
+    /// <summary>Resource group of the existing namespace (set by <c>AsExisting</c>); null means the resource group configured for this resource.</summary>
+    public string? ExistingNamespaceResourceGroup { get; internal set; }
+
     public List<AzureServiceBusQueueResource> Queues { get; } = [];
     public List<AzureServiceBusTopicResource> Topics { get; } = [];
 
@@ -37,21 +40,29 @@ public sealed class AzureServiceBusResource(string name) : PulumiAzureResource(n
 
     public ReferenceExpression ConnectionStringExpression => ReferenceExpression.Create($"{ServiceBusEndpoint}");
 
+    /// <summary>Emits the <c>getNamespace</c> lookup (under the namespace's id) and returns the resource group the namespace and its children live in.</summary>
+    internal string AddExistingLookup(PulumiProgram program, string rg)
+    {
+        if (ExistingNamespaceResourceGroup is null && !HasConfiguredResourceGroup)
+            throw new InvalidOperationException(
+                $"'{Name}' is an existing Service Bus namespace but no resource group is known. Pass resourceGroupName to AsExisting/PublishAsExisting, or call WithExistingResourceGroup/WithResourceGroup.");
+        rg = ExistingNamespaceResourceGroup ?? rg;
+        // The lookup variable shares the namespace's id, so ${id}.name / .id / .serviceBusEndpoint resolve as for a created namespace.
+        program.Variables[Id] = new Dictionary<string, object?>
+        {
+            ["fn::invoke"] = new Dictionary<string, object?>
+            {
+                ["function"] = "azure-native:servicebus:getNamespace",
+                ["arguments"] = new Dictionary<string, object?> { ["resourceGroupName"] = rg, ["namespaceName"] = ExistingNamespaceName },
+            },
+        };
+        return rg;
+    }
+
     protected override Task ContributeResourcesAsync(PulumiProgram program, PipelineStepContext context, string rg, string location)
     {
-        if (ExistingNamespaceName is { } existing)
-        {
-            // Look the namespace up instead of creating it; the lookup variable shares the namespace's id, so
-            // ${id}.name / .id / .serviceBusEndpoint resolve exactly as they do for a created namespace.
-            program.Variables[Id] = new Dictionary<string, object?>
-            {
-                ["fn::invoke"] = new Dictionary<string, object?>
-                {
-                    ["function"] = "azure-native:servicebus:getNamespace",
-                    ["arguments"] = new Dictionary<string, object?> { ["resourceGroupName"] = rg, ["namespaceName"] = existing },
-                },
-            };
-        }
+        if (ExistingNamespaceName is not null)
+            rg = AddExistingLookup(program, rg);
         else
         // Named by the naming layer ({project}-{resource}-{stack}, normalised for ServiceBusNamespace); override with WithAzureName.
         program.AddInfraResource(Id, "azure-native:servicebus:Namespace", new()

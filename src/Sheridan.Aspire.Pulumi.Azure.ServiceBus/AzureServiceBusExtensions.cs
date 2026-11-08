@@ -31,6 +31,8 @@ public static class AzureServiceBusExtensions
         ArgumentException.ThrowIfNullOrEmpty(existingResourceName);
         if (resourceGroupName is not null) ArgumentException.ThrowIfNullOrEmpty(resourceGroupName);
         builder.Resource.ExistingNamespaceName = existingResourceName;
+        builder.Resource.ExistingNamespaceResourceGroup = resourceGroupName;
+        // Also marks a resource group as configured so none is created just for the lookup.
         if (resourceGroupName is not null) builder.Resource.ExistingResourceGroup = resourceGroupName;
         return builder;
     }

@@ -85,6 +85,9 @@ public sealed class AzureContainerAppEnvironmentResource : PulumiAzureResource, 
     /// <summary>Whether the Aspire dashboard component is added to the environment (see <c>WithDashboard</c>); default true as upstream.</summary>
     public bool DashboardEnabled { get; set; } = true;
 
+    /// <summary>True once <c>WithDashboard</c> was called explicitly.</summary>
+    internal bool DashboardConfigured { get; set; }
+
     private PulumiStackResource? _resolvedStack;
 
     private string IdentityRef => PullIdentity?.Id ?? $"{Id}Identity";
@@ -169,6 +172,39 @@ public sealed class AzureContainerAppEnvironmentResource : PulumiAzureResource, 
         return Task.CompletedTask;
     }
 
+    /// <summary>Rejects settings that can't apply to an existing environment.</summary>
+    internal void ValidateExisting(string rg)
+    {
+        if (ExistingEnvironmentResourceGroup is null && !HasConfiguredResourceGroup)
+            throw new InvalidOperationException(
+                $"'{Name}' is an existing Container Apps environment but no resource group is known. Pass resourceGroupName to AsExisting/PublishAsExisting, or call WithExistingResourceGroup/WithResourceGroup.");
+        if (DashboardConfigured && DashboardEnabled)
+            throw new InvalidOperationException(
+                $"'{Name}' is an existing Container Apps environment; the Aspire dashboard component can't be added to it. Remove WithDashboard.");
+        if (Registry is null)
+            throw new InvalidOperationException(
+                $"'{Name}' is an existing Container Apps environment, so it has no registry of its own to push images to. " +
+                "Call WithAzureContainerRegistry with a registry (use AsExisting on AddPulumiAzureContainerRegistry to reuse an existing one).");
+        if (LogAnalyticsWorkspace is not null || Annotations.OfType<PulumiDelegatedSubnetAnnotation>().Any() || Annotations.OfType<PulumiPrivateLinkTargetAnnotation>().Any())
+            throw new InvalidOperationException(
+                $"'{Name}' is an existing Container Apps environment; its Log Analytics workspace, subnet and private link settings can't be changed from here.");
+    }
+
+    /// <summary>Emits the <c>getManagedEnvironment</c> lookup under the environment's id, so ${id}.id / .name / .defaultDomain / .location resolve as for a created environment.</summary>
+    internal void AddExistingLookup(PulumiProgram program, string rg) =>
+        program.Variables[Id] = new Dictionary<string, object?>
+        {
+            ["fn::invoke"] = new Dictionary<string, object?>
+            {
+                ["function"] = "azure-native:app:getManagedEnvironment",
+                ["arguments"] = new Dictionary<string, object?>
+                {
+                    ["resourceGroupName"] = ExistingEnvironmentResourceGroup ?? rg,
+                    ["environmentName"] = ExistingEnvironmentName,
+                },
+            },
+        };
+
     protected override async Task ContributeResourcesAsync(PulumiProgram program, PipelineStepContext ctx, string rg, string location)
     {
         var stack = _resolvedStack ?? ResolveStack(ctx);
@@ -179,16 +215,7 @@ public sealed class AzureContainerAppEnvironmentResource : PulumiAzureResource, 
         program.AddClientConfig();
 
         var existing = ExistingEnvironmentName is not null;
-        if (existing)
-        {
-            if (Registry is null)
-                throw new InvalidOperationException(
-                    $"'{Name}' is an existing Container Apps environment, so it has no registry of its own to push images to. " +
-                    "Call WithAzureContainerRegistry with a registry (use AsExisting on AddPulumiAzureContainerRegistry to reuse an existing one).");
-            if (LogAnalyticsWorkspace is not null || Annotations.OfType<PulumiDelegatedSubnetAnnotation>().Any() || Annotations.OfType<PulumiPrivateLinkTargetAnnotation>().Any())
-                throw new InvalidOperationException(
-                    $"'{Name}' is an existing Container Apps environment; its Log Analytics workspace, subnet and private link settings can't be changed from here.");
-        }
+        if (existing) ValidateExisting(rg);
 
         // Log Analytics: the environment's own workspace (upstream '{name}-law') unless one was supplied.
         string lawName = "", lawId = "", lawCustomerId = "", lawResourceGroup = "";
@@ -274,22 +301,7 @@ public sealed class AzureContainerAppEnvironmentResource : PulumiAzureResource, 
         program.AddRoleAssignment($"{Id}AcrPull", $"${{{IdentityRef}.principalId}}", AcrPullRoleId, $"${{{RegistryRef}.id}}");
 
         if (existing)
-        {
-            // Look the environment up instead of creating it; the lookup variable shares the environment's id, so
-            // ${id}.id / .name / .defaultDomain resolve exactly as they do for a created environment.
-            program.Variables[Id] = new Dictionary<string, object?>
-            {
-                ["fn::invoke"] = new Dictionary<string, object?>
-                {
-                    ["function"] = "azure-native:app:getManagedEnvironment",
-                    ["arguments"] = new Dictionary<string, object?>
-                    {
-                        ["resourceGroupName"] = ExistingEnvironmentResourceGroup ?? rg,
-                        ["environmentName"] = ExistingEnvironmentName,
-                    },
-                },
-            };
-        }
+            AddExistingLookup(program, rg);
         else
         {
         var properties = new Dictionary<string, object?>
@@ -353,8 +365,8 @@ public sealed class AzureContainerAppEnvironmentResource : PulumiAzureResource, 
         program.Outputs[$"{Id}Id"] = $"${{{Id}.id}}";
         program.Outputs[$"{Id}Name"] = $"${{{Id}.name}}";
         program.Outputs[$"{Id}DefaultDomain"] = $"${{{Id}.defaultDomain}}";
-        program.Outputs[$"{Id}Location"] = location;
-        program.Outputs[$"{Id}ResourceGroup"] = rg;
+        program.Outputs[$"{Id}Location"] = existing ? $"${{{Id}.location}}" : location;
+        program.Outputs[$"{Id}ResourceGroup"] = existing ? ExistingEnvironmentResourceGroup ?? rg : rg;
         program.Outputs[$"{Id}SubscriptionId"] = PulumiAzureProgramExtensions.SubscriptionId;
         program.Outputs[$"{Id}RegistryName"] = $"${{{RegistryRef}.name}}";
         program.Outputs[$"{Id}RegistryLoginServer"] = $"${{{RegistryRef}.loginServer}}";
@@ -368,7 +380,7 @@ public sealed class AzureContainerAppEnvironmentResource : PulumiAzureResource, 
         foreach (var r in ctx.Model.GetComputeResources().Where(IsTargeted))
         {
             var job = r.Annotations.OfType<PulumiContainerAppJobAnnotation>().LastOrDefault();
-            program.AddAppResource(AppId(r), await BuildContainerAppAsync(r, job, stack, rg, ctx));
+            program.AddAppResource(AppId(r), await BuildContainerAppAsync(r, job, stack, rg, ctx, existing));
         }
 
         Provisioning.PulumiInfrastructureExtensions.ApplyInfrastructureCallbacks(this, program);
@@ -387,7 +399,7 @@ public sealed class AzureContainerAppEnvironmentResource : PulumiAzureResource, 
     internal static string AppId(string computeResourceName) => PulumiAzureProgramExtensions.ToPulumiId(computeResourceName) + "App";
 
     private async Task<Dictionary<string, object?>> BuildContainerAppAsync(
-        IResource r, PulumiContainerAppJobAnnotation? job, PulumiStackResource stack, string rg, PipelineStepContext ctx)
+        IResource r, PulumiContainerAppJobAnnotation? job, PulumiStackResource stack, string rg, PipelineStepContext ctx, bool existingEnvironment)
     {
         var appName = ContainerAppName(r.Name, job is not null);
         var imageName = r.Name.ToLowerInvariant();
@@ -488,7 +500,7 @@ public sealed class AzureContainerAppEnvironmentResource : PulumiAzureResource, 
                 configuration["manualTriggerConfig"] = new Dictionary<string, object?> { ["parallelism"] = 1, ["replicaCompletionCount"] = 1 };
             }
 
-            return new()
+            var jobResource = new Dictionary<string, object?>
             {
                 ["type"] = "azure-native:app:Job",
                 ["properties"] = new Dictionary<string, object?>
@@ -502,6 +514,8 @@ public sealed class AzureContainerAppEnvironmentResource : PulumiAzureResource, 
                 },
                 ["options"] = options,
             };
+            if (existingEnvironment) ((Dictionary<string, object?>)jobResource["properties"]!)["location"] = $"${{{Id}.location}}";
+            return jobResource;
         }
 
         var appConfiguration = new Dictionary<string, object?>
@@ -539,6 +553,9 @@ public sealed class AzureContainerAppEnvironmentResource : PulumiAzureResource, 
             },
             ["options"] = options,
         };
+
+        // An app must live in its environment's region, which may differ from the stack's.
+        if (existingEnvironment) ((Dictionary<string, object?>)app["properties"]!)["location"] = $"${{{Id}.location}}";
 
         // Integrations (e.g. Azure Functions: kind=functionapp) tailor the generated container app.
         foreach (var customize in r.Annotations.OfType<PulumiContainerAppCustomizationAnnotation>())

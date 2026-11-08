@@ -36,7 +36,7 @@ builder.Build().Run();
 
 ## Deploying into an existing environment
 
-`AsExisting` (alias `PublishAsExisting`) looks up a managed environment created elsewhere with `azure-native:app:getManagedEnvironment` instead of creating it (no managed environment, Log Analytics workspace or dashboard is created). Container apps and jobs, the ACR pull identity and its AcrPull assignment are still created. The environment has no registry of its own in this mode, so pair it with `WithAzureContainerRegistry` (typically an `AsExisting` registry from the ContainerRegistry package). `WithAzureLogAnalyticsWorkspace`, `WithDelegatedSubnet` and Front Door private link aren't allowed with an existing environment.
+`AsExisting` (alias `PublishAsExisting`) looks up a managed environment created elsewhere with `azure-native:app:getManagedEnvironment` instead of creating it (no managed environment, Log Analytics workspace or dashboard is created). Container apps and jobs, the ACR pull identity and its AcrPull assignment are still created. The environment has no registry of its own in this mode, so pair it with `WithAzureContainerRegistry` (typically an `AsExisting` registry from the ContainerRegistry package). `WithAzureLogAnalyticsWorkspace`, `WithDelegatedSubnet`, Front Door private link and `WithDashboard(true)` aren't allowed with an existing environment (they throw at generation). Container apps and jobs are created in the existing environment's region (`location` is taken from the lookup).
 
 ```csharp
 var acr = builder.AddPulumiAzureContainerRegistry("acr").AsExisting("sharedacr", "shared-rg");
@@ -45,7 +45,7 @@ var env = builder.AddPulumiAzureContainerAppEnvironment("aca-env")
     .WithAzureContainerRegistry(acr);
 ```
 
-The apps and identity are created in the resource group configured for the resource (`WithResourceGroup` / `WithExistingResourceGroup`; by default a new one), which can differ from the environment's.
+The apps and identity are created in the resource group configured for the resource (`WithResourceGroup` / `WithExistingResourceGroup`; by default a new one), which can differ from the environment's. If `resourceGroupName` is omitted, a configured group is required (otherwise generation throws), and it is also used for the lookup.
 
 ## Learn more
 

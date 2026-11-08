@@ -34,6 +34,8 @@ public static class AzureContainerRegistryExtensions
         ArgumentException.ThrowIfNullOrEmpty(existingResourceName);
         if (resourceGroupName is not null) ArgumentException.ThrowIfNullOrEmpty(resourceGroupName);
         builder.Resource.ExistingRegistryName = existingResourceName;
+        builder.Resource.ExistingRegistryResourceGroup = resourceGroupName;
+        // Also marks a resource group as configured so none is created just for the lookup.
         if (resourceGroupName is not null) builder.Resource.ExistingResourceGroup = resourceGroupName;
         return builder;
     }

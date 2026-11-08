@@ -97,6 +97,7 @@ public static class AzureContainerAppEnvironmentExtensions
     {
         ArgumentNullException.ThrowIfNull(builder);
         builder.Resource.DashboardEnabled = enable;
+        builder.Resource.DashboardConfigured = true;
         return builder;
     }
 
