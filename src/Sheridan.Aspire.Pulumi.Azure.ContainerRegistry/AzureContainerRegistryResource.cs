@@ -22,6 +22,12 @@ public sealed class AzureContainerRegistryRoleAssignmentAnnotation(
 /// </summary>
 public sealed class AzureContainerRegistryResource(string name) : PulumiAzureResource(name), IContainerRegistry
 {
+    /// <summary>Name of an existing registry (set by <c>AsExisting</c>/<c>PublishAsExisting</c>); when set, the registry itself is not created.</summary>
+    public string? ExistingRegistryName { get; internal set; }
+
+    /// <summary>Resource group of the existing registry (set by <c>AsExisting</c>); null means the resource group configured for this resource.</summary>
+    public string? ExistingRegistryResourceGroup { get; internal set; }
+
     public List<AzureContainerRegistryPurgeTask> PurgeTasks { get; } = [];
 
     public PulumiOutputReference NameOutputReference => Output(Stack ?? throw Unbound(), "Name");
@@ -33,8 +39,33 @@ public sealed class AzureContainerRegistryResource(string name) : PulumiAzureRes
 
     private InvalidOperationException Unbound() => new($"'{Name}' has not been bound to a Pulumi stack; call WithPulumiStack().");
 
+    /// <summary>Emits the <c>getRegistry</c> lookup under the registry's id, so ${id}.name / .id / .loginServer resolve as for a created registry.</summary>
+    internal void AddExistingLookup(PulumiProgram program, string resourceGroup)
+    {
+        if (ExistingRegistryResourceGroup is null && !HasConfiguredResourceGroup)
+            throw new InvalidOperationException(
+                $"'{Name}' is an existing container registry but no resource group is known. Pass resourceGroupName to AsExisting/PublishAsExisting, or call WithExistingResourceGroup/WithResourceGroup.");
+        if (PurgeTasks.Count > 0)
+            throw new InvalidOperationException($"'{Name}' is an existing registry; purge tasks are not applied to existing registries. Remove WithPurgeTask.");
+        program.Variables[Id] = new Dictionary<string, object?>
+        {
+            ["fn::invoke"] = new Dictionary<string, object?>
+            {
+                ["function"] = "azure-native:containerregistry:getRegistry",
+                ["arguments"] = new Dictionary<string, object?>
+                {
+                    ["resourceGroupName"] = ExistingRegistryResourceGroup ?? resourceGroup,
+                    ["registryName"] = ExistingRegistryName,
+                },
+            },
+        };
+    }
+
     protected override Task ContributeResourcesAsync(PulumiProgram program, PipelineStepContext context, string resourceGroup, string location)
     {
+        if (ExistingRegistryName is not null)
+            AddExistingLookup(program, resourceGroup);
+        else
         // Registry names are global and alphanumeric only: {project}{name}{stack}, shortened with a hash when too long.
         program.AddInfraResource(Id, "azure-native:containerregistry:Registry", new()
         {
