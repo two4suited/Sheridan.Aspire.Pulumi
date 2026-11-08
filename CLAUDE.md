@@ -25,6 +25,10 @@ Every new project under `src/` must also be wired into the docs and the release 
 - **Description**: give the csproj a short `<Description>` (2–3 sentences: what it provisions, the `AddPulumiX` entry point, and a link to the package README). Keep it brief; GitHub renders it as one plain-text block. nuget.org renders each package's embedded README (and shows the description); GitHub Packages doesn't (it shows the repo README on the package page and only the description on the version page).
 - After a release tag, verify the new package shows up in the workflow's `ls -1 artifacts` output and on nuget.org (`https://www.nuget.org/packages/<PackageId>`; new packages can take up to an hour to validate and index). nuget.org publishing uses trusted publishing (OIDC) via the `NUGET_USER` repo variable; no API key is stored.
 
+### Release notes
+
+After a release tag is published, `.github/workflows/release-notes.yml` (triggered by the "Publish packages" workflow completing) copies the GitHub Release body into `docs/src/content/docs/reference/release-notes.md` via `docs/scripts/add-release-notes.mjs` and opens a `release-notes/<tag>` PR against `main`; merging it redeploys the docs. It needs "Allow GitHub Actions to create and approve pull requests" enabled in repo settings. Backfill an older tag with the workflow's manual `tag` input. Don't edit the `<!-- releases:start -->` marker in that page.
+
 ## Working on issues
 
 When asked to work on a GitHub issue:
