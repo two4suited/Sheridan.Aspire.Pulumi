@@ -1,3 +1,4 @@
+using System.Text.Json.Nodes;
 using System.Xml;
 using Aspire.Hosting.ApplicationModel;
 using Aspire.Hosting.Pipelines;
@@ -38,7 +39,24 @@ public sealed class AzureServiceBusResource(string name) : PulumiAzureResource(n
 
     public PulumiOutputReference NameOutputReference => Output(Stack ?? throw Unbound(), "Name");
 
-    public ReferenceExpression ConnectionStringExpression => ReferenceExpression.Create($"{ServiceBusEndpoint}");
+    /// <summary>The local emulator container, when <c>RunAsEmulator</c> was called (run mode only).</summary>
+    public AzureServiceBusEmulatorResource? Emulator { get; internal set; }
+
+    /// <summary>Endpoint supplied by <c>RunAsExisting</c> for local runs (run mode only); used instead of the deployed stack output.</summary>
+    internal ReferenceExpression? RunEndpoint { get; set; }
+
+    /// <summary>The namespace endpoint: the one given to <c>RunAsExisting</c> in run mode, otherwise the stack output.</summary>
+    internal ReferenceExpression EndpointExpression => RunEndpoint ?? ReferenceExpression.Create($"{ServiceBusEndpoint}");
+
+    /// <summary>The emulator connection string, the <c>RunAsExisting</c> endpoint, or the deployed namespace endpoint.</summary>
+    public ReferenceExpression ConnectionStringExpression => Emulator is { } e
+        ? ReferenceExpression.Create($"Endpoint=sb://{e.GetEndpoint(AzureServiceBusEmulatorResource.EndpointName).Property(EndpointProperty.HostAndPort)};SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=SAS_KEY_VALUE;UseDevelopmentEmulator=true;")
+        : EndpointExpression;
+
+    /// <summary>Connection string of an entity: <c>Endpoint=...;EntityPath=...</c> (the emulator form already carries <c>Endpoint=</c>).</summary>
+    internal ReferenceExpression EntityConnectionString(string suffix) => Emulator is not null
+        ? ReferenceExpression.Create($"{ConnectionStringExpression}{suffix}")
+        : ReferenceExpression.Create($"Endpoint={EndpointExpression}{suffix}");
 
     /// <summary>Emits the <c>getNamespace</c> lookup (under the namespace's id) and returns the resource group the namespace and its children live in.</summary>
     internal string AddExistingLookup(PulumiProgram program, string rg)
@@ -183,6 +201,28 @@ public sealed class AzureServiceBusResource(string name) : PulumiAzureResource(n
 
     internal static string? Iso(TimeSpan? value) => value is { } v ? XmlConvert.ToString(v) : null;
 
+    internal static void PutJson(JsonObject props, string key, object? value)
+    {
+        if (value is not null) props[key] = JsonValue.Create(value);
+    }
+
+    /// <summary>The emulator's <c>Config.json</c> for this namespace's queues, topics, subscriptions and rules.</summary>
+    internal JsonObject ToEmulatorConfig()
+    {
+        var queues = new JsonArray();
+        foreach (var q in Queues) queues.Add(q.ToEmulatorJson());
+        var topics = new JsonArray();
+        foreach (var t in Topics) topics.Add(t.ToEmulatorJson());
+        return new JsonObject
+        {
+            ["UserConfig"] = new JsonObject
+            {
+                ["Namespaces"] = new JsonArray(new JsonObject { ["Name"] = Name, ["Queues"] = queues, ["Topics"] = topics }),
+                ["Logging"] = new JsonObject { ["Type"] = "File" },
+            },
+        };
+    }
+
     internal static void Put(Dictionary<string, object?> props, string key, object? value)
     {
         if (value is not null) props[key] = value;
@@ -216,7 +256,22 @@ public sealed class AzureServiceBusQueueResource(string name, string queueName, 
     internal string PulumiId => Parent.ChildId(Name);
 
     public ReferenceExpression ConnectionStringExpression =>
-        ReferenceExpression.Create($"Endpoint={Parent.ServiceBusEndpoint};EntityPath={QueueName}");
+        Parent.EntityConnectionString($";EntityPath={QueueName}");
+
+    internal JsonObject ToEmulatorJson()
+    {
+        var p = new JsonObject();
+        AzureServiceBusResource.PutJson(p, "DeadLetteringOnMessageExpiration", DeadLetteringOnMessageExpiration);
+        AzureServiceBusResource.PutJson(p, "DefaultMessageTimeToLive", AzureServiceBusResource.Iso(DefaultMessageTimeToLive));
+        AzureServiceBusResource.PutJson(p, "DuplicateDetectionHistoryTimeWindow", AzureServiceBusResource.Iso(DuplicateDetectionHistoryTimeWindow));
+        AzureServiceBusResource.PutJson(p, "ForwardDeadLetteredMessagesTo", ForwardDeadLetteredMessagesTo);
+        AzureServiceBusResource.PutJson(p, "ForwardTo", ForwardTo);
+        AzureServiceBusResource.PutJson(p, "LockDuration", AzureServiceBusResource.Iso(LockDuration));
+        AzureServiceBusResource.PutJson(p, "MaxDeliveryCount", MaxDeliveryCount);
+        AzureServiceBusResource.PutJson(p, "RequiresDuplicateDetection", RequiresDuplicateDetection);
+        AzureServiceBusResource.PutJson(p, "RequiresSession", RequiresSession);
+        return new JsonObject { ["Name"] = QueueName, ["Properties"] = p };
+    }
 
     internal Dictionary<string, object?> ToProperties()
     {
@@ -250,7 +305,18 @@ public sealed class AzureServiceBusTopicResource(string name, string topicName, 
     internal string PulumiId => Parent.ChildId(Name);
 
     public ReferenceExpression ConnectionStringExpression =>
-        ReferenceExpression.Create($"Endpoint={Parent.ServiceBusEndpoint};EntityPath={TopicName}");
+        Parent.EntityConnectionString($";EntityPath={TopicName}");
+
+    internal JsonObject ToEmulatorJson()
+    {
+        var p = new JsonObject();
+        AzureServiceBusResource.PutJson(p, "DefaultMessageTimeToLive", AzureServiceBusResource.Iso(DefaultMessageTimeToLive));
+        AzureServiceBusResource.PutJson(p, "DuplicateDetectionHistoryTimeWindow", AzureServiceBusResource.Iso(DuplicateDetectionHistoryTimeWindow));
+        AzureServiceBusResource.PutJson(p, "RequiresDuplicateDetection", RequiresDuplicateDetection);
+        var subs = new JsonArray();
+        foreach (var s in Subscriptions) subs.Add(s.ToEmulatorJson());
+        return new JsonObject { ["Name"] = TopicName, ["Properties"] = p, ["Subscriptions"] = subs };
+    }
 
     internal Dictionary<string, object?> ToProperties()
     {
@@ -282,7 +348,22 @@ public sealed class AzureServiceBusSubscriptionResource(string name, string subs
     internal string PulumiId => Parent.Parent.ChildId(Parent.Name, Name);
 
     public ReferenceExpression ConnectionStringExpression =>
-        ReferenceExpression.Create($"Endpoint={Parent.Parent.ServiceBusEndpoint};EntityPath={Parent.TopicName};SubscriptionName={SubscriptionName}");
+        Parent.Parent.EntityConnectionString($";EntityPath={Parent.TopicName}/Subscriptions/{SubscriptionName}");
+
+    internal JsonObject ToEmulatorJson()
+    {
+        var p = new JsonObject();
+        AzureServiceBusResource.PutJson(p, "DeadLetteringOnMessageExpiration", DeadLetteringOnMessageExpiration);
+        AzureServiceBusResource.PutJson(p, "DefaultMessageTimeToLive", AzureServiceBusResource.Iso(DefaultMessageTimeToLive));
+        AzureServiceBusResource.PutJson(p, "ForwardDeadLetteredMessagesTo", ForwardDeadLetteredMessagesTo);
+        AzureServiceBusResource.PutJson(p, "ForwardTo", ForwardTo);
+        AzureServiceBusResource.PutJson(p, "LockDuration", AzureServiceBusResource.Iso(LockDuration));
+        AzureServiceBusResource.PutJson(p, "MaxDeliveryCount", MaxDeliveryCount);
+        AzureServiceBusResource.PutJson(p, "RequiresSession", RequiresSession);
+        var rules = new JsonArray();
+        foreach (var r in Rules) rules.Add(r.ToEmulatorJson());
+        return new JsonObject { ["Name"] = SubscriptionName, ["Properties"] = p, ["Rules"] = rules };
+    }
 
     internal Dictionary<string, object?> ToProperties()
     {
@@ -314,6 +395,17 @@ public sealed class AzureServiceBusRule(string name)
     internal string PulumiId(AzureServiceBusSubscriptionResource subscription) =>
         subscription.Parent.Parent.ChildId(subscription.Parent.Name, subscription.Name, Name);
 
+    /// <summary>The emulator spells the filter types "Sql"/"Correlation" and a few correlation fields differently from ARM.</summary>
+    internal JsonObject ToEmulatorJson() => new()
+    {
+        ["Name"] = Name,
+        ["Properties"] = new JsonObject
+        {
+            ["FilterType"] = FilterType == AzureServiceBusFilterType.SqlFilter ? "Sql" : "Correlation",
+            ["CorrelationFilter"] = CorrelationFilter.ToEmulatorJson(),
+        },
+    };
+
     internal Dictionary<string, object?> ToProperties()
     {
         var p = new Dictionary<string, object?> { ["ruleName"] = Name, ["filterType"] = FilterType.ToString() };
@@ -335,6 +427,27 @@ public sealed class AzureServiceBusCorrelationFilter
     public string? ReplyToSessionId { get; set; }
     public string? ContentType { get; set; }
     public bool? RequiresPreprocessing { get; set; }
+
+    internal JsonObject ToEmulatorJson()
+    {
+        var p = new JsonObject();
+        if (Properties.Count > 0)
+        {
+            var props = new JsonObject();
+            foreach (var kv in Properties) props[kv.Key] = kv.Value;
+            p["Properties"] = props;
+        }
+        AzureServiceBusResource.PutJson(p, "CorrelationId", CorrelationId);
+        AzureServiceBusResource.PutJson(p, "MessageId", MessageId);
+        AzureServiceBusResource.PutJson(p, "To", SendTo);
+        AzureServiceBusResource.PutJson(p, "ReplyTo", ReplyTo);
+        AzureServiceBusResource.PutJson(p, "Label", Subject);
+        AzureServiceBusResource.PutJson(p, "SessionId", SessionId);
+        AzureServiceBusResource.PutJson(p, "ReplyToSessionId", ReplyToSessionId);
+        AzureServiceBusResource.PutJson(p, "ContentType", ContentType);
+        AzureServiceBusResource.PutJson(p, "RequiresPreprocessing", RequiresPreprocessing);
+        return p;
+    }
 
     internal Dictionary<string, object?> ToProperties()
     {

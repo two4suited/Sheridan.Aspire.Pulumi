@@ -48,9 +48,41 @@ sb.AddServiceBusQueue("orders");
 
 `resourceGroupName` is optional, but a group must be resolvable: when omitted, call `WithExistingResourceGroup` / `WithResourceGroup`, otherwise program generation throws. A group passed to `AsExisting` is always the one used for the lookup and the child entities. `ConfigureInfrastructure(...).ServiceBusNamespace` throws for an existing namespace, and `WithSku` is ignored.
 
+## Running locally
+
+Connection values normally come from the deployed stack's outputs, so `aspire run` fails with "Pulumi project ... has not been generated yet" until something is deployed. Two ways around that:
+
+### Emulator
+
+```csharp
+var sb = builder.AddPulumiServiceBus("messaging").RunAsEmulator();
+sb.AddServiceBusQueue("orders");
+sb.AddServiceBusTopic("events").AddServiceBusSubscription("audit");
+```
+
+`RunAsEmulator` (run mode only; no effect when publishing) starts the Service Bus emulator plus the SQL Server container it stores state in. Queues, topics, subscriptions and rules declared on the resource are written to the emulator's `Config.json`, and `WithReference` resolves to the emulator's connection string, so no Pulumi output is read. Consumers should `WaitFor(sb.Resource.Emulator!)` (the emulator is a separate container resource and the SQL Server behind it is slow to start). The optional callback configures the emulator container:
+
+- `WithHostPort(int?)` pins the AMQP port.
+- `WithConfigurationFile(path)` supplies your own `Config.json`; `WithConfiguration(json => ...)` edits the generated one.
+
+> **Apple Silicon:** the SQL Server image crashes (segfault) under QEMU. Enable Docker Desktop's *Use Rosetta for x86_64/amd64 emulation*.
+
+### Existing namespace
+
+For an `AsExisting` namespace, `RunAsExisting` supplies the endpoint to use when running locally (a string or a parameter; a bare namespace name is expanded to `<name>.servicebus.windows.net`), instead of the deployed stack output:
+
+```csharp
+var endpoint = builder.AddParameter("sb-endpoint");
+var sb = builder.AddPulumiServiceBus("messaging")
+    .AsExisting("shared-sb", "shared-rg")
+    .RunAsExisting(endpoint);   // e.g. shared-sb.servicebus.windows.net
+```
+
+The namespace has local auth disabled, so the app authenticates with `DefaultAzureCredential`. In publish mode `RunAsExisting` has no effect.
+
 ## Notes
 
-- Not ported: `RunAsEmulator` (the Service Bus emulator) and its configuration APIs.
+- Not ported: the emulator's `WithSqlServer` overloads (the SQL Server container is always created for you).
 
 ## Learn more
 
