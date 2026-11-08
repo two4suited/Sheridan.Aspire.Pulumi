@@ -20,6 +20,7 @@
     <ProjectReference Include="../../src/Sheridan.Aspire.Pulumi.Azure.Foundry/Sheridan.Aspire.Pulumi.Azure.Foundry.csproj" />
     <ProjectReference Include="../../src/Sheridan.Aspire.Pulumi.Azure.ApiManagement/Sheridan.Aspire.Pulumi.Azure.ApiManagement.csproj" />
     <ProjectReference Include="../../src/Sheridan.Aspire.Pulumi.Azure.EntraId/Sheridan.Aspire.Pulumi.Azure.EntraId.csproj" />
+    <ProjectReference Include="../../src/Sheridan.Aspire.Pulumi.Azure.ContainerRegistry/Sheridan.Aspire.Pulumi.Azure.ContainerRegistry.csproj" />
     <ProjectReference Include="../../src/Sheridan.Aspire.Pulumi.Azure.Kubernetes/Sheridan.Aspire.Pulumi.Azure.Kubernetes.csproj" />
   </ItemGroup>
 

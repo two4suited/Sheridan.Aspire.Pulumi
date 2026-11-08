@@ -28,7 +28,7 @@ builder.Build().Run();
 
 ## Features
 
-- `WithPurgeTask(schedule, filter?, ago?, keep)` adds a scheduled `acr purge` task (five-part cron; defaults: filter `.*:.*`, ago `0d`, keep 3).
+- `WithPurgeTask(schedule, filter?, ago?, keep)` adds a scheduled `acr purge` task (five-part cron; defaults: filter `.*:.*`, ago `0d`, keep 3). Besides old tags, the task also deletes untagged manifests in matching repositories (`--untagged --max-untagged-manifests 0`, regardless of age). This is irreversible and can break digest-based pulls and rollbacks.
 - `WithRoleAssignments(...)` grants roles on the registry using `AzureContainerRegistryRole`.
 - Alias: `AddPulumiContainerRegistry`.
 

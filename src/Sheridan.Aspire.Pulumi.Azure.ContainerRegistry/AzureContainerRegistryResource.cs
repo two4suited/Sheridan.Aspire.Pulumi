@@ -52,7 +52,7 @@ public sealed class AzureContainerRegistryResource(string name) : PulumiAzureRes
         for (var i = 0; i < PurgeTasks.Count; i++)
         {
             var t = PurgeTasks[i];
-            var cmd = $"version: v1.1.0\nsteps:\n- cmd: acr purge --filter '{t.Filter}' --ago {t.Ago} --keep {t.Keep}";
+            var cmd = BuildPurgeTaskContent(t);
             program.AddInfraResource($"{Id}PurgeOldImages{i}", "azure-native:containerregistry:Task", new()
             {
                 ["type"] = "azure-native:containerregistry:Task",
@@ -87,6 +87,14 @@ public sealed class AzureContainerRegistryResource(string name) : PulumiAzureRes
         Provisioning.PulumiInfrastructureExtensions.ApplyInfrastructureCallbacks(this, program);
         return Task.CompletedTask;
     }
+
+    /// <summary>
+    /// The ACR task YAML for a purge task. Matching tags older than <c>Ago</c> are deleted while the newest <c>Keep</c> per
+    /// repository are kept; eligible untagged manifests in matching repositories are always removed too (irreversible, and
+    /// can break digest-based pulls), mirroring upstream Aspire.
+    /// </summary>
+    internal static string BuildPurgeTaskContent(AzureContainerRegistryPurgeTask t) =>
+        $"version: v1.1.0\nsteps:\n- cmd: acr purge --filter '{t.Filter}' --ago {t.Ago} --keep {t.Keep} --untagged --max-untagged-manifests 0";
 
     private void AddRoleAssignments(PulumiProgram program, PipelineStepContext context)
     {
