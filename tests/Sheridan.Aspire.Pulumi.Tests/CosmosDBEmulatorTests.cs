@@ -11,16 +11,26 @@ namespace Sheridan.Aspire.Pulumi.Tests;
 public sealed class CosmosDBEmulatorTests
 {
     [Fact]
-    public void WithDataExplorer_adds_a_Data_Explorer_url_to_the_emulator_and_the_cosmos_resource_and_hides_the_health_url()
+    public async Task WithDataExplorer_labels_the_explorer_url_and_hides_the_health_url_on_the_emulator()
     {
         var builder = DistributedApplication.CreateBuilder();
         var cosmos = builder.AddPulumiAzureCosmosDB("cosmos");
         AzureCosmosDBEmulatorResource? emulator = null;
-        cosmos.RunAsEmulator(e => { e.WithDataExplorer(); emulator = e.Resource; });
-
+        cosmos.RunAsEmulator(e => { e.WithDataExplorer().WithDataExplorer(); emulator = e.Resource; });
         Assert.NotNull(emulator);
-        Assert.Contains(emulator.Annotations.OfType<ResourceUrlsCallbackAnnotation>(), _ => true);
-        Assert.Contains(cosmos.Resource.Annotations.OfType<ResourceUrlsCallbackAnnotation>(), _ => true);
+
+        var urls = new List<ResourceUrlAnnotation>
+        {
+            new() { Url = "http://localhost:1", Endpoint = emulator.GetEndpoint("data-explorer") },
+            new() { Url = "http://localhost:2", Endpoint = emulator.GetEndpoint("emulatorhealth") },
+        };
+        var context = new ResourceUrlsCallbackContext(new DistributedApplicationExecutionContext(DistributedApplicationOperation.Run), emulator, urls);
+        foreach (var callback in emulator.Annotations.OfType<ResourceUrlsCallbackAnnotation>())
+            await callback.Callback(context);
+
+        Assert.Equal("Data Explorer", urls[0].DisplayText);
+        Assert.Equal(UrlDisplayLocation.DetailsOnly, urls[1].DisplayLocation);
+        Assert.Equal(UrlDisplayLocation.SummaryAndDetails, urls[0].DisplayLocation);
     }
 
     [Fact]
