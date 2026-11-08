@@ -1,0 +1,5 @@
+# Auto-generated GitHub Release notes: leave out the bot's own release-notes PRs.
+changelog:
+  exclude:
+    authors:
+      - github-actions

@@ -33,6 +33,8 @@ const notes = readFileSync(notesFile, 'utf8')
   .replace(/\r\n/g, '\n')
   .trim()
   .split('\n')
+  // Drop the bot's own "Docs: release notes for vX.Y.Z" PRs from the changelog.
+  .filter((line) => !/^\*\s+Docs: release notes for v\S+/.test(line))
   .map((line) => {
     if (/^\s*```/.test(line)) inFence = !inFence;
     return !inFence && /^#{1,4}\s/.test(line) ? `##${line}` : line;
