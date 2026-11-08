@@ -10,6 +10,19 @@ after a `vX.Y.Z` tag has been published. Packages are on
 
 <!-- releases:start -->
 
+## v1.5.1
+
+_2026-11-08_ · [GitHub release](https://github.com/two4suited/Sheridan.Aspire.Pulumi/releases/tag/v1.5.1)
+
+#### What's Changed
+* Docs: release notes for v1.5.0 by @github-actions[bot] in https://github.com/two4suited/Sheridan.Aspire.Pulumi/pull/181
+* Release notes workflow: auto-merge the PR by @two4suited in https://github.com/two4suited/Sheridan.Aspire.Pulumi/pull/182
+* Cosmos DB: show Data Explorer link in the dashboard by @two4suited in https://github.com/two4suited/Sheridan.Aspire.Pulumi/pull/184
+
+
+**Full Changelog**: https://github.com/two4suited/Sheridan.Aspire.Pulumi/compare/v1.5.0...v1.5.1
+
+
 ## v1.5.0
 
 _2026-11-08_ · [GitHub release](https://github.com/two4suited/Sheridan.Aspire.Pulumi/releases/tag/v1.5.0)
