@@ -48,6 +48,9 @@ public static class AzureContainerRegistryExtensions
     /// <summary>
     /// Adds a scheduled <c>acr purge</c> task. Mirrors <c>WithPurgeTask</c>: <paramref name="schedule"/> is a five-part cron
     /// expression, <paramref name="filter"/> defaults to <c>.*:.*</c>, <paramref name="ago"/> to <c>0d</c>, <paramref name="keep"/> to 3.
+    /// The newest <paramref name="keep"/> matching tags per repository are always retained, and tags younger than
+    /// <paramref name="ago"/> are kept too, so more than <paramref name="keep"/> can remain. Eligible untagged manifests are
+    /// also deleted regardless of age; this is irreversible and can break digest-based pulls and rollbacks.
     /// </summary>
     public static IResourceBuilder<AzureContainerRegistryResource> WithPurgeTask(
         this IResourceBuilder<AzureContainerRegistryResource> builder, string schedule, string? filter = null,
