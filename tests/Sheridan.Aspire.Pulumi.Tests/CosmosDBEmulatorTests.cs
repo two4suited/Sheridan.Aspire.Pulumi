@@ -1,6 +1,7 @@
 using System.Net;
 using System.Text.Json;
 using Aspire.Hosting;
+using Aspire.Hosting.ApplicationModel;
 using Microsoft.Extensions.Logging.Abstractions;
 using Sheridan.Aspire.Pulumi.Azure.CosmosDB;
 using Xunit;
@@ -9,6 +10,19 @@ namespace Sheridan.Aspire.Pulumi.Tests;
 
 public sealed class CosmosDBEmulatorTests
 {
+    [Fact]
+    public void WithDataExplorer_adds_a_Data_Explorer_url_to_the_emulator_and_the_cosmos_resource_and_hides_the_health_url()
+    {
+        var builder = DistributedApplication.CreateBuilder();
+        var cosmos = builder.AddPulumiAzureCosmosDB("cosmos");
+        AzureCosmosDBEmulatorResource? emulator = null;
+        cosmos.RunAsEmulator(e => { e.WithDataExplorer(); emulator = e.Resource; });
+
+        Assert.NotNull(emulator);
+        Assert.Contains(emulator.Annotations.OfType<ResourceUrlsCallbackAnnotation>(), _ => true);
+        Assert.Contains(cosmos.Resource.Annotations.OfType<ResourceUrlsCallbackAnnotation>(), _ => true);
+    }
+
     [Fact]
     public void Authorization_signs_the_documented_string_to_sign()
     {

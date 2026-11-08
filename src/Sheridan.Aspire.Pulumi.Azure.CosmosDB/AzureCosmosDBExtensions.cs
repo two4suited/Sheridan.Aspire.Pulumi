@@ -119,6 +119,7 @@ public static class AzureCosmosDBExtensions
         {
             emulatorBuilder
                 .WithHttpEndpoint(targetPort: 8080, name: "emulatorhealth")
+                .WithUrlForEndpoint("emulatorhealth", u => u.DisplayLocation = UrlDisplayLocation.DetailsOnly)
                 .WithEnvironment("PROTOCOL", "https")
                 .WithEnvironment("ENABLE_EXPLORER", "false");
         }
@@ -181,9 +182,18 @@ public static class AzureCosmosDBExtensions
         ArgumentNullException.ThrowIfNull(builder);
         if (builder.Resource.IsClassic)
             throw new InvalidOperationException("The Data Explorer endpoint is only available when using the Linux-based (vNext) Azure Cosmos DB emulator. Call 'RunAsEmulator' instead.");
+        var explorerUrl = ReferenceExpression.Create($"{builder.Resource.GetEndpoint("data-explorer")}");
+        builder.Resource.InnerResource.Annotations.Add(new ResourceUrlsCallbackAnnotation(async context =>
+        {
+            // Surface the link on the cosmos resource users interact with, not only on the emulator container.
+            var url = await explorerUrl.GetValueAsync(context.CancellationToken).ConfigureAwait(false);
+            if (!string.IsNullOrEmpty(url))
+                context.Urls.Add(new ResourceUrlAnnotation { Url = url, DisplayText = "Data Explorer" });
+        }));
         return builder
             .WithEnvironment("ENABLE_EXPLORER", "true")
             .WithEnvironment("EXPLORER_PROTOCOL", "http")
-            .WithHttpEndpoint(port: port, targetPort: 1234, name: "data-explorer");
+            .WithHttpEndpoint(port: port, targetPort: 1234, name: "data-explorer")
+            .WithUrlForEndpoint("data-explorer", u => u.DisplayText = "Data Explorer");
     }
 }
