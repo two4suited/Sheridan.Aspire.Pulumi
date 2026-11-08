@@ -41,3 +41,7 @@ builder.Build().Run();
 - Stack, ESC and deploy setup: [repository README](https://github.com/two4suited/Sheridan.Aspire.Pulumi#readme).
 - Customizing generated resources with `ConfigureInfrastructure`: [provisioning guide](https://two4suited.github.io/Sheridan.Aspire.Pulumi/concepts/provisioning/).
 - Resource naming: [naming guide](https://two4suited.github.io/Sheridan.Aspire.Pulumi/concepts/naming/).
+
+## Front Door Private Link
+
+With `Sheridan.Aspire.Pulumi.Azure.FrontDoor`, `appSvc.WithAzureFrontDoorPrivateLink(frontDoor)` disables public network access (`publicNetworkAccess: Disabled`) on every workload web app in the environment (not the dashboard) and links each one to Front Door. The private endpoint connections must be approved on each website after deployment. See the [Front Door README](../Sheridan.Aspire.Pulumi.Azure.FrontDoor/README.md#private-link-to-app-service).
