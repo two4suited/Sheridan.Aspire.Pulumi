@@ -127,7 +127,7 @@ var acaEnv = builder.AddPulumiAzureContainerAppEnvironment("aca-env")
 
 - `src/`: one class library per package (`Sheridan.Aspire.Pulumi*`).
 - `tests/`: unit tests; run with `dotnet test Sheridan.Aspire.Pulumi.slnx`.
-- `docs/`: the [documentation site](https://two4suited.github.io/Sheridan.Aspire.Pulumi/) (Astro Starlight; run `npm install && npm run dev` in `docs/`), including the [naming scheme](https://two4suited.github.io/Sheridan.Aspire.Pulumi/concepts/naming/), [provisioning / `ConfigureInfrastructure`](https://two4suited.github.io/Sheridan.Aspire.Pulumi/concepts/provisioning/) and per-service overlay notes.
+- `docs/`: the [documentation site](https://two4suited.github.io/Sheridan.Aspire.Pulumi/) (Astro Starlight; run `npm install && npm run dev` in `docs/`), including the [naming scheme](https://two4suited.github.io/Sheridan.Aspire.Pulumi/concepts/naming/), [provisioning / `ConfigureInfrastructure`](https://two4suited.github.io/Sheridan.Aspire.Pulumi/concepts/provisioning/) and per-service overlay notes, and the [release notes](https://two4suited.github.io/Sheridan.Aspire.Pulumi/reference/release-notes/).
 
 See [CLAUDE.md](CLAUDE.md) for how new resource integrations are added.
 
