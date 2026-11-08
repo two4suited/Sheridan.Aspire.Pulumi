@@ -37,7 +37,7 @@ public static class AzureServiceBusExtensions
         return builder;
     }
 
-    /// <summary>Alias of <see cref="PublishAsExisting"/> (this resource has no local run mode). Mirrors <c>AsExisting</c>.</summary>
+    /// <summary>Alias of <see cref="PublishAsExisting"/>. For local runs, add <c>RunAsExisting</c> or <c>RunAsEmulator</c>. Mirrors <c>AsExisting</c>.</summary>
     public static IResourceBuilder<AzureServiceBusResource> AsExisting(
         this IResourceBuilder<AzureServiceBusResource> builder, string existingResourceName, string? resourceGroupName = null) =>
         builder.PublishAsExisting(existingResourceName, resourceGroupName);
