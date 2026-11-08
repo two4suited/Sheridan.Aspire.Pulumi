@@ -55,6 +55,7 @@ public static class AzureStorageExtensions
             .ExcludeFromManifest();
 
         builder.Resource.Emulator = emulator;
+        AzureStorageEmulatorInitializer.Register(builder.ApplicationBuilder, builder, emulator, emulatorBuilder);
         configureContainer?.Invoke(emulatorBuilder);
         return builder;
     }

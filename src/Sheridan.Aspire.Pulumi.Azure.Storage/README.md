@@ -57,6 +57,10 @@ var storage = builder.AddPulumiStorage("storage")
 - `WithBlobPort(port)` / `WithQueuePort(port)` / `WithTablePort(port)`: fixed host ports (random otherwise).
 - `WithApiVersionCheck(enable = true)`: remove `--skipApiVersionCheck` so Azurite validates the requested API version. Note this differs from the official integration, whose implementation adds the flag when `enable` is `true`, contradicting its documentation.
 
+### Declared containers and queues are created in Azurite
+
+Blob containers added with `AddBlobContainer` and queues added with `AddQueue` (also through `AddBlobs(...).AddBlobContainer` / `AddQueues(...).AddQueue`) are created in the emulator with `CreateIfNotExistsAsync` once Azurite is healthy, the way the official `RunAsEmulator` does. The emulator container has a health check, and anything that references the storage account or one of its children waits for the account to be `Running`, i.e. for that creation step to finish. If creation fails, the account and its children are marked `FailedToStart` and the error is written to the account's log.
+
 ## Learn more
 
 - Mirrors the official [`Aspire.Hosting.Azure.Storage`](https://www.nuget.org/packages/Aspire.Hosting.Azure.Storage) integration, so moving from Bicep to Pulumi is a drop-in change in your AppHost.

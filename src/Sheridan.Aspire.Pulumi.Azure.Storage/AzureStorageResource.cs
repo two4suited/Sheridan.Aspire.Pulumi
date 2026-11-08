@@ -27,6 +27,34 @@ public sealed class AzureStorageResource(string name) : PulumiAzureResource(name
     public List<AzureBlobStorageContainerResource> BlobContainers { get; } = [];
     public List<AzureQueueStorageQueueResource> Queues { get; } = [];
 
+    /// <summary>Every child resource added to the account (services, containers and queues).</summary>
+    internal IEnumerable<IResource> Children =>
+        BlobServices.Cast<IResource>().Concat(QueueServices).Concat(TableServices).Concat(BlobContainers).Concat(Queues);
+
+    /// <summary>Publishes <paramref name="state"/> for the account and each of its children (the dashboard shows Unknown otherwise).</summary>
+    internal async Task PublishStateAsync(ResourceNotificationService notifications, ResourceStateSnapshot state)
+    {
+        foreach (var resource in Children.Prepend(this))
+            await notifications.PublishUpdateAsync(resource, s => s with { State = state }).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Makes every resource that references the account or one of its children wait for the account (which is only Running once
+    /// it is usable). <paramref name="skip"/> are resources that belong to the account itself.
+    /// </summary>
+    internal void AddWaitForReferencing(DistributedApplicationModel model, IResource skip)
+    {
+        var related = new HashSet<IResource>(Children.Prepend(this));
+        foreach (var resource in model.Resources)
+        {
+            if (related.Contains(resource) || resource == skip) continue;
+            var references = resource.Annotations.OfType<ResourceRelationshipAnnotation>()
+                .Where(a => a.Type == "Reference" && related.Contains(a.Resource));
+            if (references.Any() && !resource.Annotations.OfType<WaitAnnotation>().Any(w => w.Resource == this))
+                resource.Annotations.Add(new WaitAnnotation(this, WaitType.WaitUntilHealthy));
+        }
+    }
+
     internal PulumiOutputReference OutputRef(string suffix) =>
         Output(Stack ?? throw new InvalidOperationException($"'{Name}' has not been bound to a Pulumi stack yet; call WithPulumiStack()."), suffix);
 
@@ -35,6 +63,14 @@ public sealed class AzureStorageResource(string name) : PulumiAzureResource(name
     public PulumiOutputReference QueueEndpoint => OutputRef("QueueEndpoint");
     public PulumiOutputReference TableEndpoint => OutputRef("TableEndpoint");
     public PulumiOutputReference NameOutput => OutputRef("Name");
+
+    /// <summary>Connection value of a service: the Azurite connection string when emulated, otherwise the service endpoint.</summary>
+    internal ReferenceExpression BlobConnection => Emulator is { } e ? EmulatorConnection(e, "blob") : ReferenceExpression.Create($"{BlobEndpoint}");
+    internal ReferenceExpression QueueConnection => Emulator is { } e ? EmulatorConnection(e, "queue") : ReferenceExpression.Create($"{QueueEndpoint}");
+    internal ReferenceExpression TableConnection => Emulator is { } e ? EmulatorConnection(e, "table") : ReferenceExpression.Create($"{TableEndpoint}");
+
+    private static ReferenceExpression EmulatorConnection(AzureStorageEmulatorResource e, string service) =>
+        ReferenceExpression.Create($"DefaultEndpointsProtocol=http;AccountName={AzureStorageEmulatorResource.AccountName};AccountKey={AzureStorageEmulatorResource.AccountKey};{char.ToUpperInvariant(service[0]) + service[1..]}Endpoint={e.GetEndpoint(service)}/{AzureStorageEmulatorResource.AccountName};");
 
     protected override Task ContributeResourcesAsync(PulumiProgram program, PipelineStepContext context, string rg, string location)
     {
@@ -153,9 +189,7 @@ public sealed class AzureBlobStorageResource(string name, AzureStorageResource p
 {
     public AzureStorageResource Parent { get; } = parent;
 
-    public ReferenceExpression ConnectionStringExpression => Parent.Emulator is { } e
-        ? ReferenceExpression.Create($"DefaultEndpointsProtocol=http;AccountName={AzureStorageEmulatorResource.AccountName};AccountKey={AzureStorageEmulatorResource.AccountKey};BlobEndpoint={e.GetEndpoint("blob")}/{AzureStorageEmulatorResource.AccountName};")
-        : ReferenceExpression.Create($"{Parent.BlobEndpoint}");
+    public ReferenceExpression ConnectionStringExpression => Parent.BlobConnection;
 }
 
 /// <summary>Queue service of an <see cref="AzureStorageResource"/> (connection string = queue endpoint).</summary>
@@ -163,9 +197,7 @@ public sealed class AzureQueueStorageResource(string name, AzureStorageResource 
 {
     public AzureStorageResource Parent { get; } = parent;
 
-    public ReferenceExpression ConnectionStringExpression => Parent.Emulator is { } e
-        ? ReferenceExpression.Create($"DefaultEndpointsProtocol=http;AccountName={AzureStorageEmulatorResource.AccountName};AccountKey={AzureStorageEmulatorResource.AccountKey};QueueEndpoint={e.GetEndpoint("queue")}/{AzureStorageEmulatorResource.AccountName};")
-        : ReferenceExpression.Create($"{Parent.QueueEndpoint}");
+    public ReferenceExpression ConnectionStringExpression => Parent.QueueConnection;
 }
 
 /// <summary>Table service of an <see cref="AzureStorageResource"/> (connection string = table endpoint).</summary>
@@ -173,9 +205,7 @@ public sealed class AzureTableStorageResource(string name, AzureStorageResource 
 {
     public AzureStorageResource Parent { get; } = parent;
 
-    public ReferenceExpression ConnectionStringExpression => Parent.Emulator is { } e
-        ? ReferenceExpression.Create($"DefaultEndpointsProtocol=http;AccountName={AzureStorageEmulatorResource.AccountName};AccountKey={AzureStorageEmulatorResource.AccountKey};TableEndpoint={e.GetEndpoint("table")}/{AzureStorageEmulatorResource.AccountName};")
-        : ReferenceExpression.Create($"{Parent.TableEndpoint}");
+    public ReferenceExpression ConnectionStringExpression => Parent.TableConnection;
 }
 
 /// <summary>A blob container in the account (connection string = <c>Endpoint=...;ContainerName=...</c>).</summary>

@@ -11,6 +11,16 @@
 
   <ItemGroup>
     <PackageReference Include="Aspire.Hosting" Version="13.6.4" />
+    <!-- The same health checks and SDK clients the official Aspire.Hosting.Azure.Storage uses. -->
+    <PackageReference Include="AspNetCore.HealthChecks.Azure.Storage.Blobs" Version="9.0.0" />
+    <PackageReference Include="AspNetCore.HealthChecks.Azure.Storage.Queues" Version="9.0.0" />
+    <PackageReference Include="Azure.Identity" Version="1.18.0" />
+    <PackageReference Include="Azure.Storage.Blobs" Version="12.26.0" />
+    <PackageReference Include="Azure.Storage.Queues" Version="12.24.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Sheridan.Aspire.Pulumi.Tests" />
   </ItemGroup>
 
   <ItemGroup>
