@@ -35,6 +35,10 @@ builder.Build().Run();
 - Multiple stacks: bind each resource to its stack with `WithPulumiStack(...)` and order stacks with `DependsOnStack(...)` or simply by referencing resources across them.
 - Command-line overrides: `aspire deploy -- --Pulumi:Stack=qa --Pulumi:Esc=shared/qa` (also `Pulumi__Stack` / `Pulumi__Esc` environment variables).
 
+## Run mode
+
+When the AppHost runs locally (`aspire start` / F5), deploy-only resources with no local counterpart (the Pulumi stack, resource groups, container registry and Container Apps environment) are hidden from the dashboard and `aspire describe`. They remain in the model for `aspire publish` / `aspire deploy`. Resources with a local emulator (Cosmos DB, Storage, Service Bus) stay visible. To hide your own deploy-only resource the same way, call `HideInRunMode()` on its builder.
+
 ## How `aspire deploy` orders things
 
 Each stack contributes `pulumi-publish` → `pulumi-provision` → `pulumi-deploy` steps. The generated program is split in two halves: **app resources** (container apps, web apps, Kubernetes workloads) and **infrastructure** (everything else).

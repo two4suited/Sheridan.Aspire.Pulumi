@@ -1,3 +1,4 @@
+using Sheridan.Aspire.Pulumi;
 using Aspire.Hosting.ApplicationModel;
 using Sheridan.Aspire.Pulumi.Azure.AppContainers;
 using Sheridan.Aspire.Pulumi.Azure.Base;
@@ -19,7 +20,7 @@ public static class AzureContainerAppEnvironmentExtensions
     {
         ArgumentNullException.ThrowIfNull(builder);
         ArgumentException.ThrowIfNullOrEmpty(name);
-        return builder.AddResource(new AzureContainerAppEnvironmentResource(name)).ExcludeFromManifest();
+        return builder.AddResource(new AzureContainerAppEnvironmentResource(name)).ExcludeFromManifest().HideInRunMode();
     }
 
     /// <summary>Alias for <see cref="AddPulumiAzureContainerAppEnvironment"/>.</summary>

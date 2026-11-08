@@ -28,8 +28,25 @@ public static class PulumiExtensions
 
         return builder.AddResource(resource)
             .ExcludeFromManifest()
+            .HideInRunMode()
             .WithPipelineStepFactory(ctx => CreateSteps(resource))
             .WithPipelineConfiguration(context => PulumiReferenceOrdering.Configure(context, resource));
+    }
+
+    /// <summary>
+    /// Hides a deploy-only resource (one with no local counterpart) from the dashboard and <c>aspire describe</c> when running
+    /// locally. The resource stays in the model, so <c>aspire publish</c> / <c>aspire deploy</c> are unaffected.
+    /// </summary>
+    public static IResourceBuilder<T> HideInRunMode<T>(this IResourceBuilder<T> builder) where T : IResource
+    {
+        ArgumentNullException.ThrowIfNull(builder);
+        if (!builder.ApplicationBuilder.ExecutionContext.IsRunMode) return builder;
+        return builder.WithInitialState(new CustomResourceSnapshot
+        {
+            ResourceType = builder.Resource.GetType().Name,
+            Properties = [],
+            IsHidden = true,
+        });
     }
 
     public static IResourceBuilder<PulumiStackResource> WithOrganization(

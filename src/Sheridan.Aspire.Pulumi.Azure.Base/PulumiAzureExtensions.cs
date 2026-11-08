@@ -1,3 +1,4 @@
+using Sheridan.Aspire.Pulumi;
 using Aspire.Hosting;
 using Aspire.Hosting.ApplicationModel;
 
@@ -53,7 +54,7 @@ public static class PulumiAzureExtensions
     /// <summary>Adds a standalone Azure resource group provisioned by Pulumi, for grouping several resources together with <see cref="WithResourceGroup{T}"/>.</summary>
     public static IResourceBuilder<PulumiAzureResourceGroupResource> AddPulumiAzureResourceGroup(
         this IDistributedApplicationBuilder builder, string name) =>
-        builder.AddResource(new PulumiAzureResourceGroupResource(name)).ExcludeFromManifest();
+        builder.AddResource(new PulumiAzureResourceGroupResource(name)).ExcludeFromManifest().HideInRunMode();
 
     /// <summary>Adds a user-assigned managed identity provisioned by Pulumi (the equivalent of AddAzureUserAssignedIdentity).</summary>
     public static IResourceBuilder<PulumiAzureUserAssignedIdentityResource> AddPulumiAzureUserAssignedIdentity(
