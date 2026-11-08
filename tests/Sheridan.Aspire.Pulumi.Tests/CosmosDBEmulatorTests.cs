@@ -26,6 +26,7 @@ public sealed class CosmosDBEmulatorTests
         listener.Prefixes.Add($"http://localhost:{port}/");
         listener.Start();
         var seen = new List<(string Path, string Body)>();
+        var authorized = true;
         var server = Task.Run(async () =>
         {
             for (var i = 0; i < 3; i++)
@@ -33,7 +34,7 @@ public sealed class CosmosDBEmulatorTests
                 var ctx = await listener.GetContextAsync();
                 using var reader = new StreamReader(ctx.Request.InputStream);
                 seen.Add((ctx.Request.Url!.AbsolutePath, await reader.ReadToEndAsync()));
-                Assert.False(string.IsNullOrEmpty(ctx.Request.Headers["Authorization"]));
+                authorized &= !string.IsNullOrEmpty(ctx.Request.Headers["Authorization"]);
                 ctx.Response.StatusCode = i == 0 ? 409 : 201; // an existing database is fine
                 ctx.Response.Close();
             }
@@ -47,6 +48,7 @@ public sealed class CosmosDBEmulatorTests
         // Only 3 requests are served: database + first container + second container is 3.
         await CosmosDBEmulatorInitializer.CreateAsync(new Uri($"http://localhost:{port}/"), cosmos, NullLogger.Instance, CancellationToken.None);
         await server;
+        Assert.True(authorized);
 
         Assert.Equal("/dbs", seen[0].Path);
         Assert.Equal("ordersdb", JsonDocument.Parse(seen[0].Body).RootElement.GetProperty("id").GetString());

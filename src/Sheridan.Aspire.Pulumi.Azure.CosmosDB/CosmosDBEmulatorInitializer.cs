@@ -37,10 +37,17 @@ internal static class CosmosDBEmulatorInitializer
                         await notifications.PublishUpdateAsync(c, s => s with { State = KnownResourceStates.Running }).ConfigureAwait(false);
                 }
             }
-            catch (Exception ex) when (ex is not OperationCanceledException)
+            catch (Exception ex) when (!ct.IsCancellationRequested)
             {
                 logger.LogError(ex, "Failed to create databases and containers in the Cosmos DB emulator.");
                 await notifications.PublishUpdateAsync(cosmos, s => s with { State = KnownResourceStates.FailedToStart }).ConfigureAwait(false);
+                // Explicit WaitFor(database/container) must fail too instead of hanging.
+                foreach (var db in cosmos.Databases)
+                {
+                    await notifications.PublishUpdateAsync(db, s => s with { State = KnownResourceStates.FailedToStart }).ConfigureAwait(false);
+                    foreach (var c in db.Containers)
+                        await notifications.PublishUpdateAsync(c, s => s with { State = KnownResourceStates.FailedToStart }).ConfigureAwait(false);
+                }
             }
         });
 
