@@ -12,6 +12,8 @@ public sealed class AzureServiceBusEmulatorResource(AzureServiceBusResource inne
     internal const string HealthEndpointName = "emulator-health";
     internal const string ConfigFilesPath = "/ServiceBus_Emulator/ConfigFiles";
     internal const string ConfigFile = "Config.json";
+    /// <summary>The only namespace name the emulator supports; the emulator rejects any other.</summary>
+    internal const string NamespaceName = "sbemulatorns";
 
     public AzureServiceBusResource InnerResource { get; } = innerResource;
 
@@ -82,6 +84,7 @@ public static class AzureServiceBusEmulatorExtensions
         });
 
         builder.Resource.Emulator = emulator;
+        AzureServiceBusEmulatorLifecycle.Register(app, builder.Resource, emulator);
         configureContainer?.Invoke(emulatorBuilder);
         return builder;
     }

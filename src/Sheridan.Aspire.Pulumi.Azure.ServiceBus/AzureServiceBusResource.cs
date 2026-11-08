@@ -217,7 +217,7 @@ public sealed class AzureServiceBusResource(string name) : PulumiAzureResource(n
         {
             ["UserConfig"] = new JsonObject
             {
-                ["Namespaces"] = new JsonArray(new JsonObject { ["Name"] = Name, ["Queues"] = queues, ["Topics"] = topics }),
+                ["Namespaces"] = new JsonArray(new JsonObject { ["Name"] = AzureServiceBusEmulatorResource.NamespaceName, ["Queues"] = queues, ["Topics"] = topics }),
                 ["Logging"] = new JsonObject { ["Type"] = "File" },
             },
         };
