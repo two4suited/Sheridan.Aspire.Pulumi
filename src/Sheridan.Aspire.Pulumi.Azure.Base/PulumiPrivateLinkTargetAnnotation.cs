@@ -1,9 +1,9 @@
 using Aspire.Hosting.ApplicationModel;
 
-namespace Sheridan.Aspire.Pulumi.Azure.AppContainers;
+namespace Sheridan.Aspire.Pulumi.Azure.Base;
 
 /// <summary>
-/// Marks a Container Apps environment as the target of a Private Link from <see cref="Source"/> (for example an Azure Front Door).
+/// Marks a Container Apps or App Service environment as the target of a Private Link from <see cref="Source"/> (for example an Azure Front Door).
 /// The environment disables public network access when it carries this annotation, like the official integration does for
 /// <c>PrivateEndpointTargetAnnotation</c>.
 /// </summary>

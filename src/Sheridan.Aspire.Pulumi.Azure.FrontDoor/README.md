@@ -44,6 +44,14 @@ acaEnv.WithAzureFrontDoorPrivateLink(frontDoor);
 
 Disables public network access on the Container Apps environment, switches the profile to `Premium_AzureFrontDoor`, and gives each origin hosted in that environment a `sharedPrivateLinkResource` (group `managedEnvironments`, `enforceCertificateNameCheck`). The private endpoint uses the environment's region; if Front Door Private Link isn't available there, override `sharedPrivateLinkResource.privateLinkLocation` in `ConfigureInfrastructure`. Front Door creates the connection as **Pending**: approve it on the environment in the portal or with `az network private-endpoint-connection approve`. Unlike upstream, there is no automatic region remapping.
 
+## Private Link to App Service
+
+```csharp
+appSvcEnv.WithAzureFrontDoorPrivateLink(frontDoor);
+```
+
+Mirrors upstream's App Service support. Sets `publicNetworkAccess: Disabled` on every workload website in the environment (the dashboard site is unchanged; use `WithDashboard(false)` if you don't need it), switches the profile to `Premium_AzureFrontDoor`, and gives each origin a `sharedPrivateLinkResource` targeting **its own website** (group `sites`, the website's region), since Front Door can't target the plan. Front Door creates each connection as **Pending**: approve it on every website in the portal or with `az network private-endpoint-connection approve`; there is no auto-approval. `WithReference` still resolves to website hostnames. Deployment slots aren't modelled by this package.
+
 ## Notes
 
 - Origins must be hosted by a Container Apps or App Service environment in the **same Pulumi stack** and need an external HTTP(S) endpoint.

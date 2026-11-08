@@ -374,10 +374,7 @@ public sealed class AzureAppServiceEnvironmentResource : PulumiAzureResource, IC
             Add("OTEL_EXPORTER_OTLP_ENDPOINT", $"https://${{{Id}Dashboard.defaultHostName}}:443");
         }
 
-        return new()
-        {
-            ["type"] = "azure-native:web:WebApp",
-            ["properties"] = new Dictionary<string, object?>
+        var siteProps = new Dictionary<string, object?>
             {
                 ["name"] = siteName,
                 ["resourceGroupName"] = resourceGroup,
@@ -397,7 +394,19 @@ public sealed class AzureAppServiceEnvironmentResource : PulumiAzureResource, IC
                     ["appSettings"] = settings,
                 },
                 ["tags"] = new Dictionary<string, object?>(tags) { ["aspire-resource-name"] = r.Name },
-            },
+            };
+
+        // Private Link from Front Door (WithAzureFrontDoorPrivateLink): workload sites are only reachable privately.
+        // The dashboard site is left unchanged (use WithDashboard(false) if it isn't needed).
+        if (Annotations.OfType<PulumiPrivateLinkTargetAnnotation>().Any())
+        {
+            siteProps["publicNetworkAccess"] = "Disabled";
+        }
+
+        return new()
+        {
+            ["type"] = "azure-native:web:WebApp",
+            ["properties"] = siteProps,
             ["options"] = new Dictionary<string, object?>
             {
                 ["dependsOn"] = new List<object?> { $"${{{acrPull}}}" },

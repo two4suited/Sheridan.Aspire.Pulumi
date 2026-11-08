@@ -89,12 +89,14 @@ public sealed class AzureFrontDoorResource(string name) : PulumiAzureResource(na
                 };
             if (privateLinkEnvs.TryGetValue(origin.Name, out var plEnv))
             {
+                var siteId = $"{OriginKey(origin.Name)}Site";
                 originProps["enforceCertificateNameCheck"] = true;
                 originProps["sharedPrivateLinkResource"] = new Dictionary<string, object?>
                 {
-                    ["privateLink"] = new Dictionary<string, object?> { ["id"] = $"${{{plEnv.Id}.id}}" },
-                    ["groupId"] = "managedEnvironments",
-                    ["privateLinkLocation"] = location,
+                    // Container Apps: the shared environment. App Service: the origin's own site (Front Door can't target the plan).
+                    ["privateLink"] = new Dictionary<string, object?> { ["id"] = plEnv is AzureAppServiceEnvironmentResource ? $"${{{siteId}.id}}" : $"${{{plEnv.Id}.id}}" },
+                    ["groupId"] = plEnv is AzureAppServiceEnvironmentResource ? "sites" : "managedEnvironments",
+                    ["privateLinkLocation"] = plEnv is AzureAppServiceEnvironmentResource ? $"${{{siteId}.location}}" : location,
                     ["requestMessage"] = "Request access for Azure Front Door Private Link origin",
                 };
             }
@@ -127,10 +129,10 @@ public sealed class AzureFrontDoorResource(string name) : PulumiAzureResource(na
         return Task.CompletedTask;
     }
 
-    /// <summary>The Container Apps environment hosting the origin when it has a Private Link from this Front Door, else null.</summary>
-    private AzureContainerAppEnvironmentResource? PrivateLinkEnvironment(IResourceWithEndpoints origin) =>
+    /// <summary>The Container Apps or App Service environment hosting the origin when it has a Private Link from this Front Door, else null.</summary>
+    private PulumiAzureResource? PrivateLinkEnvironment(IResourceWithEndpoints origin) =>
         (origin.GetComputeEnvironment() ?? origin.Annotations.OfType<DeploymentTargetAnnotation>().Select(a => a.ComputeEnvironment).FirstOrDefault())
-            is AzureContainerAppEnvironmentResource env
+            is PulumiAzureResource and (AzureContainerAppEnvironmentResource or AzureAppServiceEnvironmentResource) and var env
         && env.Annotations.OfType<PulumiPrivateLinkTargetAnnotation>().Any(a => a.Source == this)
             ? env : null;
 
