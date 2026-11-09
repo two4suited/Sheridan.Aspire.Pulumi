@@ -44,6 +44,43 @@ public sealed class AzureApiManagementApiResource(
     internal string? PolicyXml { get; set; }
     internal List<string> InboundStatements { get; } = [];
     internal List<AzureApiManagementOperationResource> Operations { get; } = [];
+    internal AzureApiManagementOpenApiSource? OpenApi { get; set; }
+}
+
+/// <summary>The serialization of an inline OpenAPI document.</summary>
+public enum AzureApiManagementOpenApiFormat
+{
+    Json,
+    Yaml,
+}
+
+/// <summary>Where an API's OpenAPI document comes from; resolved when the Pulumi program is generated.</summary>
+internal sealed class AzureApiManagementOpenApiSource
+{
+    private readonly Func<(string Format, string Value)> _resolve;
+    private AzureApiManagementOpenApiSource(Func<(string, string)> resolve) => _resolve = resolve;
+
+    /// <summary>The <c>format</c> and <c>value</c> properties of <c>azure-native:apimanagement:Api</c>.</summary>
+    public (string Format, string Value) Resolve() => _resolve();
+
+    public static AzureApiManagementOpenApiSource FromContent(string content, AzureApiManagementOpenApiFormat format) =>
+        new(() => (format == AzureApiManagementOpenApiFormat.Json ? "openapi+json" : "openapi", content));
+
+    public static AzureApiManagementOpenApiSource FromUrl(string url) => new(() => ("openapi-link", url));
+
+    public static AzureApiManagementOpenApiSource FromFile(string path, string appHostDirectory)
+    {
+        var full = System.IO.Path.GetFullPath(path, appHostDirectory);
+        return new(() =>
+        {
+            if (!File.Exists(full))
+                throw new FileNotFoundException($"The OpenAPI document '{full}' (from '{path}') does not exist. Build the project that generates it before publishing.", full);
+            var content = File.ReadAllText(full);
+            var yaml = System.IO.Path.GetExtension(full).ToLowerInvariant() is ".yaml" or ".yml"
+                || (System.IO.Path.GetExtension(full).ToLowerInvariant() != ".json" && !content.TrimStart().StartsWith('{'));
+            return (yaml ? "openapi" : "openapi+json", content);
+        });
+    }
 }
 
 /// <summary>A product (<c>Microsoft.ApiManagement/service/products</c>) that groups APIs for consumers.</summary>

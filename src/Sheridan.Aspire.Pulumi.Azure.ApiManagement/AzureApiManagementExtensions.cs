@@ -63,7 +63,7 @@ public static class AzureApiManagementExtensions
         return builder.ApplicationBuilder.AddResource(backend).ExcludeFromManifest();
     }
 
-    /// <summary>Routes the API's requests to <paramref name="backend"/> (a <c>set-backend-service</c> inbound policy and, unless operations are modeled, a wildcard proxy for every method).</summary>
+    /// <summary>Routes the API's requests to <paramref name="backend"/> (a <c>set-backend-service</c> inbound policy and, unless operations are modeled or imported from OpenAPI, a wildcard proxy for every method).</summary>
     public static IResourceBuilder<AzureApiManagementApiResource> WithBackend(
         this IResourceBuilder<AzureApiManagementApiResource> builder, IResourceBuilder<AzureApiManagementBackendResource> backend)
     {
@@ -72,6 +72,42 @@ public static class AzureApiManagementExtensions
         if (backend.Resource.Parent != builder.Resource.Parent)
             throw new InvalidOperationException("The backend and the API must belong to the same API Management service.");
         builder.Resource.Backend = backend.Resource;
+        return builder;
+    }
+
+    /// <summary>
+    /// Imports the API's operations from an OpenAPI document on disk. The file is read when the Pulumi program is generated
+    /// (so it may be produced by a build step); a relative path is resolved against the AppHost directory. The format (JSON or YAML)
+    /// is taken from the extension, or from the content for other extensions.
+    /// </summary>
+    public static IResourceBuilder<AzureApiManagementApiResource> WithOpenApi(
+        this IResourceBuilder<AzureApiManagementApiResource> builder, string path)
+    {
+        ArgumentNullException.ThrowIfNull(builder);
+        ArgumentException.ThrowIfNullOrWhiteSpace(path);
+        builder.Resource.OpenApi = AzureApiManagementOpenApiSource.FromFile(path, builder.ApplicationBuilder.AppHostDirectory);
+        return builder;
+    }
+
+    /// <summary>Imports the API's operations from an OpenAPI document that API Management downloads from <paramref name="url"/> (<c>openapi-link</c>).</summary>
+    public static IResourceBuilder<AzureApiManagementApiResource> WithOpenApi(
+        this IResourceBuilder<AzureApiManagementApiResource> builder, Uri url)
+    {
+        ArgumentNullException.ThrowIfNull(builder);
+        ArgumentNullException.ThrowIfNull(url);
+        if (!url.IsAbsoluteUri || url.Scheme is not ("http" or "https"))
+            throw new ArgumentException($"'{url}' is not an absolute http(s) URL.", nameof(url));
+        builder.Resource.OpenApi = AzureApiManagementOpenApiSource.FromUrl(url.AbsoluteUri);
+        return builder;
+    }
+
+    /// <summary>Imports the API's operations from inline OpenAPI document content.</summary>
+    public static IResourceBuilder<AzureApiManagementApiResource> WithOpenApi(
+        this IResourceBuilder<AzureApiManagementApiResource> builder, string content, AzureApiManagementOpenApiFormat format)
+    {
+        ArgumentNullException.ThrowIfNull(builder);
+        ArgumentException.ThrowIfNullOrWhiteSpace(content);
+        builder.Resource.OpenApi = AzureApiManagementOpenApiSource.FromContent(content, format);
         return builder;
     }
 

@@ -52,6 +52,33 @@ public sealed class AzureApiManagementResource(string name, AzureApiManagementOp
         catch (System.Xml.XmlException e) { throw new ArgumentException($"The policy is not well-formed XML: {e.Message}", paramName); }
     }
 
+    /// <summary>The <c>azure-native:apimanagement:Api</c> properties; an OpenAPI document adds <c>format</c>/<c>value</c> and supplies the operations.</summary>
+    internal static Dictionary<string, object?> ApiProperties(AzureApiManagementApiResource api)
+    {
+        var props = new Dictionary<string, object?>
+        {
+            ["apiId"] = api.ApiName,
+            ["path"] = api.Path,
+            ["displayName"] = api.DisplayName,
+            ["protocols"] = new List<object?> { "https" },
+            ["subscriptionRequired"] = api.SubscriptionRequired,
+        };
+        if (api.OpenApi is { } openApi)
+        {
+            var (format, value) = openApi.Resolve();
+            props["format"] = format;
+            props["value"] = value;
+        }
+        return props;
+    }
+
+    /// <summary>Modeled operations; a routed API with neither modeled operations nor an OpenAPI document gets a wildcard proxy for every method.</summary>
+    internal static IReadOnlyList<AzureApiManagementOperationResource> EffectiveOperations(AzureApiManagementApiResource api) =>
+        api.Operations.Count > 0 || api.Backend is null || api.OpenApi is not null
+            ? api.Operations
+            : new[] { "GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS" }.Select(m =>
+                new AzureApiManagementOperationResource($"{api.Name}-{m.ToLowerInvariant()}", $"proxy-{m.ToLowerInvariant()}", m, "/*", $"Proxy {m}", api)).ToList();
+
     protected override Task ContributeResourcesAsync(PulumiProgram program, PipelineStepContext context, string rg, string location)
     {
         // Named by the naming layer ({project}-{resource}-{stack}); override with WithAzureName.
@@ -122,14 +149,7 @@ public sealed class AzureApiManagementResource(string name, AzureApiManagementOp
         {
             var apiId = Child(Id + "Api", api.Name);
             var apiRef = $"${{{apiId}.name}}";
-            Add(apiId, "azure-native:apimanagement:Api", Props(new()
-            {
-                ["apiId"] = api.ApiName,
-                ["path"] = api.Path,
-                ["displayName"] = api.DisplayName,
-                ["protocols"] = new List<object?> { "https" },
-                ["subscriptionRequired"] = api.SubscriptionRequired,
-            }));
+            Add(apiId, "azure-native:apimanagement:Api", Props(ApiProperties(api)));
 
             var inbound = new List<string>(api.InboundStatements);
             if (api.Backend is { } b) inbound.Insert(0, $"<set-backend-service backend-id=\"{System.Security.SecurityElement.Escape(b.BackendName)}\" />");
@@ -137,10 +157,7 @@ public sealed class AzureApiManagementResource(string name, AzureApiManagementOp
                 BuildPolicy(api.PolicyXml, inbound));
 
             // A routed API without modeled operations forwards every method and path (a wildcard proxy).
-            var operations = api.Operations.Count > 0 || api.Backend is null
-                ? api.Operations
-                : new[] { "GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS" }.Select(m =>
-                    new AzureApiManagementOperationResource($"{api.Name}-{m.ToLowerInvariant()}", $"proxy-{m.ToLowerInvariant()}", m, "/*", $"Proxy {m}", api)).ToList();
+            var operations = EffectiveOperations(api);
             foreach (var op in operations)
             {
                 var opId = Child(apiId + "Op", op.Name);
