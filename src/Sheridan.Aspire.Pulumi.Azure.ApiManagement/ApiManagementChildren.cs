@@ -3,13 +3,16 @@ using Aspire.Hosting.ApplicationModel;
 namespace Sheridan.Aspire.Pulumi.Azure.ApiManagement;
 
 /// <summary>A backend service (<c>Microsoft.ApiManagement/service/backends</c>) requests can be forwarded to.</summary>
-public sealed class AzureApiManagementBackendResource(string name, string backendName, string url, AzureApiManagementResource parent)
+public sealed class AzureApiManagementBackendResource(string name, string backendName, string? url, AzureApiManagementResource parent)
     : Resource(name), IResourceWithParent<AzureApiManagementResource>
 {
     public AzureApiManagementResource Parent { get; } = parent;
     /// <summary>The physical backend identifier in API Management.</summary>
     public string BackendName { get; } = backendName;
-    public string Url { get; } = url;
+    /// <summary>The literal backend URL; null when the URL is resolved at deploy time from a compute resource.</summary>
+    public string? Url { get; } = url;
+    /// <summary>The compute resource (deployed to an Azure Container Apps environment) whose ingress FQDN is the backend host.</summary>
+    internal IResourceWithEndpoints? Compute { get; init; }
     /// <summary>"http" (default) or "soap".</summary>
     public string Protocol { get; set; } = "http";
     /// <summary>Validate the backend's TLS certificate chain and host name (on by default).</summary>

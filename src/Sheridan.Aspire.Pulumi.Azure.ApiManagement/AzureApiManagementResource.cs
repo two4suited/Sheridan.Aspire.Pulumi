@@ -1,5 +1,6 @@
 using System.Xml.Linq;
 using Aspire.Hosting.ApplicationModel;
+using Sheridan.Aspire.Pulumi.Azure.AppContainers;
 using Aspire.Hosting.Pipelines;
 using Sheridan.Aspire.Pulumi.Azure.Base;
 
@@ -108,8 +109,11 @@ public sealed class AzureApiManagementResource(string name, AzureApiManagementOp
         return rg;
     }
 
+    private PulumiStackResource? _generating;
+
     protected override Task ContributeResourcesAsync(PulumiProgram program, PipelineStepContext context, string rg, string location)
     {
+        _generating = ResolveStack(context);
         Contribute(program, rg, location);
         return Task.CompletedTask;
     }
@@ -153,14 +157,18 @@ public sealed class AzureApiManagementResource(string name, AzureApiManagementOp
             foreach (var (k, v) in extra) p[k] = v;
             return p;
         }
-        void Add(string id, string type, Dictionary<string, object?> props) =>
-            program.AddInfraResource(id, type, new Dictionary<string, object?> { ["type"] = type, ["properties"] = props });
-        void Policy(string id, string type, Dictionary<string, object?> props, string? xml)
+        void Add(string id, string type, Dictionary<string, object?> props, string? dependsOn = null)
+        {
+            var def = new Dictionary<string, object?> { ["type"] = type, ["properties"] = props };
+            if (dependsOn is not null) def["options"] = new Dictionary<string, object?> { ["dependsOn"] = new List<object?> { $"${{{dependsOn}}}" } };
+            program.AddInfraResource(id, type, def);
+        }
+        void Policy(string id, string type, Dictionary<string, object?> props, string? xml, string? dependsOn = null)
         {
             if (xml is null) return;
             props["format"] = "xml";
             props["value"] = xml;
-            Add(id, type, props);
+            Add(id, type, props, dependsOn);
         }
 
         Policy($"{Id}Policy", "azure-native:apimanagement:Policy", Props(new() { ["policyId"] = "policy" }),
@@ -179,7 +187,7 @@ public sealed class AzureApiManagementResource(string name, AzureApiManagementOp
             Add(Child(Id + "Backend", backend.Name), "azure-native:apimanagement:Backend", Props(new()
             {
                 ["backendId"] = backend.BackendName,
-                ["url"] = backend.Url,
+                ["url"] = ResolveBackendUrl(backend, _generating),
                 ["protocol"] = backend.Protocol,
                 ["tls"] = new Dictionary<string, object?>
                 {
@@ -196,8 +204,9 @@ public sealed class AzureApiManagementResource(string name, AzureApiManagementOp
 
             var inbound = new List<string>(api.InboundStatements);
             if (api.Backend is { } b) inbound.Insert(0, $"<set-backend-service backend-id=\"{System.Security.SecurityElement.Escape(b.BackendName)}\" />");
+            // set-backend-service names the backend only by id, so order the policy after it explicitly.
             Policy($"{apiId}Policy", "azure-native:apimanagement:ApiPolicy", Props(new() { ["apiId"] = apiRef, ["policyId"] = "policy" }),
-                BuildPolicy(api.PolicyXml, inbound));
+                BuildPolicy(api.PolicyXml, inbound), api.Backend is { } routed ? Child(Id + "Backend", routed.Name) : null);
 
             // A routed API without modeled operations forwards every method and path (a wildcard proxy).
             var operations = EffectiveOperations(api);
@@ -243,5 +252,32 @@ public sealed class AzureApiManagementResource(string name, AzureApiManagementOp
         }
 
         Provisioning.PulumiInfrastructureExtensions.ApplyInfrastructureCallbacks(this, program);
+    }
+
+    /// <summary>The backend URL as a literal or a Pulumi expression (<c>https://${app.configuration.ingress.fqdn}</c>) that also orders the backend after the app.</summary>
+    internal string ResolveBackendUrl(AzureApiManagementBackendResource backend, PulumiStackResource? generating)
+    {
+        if (backend.Compute is { } compute)
+        {
+            var env = compute.GetComputeEnvironment()
+                ?? compute.Annotations.OfType<DeploymentTargetAnnotation>().Select(a => a.ComputeEnvironment).FirstOrDefault()
+                ?? throw new InvalidOperationException(
+                    $"Backend '{backend.Name}': resource '{compute.Name}' has no compute environment. Call WithComputeEnvironment(...) with an Azure Container Apps environment.");
+            if (env is not AzureContainerAppEnvironmentResource aca)
+                throw new NotSupportedException(
+                    $"Backend '{backend.Name}': compute environment '{env.Name}' ({env.GetType().Name}) is not supported; use an Azure Container Apps environment, or pass a URL / PulumiOutputReference.");
+            if (compute.Annotations.OfType<PulumiContainerAppJobAnnotation>().Any())
+                throw new InvalidOperationException($"Backend '{backend.Name}': '{compute.Name}' is deployed as a Container Apps job, which has no ingress.");
+            var apimStack = generating ?? Stack;
+            var envStack = aca.Stack;
+            if (envStack is not null && apimStack is not null && envStack != apimStack)
+                throw new InvalidOperationException(
+                    $"Backend '{backend.Name}': '{compute.Name}' is hosted in Pulumi stack '{envStack.Name}' but API Management '{Name}' is in '{apimStack.Name}'. They must share a stack for the ingress FQDN to be referenced directly.");
+            if (!compute.GetEndpoints().Any(e => e.EndpointAnnotation.UriScheme is "http" or "https" && e.EndpointAnnotation.IsExternal))
+                throw new InvalidOperationException(
+                    $"Backend '{backend.Name}': resource '{compute.Name}' has no external http or https endpoint (an internal-only ingress is not reachable from API Management). Call WithExternalHttpEndpoints() on it.");
+            return $"https://${{{AzureContainerAppEnvironmentResource.AppId(compute.Name)}.configuration.ingress.fqdn}}";
+        }
+        return backend.Url!;
     }
 }
