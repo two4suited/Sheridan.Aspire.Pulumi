@@ -67,7 +67,8 @@ public sealed class AzureApiManagementResource(string name, AzureApiManagementOp
         {
             var (format, value) = openApi.Resolve();
             props["format"] = format;
-            props["value"] = value;
+            // An interpolation opener in the document must be doubled to stay literal in Pulumi YAML. Links are left untouched.
+            props["value"] = format == "openapi-link" ? value : value.Replace("${", "$${");
         }
         return props;
     }

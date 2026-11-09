@@ -98,6 +98,32 @@ public sealed class ApiManagementTests
     }
 
     [Fact]
+    public void Interpolation_openers_in_a_document_are_escaped_for_Pulumi()
+    {
+        var (api, _) = NewApi();
+        api.WithOpenApi("{\"d\":\"${x}\"}", AzureApiManagementOpenApiFormat.Json);
+        Assert.Equal("{\"d\":\"$${x}\"}", AzureApiManagementResource.ApiProperties(api.Resource)["value"]);
+    }
+
+    [Fact]
+    public void Empty_file_fails_and_unknown_extension_is_detected_by_content()
+    {
+        var dir = Directory.CreateTempSubdirectory().FullName;
+        try
+        {
+            File.WriteAllText(Path.Combine(dir, "e.txt"), "  ");
+            File.WriteAllText(Path.Combine(dir, "j.txt"), "{}");
+            var app = DistributedApplication.CreateBuilder(new DistributedApplicationOptions { ProjectDirectory = dir });
+            var (api, _) = NewApi(app);
+            api.WithOpenApi("e.txt");
+            Assert.Throws<InvalidOperationException>(() => AzureApiManagementResource.ApiProperties(api.Resource));
+            api.WithOpenApi("j.txt");
+            Assert.Equal("openapi+json", AzureApiManagementResource.ApiProperties(api.Resource)["format"]);
+        }
+        finally { Directory.Delete(dir, true); }
+    }
+
+    [Fact]
     public void Without_OpenApi_a_routed_API_gets_wildcard_proxy_operations()
     {
         var (api, backend) = NewApi();
