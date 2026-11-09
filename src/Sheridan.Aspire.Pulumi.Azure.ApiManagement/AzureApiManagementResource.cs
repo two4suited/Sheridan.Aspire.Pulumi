@@ -119,26 +119,26 @@ public sealed class AzureApiManagementResource(string name, AzureApiManagementOp
             rg = AddExistingLookup(program, rg);
         else
         {
-        var options = Options ?? throw new InvalidOperationException(
-            $"'{Name}' needs AzureApiManagementOptions (publisher email and name) unless it is an existing service; pass them to AddPulumiAzureApiManagement or call AsExisting.");
-        // Named by the naming layer ({project}-{resource}-{stack}); override with WithAzureName.
-        program.AddInfraResource(Id, "azure-native:apimanagement:ApiManagementService", new Dictionary<string, object?>
-        {
-            ["type"] = "azure-native:apimanagement:ApiManagementService",
-            ["properties"] = new Dictionary<string, object?>
+            var options = Options ?? throw new InvalidOperationException(
+                $"'{Name}' needs AzureApiManagementOptions (publisher email and name) unless it is an existing service; pass them to AddPulumiAzureApiManagement or call AsExisting.");
+            // Named by the naming layer ({project}-{resource}-{stack}); override with WithAzureName.
+            program.AddInfraResource(Id, "azure-native:apimanagement:ApiManagementService", new Dictionary<string, object?>
             {
-                ["serviceName"] = NameFor(AzureNameKind.ApiManagementService),
-                ["resourceGroupName"] = rg,
-                ["location"] = location,
-                ["publisherEmail"] = options.PublisherEmail,
-                ["publisherName"] = options.PublisherName,
-                ["sku"] = new Dictionary<string, object?> { ["name"] = options.Sku.ToString(), ["capacity"] = options.Capacity },
-                ["identity"] = new Dictionary<string, object?> { ["type"] = "SystemAssigned" },
-                ["tags"] = new Dictionary<string, object?> { ["aspire-resource-name"] = Name },
-            },
-        });
+                ["type"] = "azure-native:apimanagement:ApiManagementService",
+                ["properties"] = new Dictionary<string, object?>
+                {
+                    ["serviceName"] = NameFor(AzureNameKind.ApiManagementService),
+                    ["resourceGroupName"] = rg,
+                    ["location"] = location,
+                    ["publisherEmail"] = options.PublisherEmail,
+                    ["publisherName"] = options.PublisherName,
+                    ["sku"] = new Dictionary<string, object?> { ["name"] = options.Sku.ToString(), ["capacity"] = options.Capacity },
+                    ["identity"] = new Dictionary<string, object?> { ["type"] = "SystemAssigned" },
+                    ["tags"] = new Dictionary<string, object?> { ["aspire-resource-name"] = Name },
+                },
+            });
 
-        program.Outputs[$"{Id}PrincipalId"] = $"${{{Id}.identity.principalId}}";
+            program.Outputs[$"{Id}PrincipalId"] = $"${{{Id}.identity.principalId}}";
         }
 
         var service = $"${{{Id}.name}}";

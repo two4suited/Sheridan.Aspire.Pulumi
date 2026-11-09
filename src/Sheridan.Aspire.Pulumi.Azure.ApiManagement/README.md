@@ -53,7 +53,7 @@ var api = apim.AddApi("people-api", "people")
 
 ## Existing service
 
-To add APIs to a service owned elsewhere (for example another stack or resource group), call `AsExisting` (alias `PublishAsExisting`). The service is only looked up (`getApiManagementService`), never created or modified, so no publisher or SKU options are needed; the APIs, backends, products, named values and policies are created beneath it. `gatewayUrl`, `name` and `id` outputs resolve from the existing service; `principalId` is not exposed. Resource group is optional if `WithExistingResourceGroup`/`WithResourceGroup` is used, and no group is created for the lookup.
+To add APIs to a service owned elsewhere (for example another stack or resource group), call `AsExisting` (alias `PublishAsExisting`). The service is only looked up (`getApiManagementService`), never created or modified, so no publisher or SKU options are needed; the APIs, backends, products, named values and policies are created beneath it. `gatewayUrl`, `name` and `id` outputs resolve from the existing service; `principalId` is not exposed, and `ConfigureInfrastructure(...).ApiManagementService` throws (there is no resource to configure). A group passed to `AsExisting` is always the one used for the lookup and the child resources; publisher/SKU options supplied earlier are ignored. Resource group is optional if `WithExistingResourceGroup`/`WithResourceGroup` is used, and no group is created for the lookup.
 
 ```csharp
 var apim = builder.AddPulumiAzureApiManagement("apim")   // no options overload

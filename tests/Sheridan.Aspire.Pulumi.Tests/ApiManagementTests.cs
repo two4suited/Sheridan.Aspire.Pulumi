@@ -180,4 +180,13 @@ public sealed class ApiManagementTests
         var apim = builder.AddPulumiAzureApiManagement("apim");
         Assert.Throws<InvalidOperationException>(() => apim.Resource.Contribute(new PulumiProgram(), "rg", "westus"));
     }
+
+    [Fact]
+    public void ConfigureInfrastructure_service_node_throws_for_an_existing_service()
+    {
+        var builder = DistributedApplication.CreateBuilder();
+        var apim = builder.AddPulumiAzureApiManagement("apim").AsExisting("shared-apim", "shared-rg")
+            .ConfigureInfrastructure(i => _ = i.ApiManagementService);
+        Assert.Throws<InvalidOperationException>(() => apim.Resource.Contribute(new PulumiProgram(), "shared-rg", "westus"));
+    }
 }
