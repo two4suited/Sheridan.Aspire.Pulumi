@@ -114,6 +114,8 @@ public sealed class ApiManagementTests
         api.WithOpenApi("openapi: 3.1.0", AzureApiManagementOpenApiFormat.Yaml).WithBackend(backend);
         Assert.Same(backend.Resource, api.Resource.Backend);
         Assert.Empty(AzureApiManagementResource.EffectiveOperations(api.Resource));
+    }
+
     [Fact]
     public void AsExisting_records_service_and_group_without_options()
     {
