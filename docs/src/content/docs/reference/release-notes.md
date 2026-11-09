@@ -10,6 +10,22 @@ after a `vX.Y.Z` tag has been published. Packages are on
 
 <!-- releases:start -->
 
+## v1.6.0
+
+_2026-11-09_ · [GitHub release](https://github.com/two4suited/Sheridan.Aspire.Pulumi/releases/tag/v1.6.0)
+
+<!-- Release notes generated using configuration in .github/release.yml at v1.6.0 -->
+
+#### What's Changed
+* APIM: OpenAPI import (WithOpenApi) by @two4suited in https://github.com/two4suited/Sheridan.Aspire.Pulumi/pull/198
+* APIM OpenAPI import: review fixes by @two4suited in https://github.com/two4suited/Sheridan.Aspire.Pulumi/pull/199
+* API Management: AsExisting(name, resourceGroup) by @two4suited in https://github.com/two4suited/Sheridan.Aspire.Pulumi/pull/197
+* ApiManagement: AddBackend from a compute resource (container app ingress FQDN) by @two4suited in https://github.com/two4suited/Sheridan.Aspire.Pulumi/pull/200
+
+
+**Full Changelog**: https://github.com/two4suited/Sheridan.Aspire.Pulumi/compare/v1.5.2...v1.6.0
+
+
 ## v1.5.2
 
 _2026-11-08_ · [GitHub release](https://github.com/two4suited/Sheridan.Aspire.Pulumi/releases/tag/v1.5.2)
