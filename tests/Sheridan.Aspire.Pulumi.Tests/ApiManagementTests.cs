@@ -1,5 +1,7 @@
 using Aspire.Hosting;
 using Aspire.Hosting.ApplicationModel;
+using Sheridan.Aspire.Pulumi;
+using Sheridan.Aspire.Pulumi.Azure.Base;
 using Sheridan.Aspire.Pulumi.Azure.ApiManagement;
 using Xunit;
 
@@ -138,5 +140,81 @@ public sealed class ApiManagementTests
         api.WithOpenApi("openapi: 3.1.0", AzureApiManagementOpenApiFormat.Yaml).WithBackend(backend);
         Assert.Same(backend.Resource, api.Resource.Backend);
         Assert.Empty(AzureApiManagementResource.EffectiveOperations(api.Resource));
+    }
+
+    [Fact]
+    public void AsExisting_records_service_and_group_without_options()
+    {
+        var builder = DistributedApplication.CreateBuilder();
+        var apim = builder.AddPulumiAzureApiManagement("apim").AsExisting("shared-apim", "shared-rg");
+        Assert.Null(apim.Resource.Options);
+        Assert.Equal("shared-apim", apim.Resource.ExistingServiceName);
+        Assert.Equal("shared-rg", apim.Resource.ExistingServiceResourceGroup);
+        Assert.Equal("shared-rg", apim.Resource.ExistingResourceGroup);
+
+        var other = builder.AddPulumiAzureApiManagement("apim2").PublishAsExisting("a2");
+        Assert.Equal("a2", other.Resource.ExistingServiceName);
+        Assert.Null(other.Resource.ExistingResourceGroup);
+
+        Assert.Throws<ArgumentException>(() => builder.AddPulumiAzureApiManagement("apim3").AsExisting(""));
+        Assert.Throws<ArgumentException>(() => builder.AddPulumiAzureApiManagement("apim4").AsExisting("a", ""));
+    }
+
+    [Fact]
+    public void Existing_lookup_is_emitted_under_the_service_id_and_needs_a_group()
+    {
+        var builder = DistributedApplication.CreateBuilder();
+        var apim = builder.AddPulumiAzureApiManagement("apim").AsExisting("shared-apim", "shared-rg");
+        var program = new PulumiProgram();
+        var rg = apim.Resource.AddExistingLookup(program, "${other.name}");
+
+        Assert.Equal("shared-rg", rg);
+        var invoke = (Dictionary<string, object?>)((Dictionary<string, object?>)program.Variables[apim.Resource.Id]!)["fn::invoke"]!;
+        Assert.Equal("azure-native:apimanagement:getApiManagementService", invoke["function"]);
+        var args = (Dictionary<string, object?>)invoke["arguments"]!;
+        Assert.Equal("shared-apim", args["serviceName"]);
+        Assert.Equal("shared-rg", args["resourceGroupName"]);
+        Assert.DoesNotContain(apim.Resource.Id, program.Resources.Keys);
+
+        var noGroup = builder.AddPulumiAzureApiManagement("apim2").AsExisting("a");
+        Assert.Throws<InvalidOperationException>(() => noGroup.Resource.AddExistingLookup(new PulumiProgram(), "x"));
+        Assert.Equal("rg-x", noGroup.WithExistingResourceGroup("rg-x").Resource.AddExistingLookup(new PulumiProgram(), "rg-x"));
+    }
+
+    [Fact]
+    public void Existing_service_contributes_children_and_outputs_but_no_service()
+    {
+        var builder = DistributedApplication.CreateBuilder();
+        var apim = builder.AddPulumiAzureApiManagement("apim").AsExisting("shared-apim", "shared-rg");
+        var api = apim.AddApi("catalog", "catalog");
+        apim.AddNamedValue("k", "v");
+        var program = new PulumiProgram();
+        apim.Resource.Contribute(program, "shared-rg", "westus");
+
+        Assert.DoesNotContain(apim.Resource.Id, program.Resources.Keys);
+        Assert.Contains(program.Resources.Values, r => r is Dictionary<string, object?> d && (string?)d["type"] == "azure-native:apimanagement:Api");
+        Assert.Equal("${apim.gatewayUrl}", program.Outputs["apimGatewayUrl"]);
+        Assert.Equal("${apim.name}", program.Outputs["apimName"]);
+        Assert.Equal("${apim.id}", program.Outputs["apimId"]);
+        Assert.DoesNotContain("apimPrincipalId", program.Outputs.Keys);
+        Assert.Throws<InvalidOperationException>(() => apim.Resource.PrincipalId);
+        _ = api;
+    }
+
+    [Fact]
+    public void New_service_without_options_throws_at_generation()
+    {
+        var builder = DistributedApplication.CreateBuilder();
+        var apim = builder.AddPulumiAzureApiManagement("apim");
+        Assert.Throws<InvalidOperationException>(() => apim.Resource.Contribute(new PulumiProgram(), "rg", "westus"));
+    }
+
+    [Fact]
+    public void ConfigureInfrastructure_service_node_throws_for_an_existing_service()
+    {
+        var builder = DistributedApplication.CreateBuilder();
+        var apim = builder.AddPulumiAzureApiManagement("apim").AsExisting("shared-apim", "shared-rg")
+            .ConfigureInfrastructure(i => _ = i.ApiManagementService);
+        Assert.Throws<InvalidOperationException>(() => apim.Resource.Contribute(new PulumiProgram(), "shared-rg", "westus"));
     }
 }

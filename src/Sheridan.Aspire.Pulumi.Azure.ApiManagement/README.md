@@ -53,8 +53,21 @@ var api = apim.AddApi("people-api", "people")
 - A URL import is re-run only when the URL string changes, not when the remote document does. Without `WithBackend`, API Management takes the service URL from the document's `servers`, which generated documents often point at localhost.
 - **OpenAPI 3.1 caveat:** API Management supports OpenAPI 3.1 for import only and not fully. Documents emitted by `Microsoft.AspNetCore.OpenApi` (3.1) import, but 3.1-only keywords (for example `prefixItems`, `const`) and some `$ref` forms are ignored, downgraded or can fail the deployment. If an import fails, configure the generator for OpenAPI 3.0 (`OpenApiVersion = OpenApiSpecVersion.OpenApi3_0`). Swagger 2.0 documents are not supported by `WithOpenApi`. Recursive schemas are also unsupported by API Management.
 
+## Existing service
+
+To add APIs to a service owned elsewhere (for example another stack or resource group), call `AsExisting` (alias `PublishAsExisting`). The service is only looked up (`getApiManagementService`), never created or modified, so no publisher or SKU options are needed; the APIs, backends, products, named values and policies are created beneath it. `gatewayUrl`, `name` and `id` outputs resolve from the existing service; `principalId` is not exposed, and `ConfigureInfrastructure(...).ApiManagementService` throws (there is no resource to configure). A group passed to `AsExisting` is always the one used for the lookup and the child resources; publisher/SKU options supplied earlier are ignored. Resource group is optional if `WithExistingResourceGroup`/`WithResourceGroup` is used, and no group is created for the lookup.
+
+```csharp
+var apim = builder.AddPulumiAzureApiManagement("apim")   // no options overload
+    .WithPulumiStack(stack)
+    .AsExisting("shared-apim", "shared-rg");
+apim.AddApi("catalog-api", "catalog");
+```
+
+Note that service-scope policies (`WithPolicy`/`WithInboundPolicy`) replace the existing service's policy; omit them to leave it untouched.
+
 ## Not yet ported
 
-Compute-targeted `AddApi<T>`, Foundry/OpenAI/Blob backends and backend pools, policy fragments, subscriptions, Key Vault named values, Application Insights diagnostics, custom domains, existing-service adoption and networking.
+Compute-targeted `AddApi<T>`, Foundry/OpenAI/Blob backends and backend pools, policy fragments, subscriptions, Key Vault named values, Application Insights diagnostics, custom domains, networking.
 
 Upstream status: `Aspire.Hosting.Azure.ApiManagement` is experimental and was merged after Aspire 13.6.4; track changes in [#138](https://github.com/two4suited/Sheridan.Aspire.Pulumi/issues/138).
