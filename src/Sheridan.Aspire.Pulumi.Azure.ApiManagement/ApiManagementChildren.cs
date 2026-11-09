@@ -79,6 +79,7 @@ internal sealed class AzureApiManagementOpenApiSource
             if (!File.Exists(full))
                 throw new FileNotFoundException($"The OpenAPI document '{full}' (from '{path}') does not exist. Build the project that generates it before publishing.", full);
             var content = File.ReadAllText(full);
+            if (string.IsNullOrWhiteSpace(content)) throw new InvalidOperationException($"The OpenAPI document '{full}' is empty.");
             var yaml = System.IO.Path.GetExtension(full).ToLowerInvariant() is ".yaml" or ".yml"
                 || (System.IO.Path.GetExtension(full).ToLowerInvariant() != ".json" && !content.TrimStart().StartsWith('{'));
             return (yaml ? "openapi" : "openapi+json", content);

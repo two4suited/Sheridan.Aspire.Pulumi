@@ -22,10 +22,52 @@ public static class AzureApiManagementExtensions
         return builder.AddResource(new AzureApiManagementResource(name, options)).ExcludeFromManifest();
     }
 
-    /// <summary>Alias of <see cref="AddPulumiAzureApiManagement"/>.</summary>
+    /// <summary>
+    /// Adds an Azure API Management service without options, for a service that already exists: follow with
+    /// <see cref="AsExisting"/>. Provisioning throws unless <c>AsExisting</c> is called.
+    /// </summary>
+    public static IResourceBuilder<AzureApiManagementResource> AddPulumiAzureApiManagement(
+        this IDistributedApplicationBuilder builder, string name)
+    {
+        ArgumentNullException.ThrowIfNull(builder);
+        ArgumentException.ThrowIfNullOrEmpty(name);
+        return builder.AddResource(new AzureApiManagementResource(name)).ExcludeFromManifest();
+    }
+
+    /// <summary>Alias of <see cref="AddPulumiAzureApiManagement(IDistributedApplicationBuilder, string, AzureApiManagementOptions)"/>.</summary>
     public static IResourceBuilder<AzureApiManagementResource> AddPulumiApiManagement(
         this IDistributedApplicationBuilder builder, string name, AzureApiManagementOptions options) =>
         builder.AddPulumiAzureApiManagement(name, options);
+
+    /// <summary>Alias of <see cref="AddPulumiAzureApiManagement(IDistributedApplicationBuilder, string)"/>.</summary>
+    public static IResourceBuilder<AzureApiManagementResource> AddPulumiApiManagement(
+        this IDistributedApplicationBuilder builder, string name) =>
+        builder.AddPulumiAzureApiManagement(name);
+
+    /// <summary>
+    /// Uses an existing API Management service instead of creating one: it is looked up by name and resource group and never
+    /// created or modified (publisher and SKU options are not needed); the APIs, backends, products, named values and
+    /// policies declared here are created beneath it. Outputs (gateway URL, name, id) resolve from the existing service. Mirrors <c>PublishAsExisting</c>.
+    /// </summary>
+    /// <param name="existingResourceName">Name of the existing API Management service.</param>
+    /// <param name="resourceGroupName">Resource group of the service; when omitted, the resource group configured for this resource (<c>WithResourceGroup</c>/<c>WithExistingResourceGroup</c>) is used.</param>
+    public static IResourceBuilder<AzureApiManagementResource> PublishAsExisting(
+        this IResourceBuilder<AzureApiManagementResource> builder, string existingResourceName, string? resourceGroupName = null)
+    {
+        ArgumentNullException.ThrowIfNull(builder);
+        ArgumentException.ThrowIfNullOrEmpty(existingResourceName);
+        if (resourceGroupName is not null) ArgumentException.ThrowIfNullOrEmpty(resourceGroupName);
+        builder.Resource.ExistingServiceName = existingResourceName;
+        builder.Resource.ExistingServiceResourceGroup = resourceGroupName;
+        // Also marks a resource group as configured so none is created just for the lookup.
+        if (resourceGroupName is not null) builder.Resource.ExistingResourceGroup = resourceGroupName;
+        return builder;
+    }
+
+    /// <summary>Alias of <see cref="PublishAsExisting"/> (this resource has no local run mode). Mirrors <c>AsExisting</c>.</summary>
+    public static IResourceBuilder<AzureApiManagementResource> AsExisting(
+        this IResourceBuilder<AzureApiManagementResource> builder, string existingResourceName, string? resourceGroupName = null) =>
+        builder.PublishAsExisting(existingResourceName, resourceGroupName);
 
     /// <summary>Adds an API published under <paramref name="path"/> (the equivalent of <c>AddApi(name, path)</c>).</summary>
     public static IResourceBuilder<AzureApiManagementApiResource> AddApi(
