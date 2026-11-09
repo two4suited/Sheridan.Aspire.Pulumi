@@ -1,6 +1,7 @@
 using Aspire.Hosting;
 using Aspire.Hosting.ApplicationModel;
 using Sheridan.Aspire.Pulumi.Azure.ApiManagement;
+using Sheridan.Aspire.Pulumi.Azure.AppContainers;
 using Xunit;
 
 namespace Sheridan.Aspire.Pulumi.Tests;
@@ -112,5 +113,58 @@ public sealed class ApiManagementTests
         api.WithOpenApi("openapi: 3.1.0", AzureApiManagementOpenApiFormat.Yaml).WithBackend(backend);
         Assert.Same(backend.Resource, api.Resource.Backend);
         Assert.Empty(AzureApiManagementResource.EffectiveOperations(api.Resource));
+    }
+
+    private static (IResourceBuilder<AzureApiManagementResource> Apim, IDistributedApplicationBuilder App) NewApim()
+    {
+        var app = DistributedApplication.CreateBuilder();
+        var apim = app.AddPulumiAzureApiManagement("apim", new AzureApiManagementOptions { PublisherEmail = "a@b.c", PublisherName = "p" });
+        return (apim, app);
+    }
+
+    [Fact]
+    public void Literal_url_backend_is_unchanged()
+    {
+        var (apim, _) = NewApim();
+        var backend = apim.AddBackend("b", "https://example.com");
+        Assert.Equal("https://example.com", backend.Resource.Url);
+        Assert.Equal("https://example.com", apim.Resource.ResolveBackendUrl(backend.Resource, null));
+    }
+
+    [Fact]
+    public void Compute_backend_uses_the_container_app_ingress_fqdn()
+    {
+        var (apim, app) = NewApim();
+        var env = app.AddPulumiAzureContainerAppEnvironment("env");
+        var people = app.AddContainer("people-api", "img").WithHttpEndpoint(targetPort: 8080).WithExternalHttpEndpoints().WithComputeEnvironment(env);
+
+        var backend = apim.AddBackend("people-backend", people);
+
+        Assert.Null(backend.Resource.Url);
+        Assert.Equal("https://${peopleApiApp.configuration.ingress.fqdn}", apim.Resource.ResolveBackendUrl(backend.Resource, null));
+    }
+
+    [Fact]
+    public void Compute_backend_requires_an_http_endpoint_and_a_container_apps_environment()
+    {
+        var (apim, app) = NewApim();
+        var env = app.AddPulumiAzureContainerAppEnvironment("env");
+        var noEndpoint = app.AddContainer("worker", "img").WithComputeEnvironment(env);
+        var b = apim.AddBackend("worker-backend", noEndpoint);
+        Assert.Throws<InvalidOperationException>(() => apim.Resource.ResolveBackendUrl(b.Resource, null));
+
+        var noEnv = app.AddContainer("orphan", "img").WithHttpEndpoint(targetPort: 80);
+        var b2 = apim.AddBackend("orphan-backend", noEnv);
+        Assert.ThrowsAny<Exception>(() => apim.Resource.ResolveBackendUrl(b2.Resource, null));
+    }
+
+    [Fact]
+    public void Backend_names_stay_unique_across_overloads()
+    {
+        var (apim, app) = NewApim();
+        var env = app.AddPulumiAzureContainerAppEnvironment("env");
+        var c = app.AddContainer("svc", "img").WithHttpEndpoint(targetPort: 80).WithComputeEnvironment(env);
+        apim.AddBackend("b", "https://example.com");
+        Assert.Throws<InvalidOperationException>(() => apim.AddBackend("b", c));
     }
 }

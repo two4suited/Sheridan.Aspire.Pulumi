@@ -30,9 +30,25 @@ apim.AddApi("catalog-api", "catalog", subscriptionRequired: false).WithBackend(b
 builder.Build().Run();
 ```
 
+### Backend from a container app
+
+Instead of a literal URL, point a backend at a project or container deployed to an Azure Container Apps environment (in the same Pulumi stack). The backend URL becomes `https://<container app ingress FQDN>`, a Pulumi expression on the container app (`configuration.ingress.fqdn`), so the backend is created after the app and nothing is hard-coded:
+
+```csharp
+var acaEnv = builder.AddPulumiAzureContainerAppEnvironment("env");
+var people = builder.AddProject<Projects.People_Api>("people-api")
+    .WithExternalHttpEndpoints()
+    .WithComputeEnvironment(acaEnv);
+
+var backend = apim.AddBackend("people-backend", people);
+apim.AddApi("people-api-gw", "people").WithBackend(backend);
+```
+
+The resource needs an external http/https endpoint (`WithExternalHttpEndpoints()`) and must not be a Container Apps job. Routed APIs' policies are ordered after the backend they reference.
+
 ## Supported
 
-`AddApi`, `WithOpenApi` (see below), `AddOperation`, `AddBackend` + `WithBackend` (a routed API with neither modeled operations nor an OpenAPI document gets wildcard proxy operations), `AddProduct` + `WithApi`, `AddNamedValue` (literal or secret), service/API/operation policies (`WithInboundPolicy`, `WithPolicy`), and `ConfigureInfrastructure` (root `ApiManagementService`).
+`AddApi`, `WithOpenApi` (see below), `AddOperation`, `AddBackend` (literal URL or compute resource) + `WithBackend` (a routed API with neither modeled operations nor an OpenAPI document gets wildcard proxy operations), `AddProduct` + `WithApi`, `AddNamedValue` (literal or secret), service/API/operation policies (`WithInboundPolicy`, `WithPolicy`), and `ConfigureInfrastructure` (root `ApiManagementService`).
 
 ## OpenAPI import
 

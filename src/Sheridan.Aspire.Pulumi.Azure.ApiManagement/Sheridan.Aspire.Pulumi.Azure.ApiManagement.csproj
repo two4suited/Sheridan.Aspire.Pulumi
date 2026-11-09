@@ -21,6 +21,8 @@
     <ProjectReference Include="..\Sheridan.Aspire.Pulumi\Sheridan.Aspire.Pulumi.csproj" />
     <ProjectReference Include="..\Sheridan.Aspire.Pulumi.Azure.Base\Sheridan.Aspire.Pulumi.Azure.Base.csproj" />
     <ProjectReference Include="..\Sheridan.Aspire.Pulumi.Provisioning\Sheridan.Aspire.Pulumi.Provisioning.csproj" />
+    <!-- AddBackend(compute resource): the container app ingress FQDN. -->
+    <ProjectReference Include="..\Sheridan.Aspire.Pulumi.Azure.AppContainers\Sheridan.Aspire.Pulumi.Azure.AppContainers.csproj" />
     <!-- Only for IPulumiManagedIdentityResource (the compute environment identity that receives data-plane roles). -->
     <ProjectReference Include="..\Sheridan.Aspire.Pulumi.Azure\Sheridan.Aspire.Pulumi.Azure.csproj" />
   </ItemGroup>

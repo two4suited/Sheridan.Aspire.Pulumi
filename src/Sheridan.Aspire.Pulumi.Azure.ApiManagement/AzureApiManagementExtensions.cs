@@ -53,12 +53,39 @@ public static class AzureApiManagementExtensions
         ArgumentException.ThrowIfNullOrEmpty(name);
         if (!Uri.TryCreate(url, UriKind.Absolute, out var uri) || uri.Scheme is not ("http" or "https"))
             throw new ArgumentException($"'{url}' is not an absolute http(s) URL.", nameof(url));
+        return AddBackendCore(builder, name, protocol, validateCertificateChain, backendName, (resolved, parent) =>
+            new AzureApiManagementBackendResource(name, resolved, url, parent));
+    }
+
+    /// <summary>
+    /// Adds a backend whose URL is <c>https://&lt;ingress FQDN&gt;</c> of a project or container deployed to an Azure Container Apps
+    /// environment (<c>AddPulumiAzureContainerAppEnvironment</c>) in the same Pulumi stack. The FQDN is a Pulumi output of the
+    /// container app, so the backend is created after the app. The resource needs an http/https endpoint.
+    /// </summary>
+    public static IResourceBuilder<AzureApiManagementBackendResource> AddBackend<T>(
+        this IResourceBuilder<AzureApiManagementResource> builder, string name, IResourceBuilder<T> compute,
+        string protocol = "http", bool validateCertificateChain = true, string? backendName = null)
+        where T : IComputeResource, IResourceWithEndpoints
+    {
+        ArgumentNullException.ThrowIfNull(compute);
+        return AddBackendCore(builder, name, protocol, validateCertificateChain, backendName, (resolved, parent) =>
+            new AzureApiManagementBackendResource(name, resolved, null, parent) { Compute = compute.Resource });
+    }
+
+    private static IResourceBuilder<AzureApiManagementBackendResource> AddBackendCore(
+        IResourceBuilder<AzureApiManagementResource> builder, string name, string protocol, bool validateCertificateChain, string? backendName,
+        Func<string, AzureApiManagementResource, AzureApiManagementBackendResource> create)
+    {
+        ArgumentNullException.ThrowIfNull(builder);
+        ArgumentException.ThrowIfNullOrEmpty(name);
         if (protocol is not ("http" or "soap")) throw new ArgumentException("The protocol must be 'http' or 'soap'.", nameof(protocol));
         var parent = builder.Resource;
         var resolved = backendName ?? name;
         if (parent.Backends.Any(b => string.Equals(b.BackendName, resolved, StringComparison.OrdinalIgnoreCase)))
             throw new InvalidOperationException($"API Management '{parent.Name}' already has a backend named '{resolved}'.");
-        var backend = new AzureApiManagementBackendResource(name, resolved, url, parent) { Protocol = protocol, ValidateCertificateChain = validateCertificateChain };
+        var backend = create(resolved, parent);
+        backend.Protocol = protocol;
+        backend.ValidateCertificateChain = validateCertificateChain;
         parent.Backends.Add(backend);
         return builder.ApplicationBuilder.AddResource(backend).ExcludeFromManifest();
     }

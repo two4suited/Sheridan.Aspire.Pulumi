@@ -25,6 +25,7 @@
 
   <ItemGroup>
     <InternalsVisibleTo Include="Sheridan.Aspire.Pulumi.Tests" />
+    <InternalsVisibleTo Include="Sheridan.Aspire.Pulumi.Azure.ApiManagement" />
   </ItemGroup>
 
 </Project>
