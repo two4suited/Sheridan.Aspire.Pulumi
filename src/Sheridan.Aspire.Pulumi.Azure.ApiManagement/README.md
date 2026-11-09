@@ -40,7 +40,7 @@ builder.Build().Run();
 
 ```csharp
 var api = apim.AddApi("people-api", "people")
-    .WithOpenApi("../People.Api/People.Api.json")                 // file: JSON or YAML (by extension, else by content)
+    .WithOpenApi("../People.Api/obj/People.Api.json")                 // file: JSON or YAML (by extension, else by content)
     .WithBackend(backend);
 
 // .WithOpenApi(new Uri("https://example.com/openapi.json"))       // API Management downloads it (openapi-link)
@@ -48,8 +48,10 @@ var api = apim.AddApi("people-api", "people")
 ```
 
 - A **file** is read when the Pulumi program is generated (publish), not when the AppHost starts, so it can be produced by a build step. Relative paths resolve against the AppHost directory; a missing file fails with an error naming the resolved path.
-- With an OpenAPI document, `WithBackend` still adds the `set-backend-service` policy but **no wildcard proxy operations**: the operations come from the document. Operations added with `AddOperation` are created in addition.
-- **OpenAPI 3.1 caveat:** API Management supports OpenAPI 3.1 for import only and not fully. Documents emitted by `Microsoft.AspNetCore.OpenApi` (3.1) import, but 3.1-only keywords (for example `prefixItems`, `const`) and some `$ref` forms are ignored, downgraded or can fail the deployment. If an import fails, configure the generator for OpenAPI 3.0 (`OpenApiVersion = OpenApiSpecVersion.OpenApi3_0`) or use 2.0/3.0.x. Recursive schemas are also unsupported by API Management.
+- With an OpenAPI document, `WithBackend` still adds the `set-backend-service` policy but **no wildcard proxy operations**: the operations come from the document. Prefer not to combine it with `AddOperation`: re-importing a changed document makes API Management replace the API's operation set, which can drop Pulumi-managed operations until the next `pulumi up`. Imported operations cannot take operation-level policies; use API-scope policies.
+- The file path must point at the generated document (with `Microsoft.Extensions.ApiDescription.Server` it is written to the project's `obj/` unless `OpenApiDocumentsDirectory` is set). Interpolation openers in the document are escaped for Pulumi automatically.
+- A URL import is re-run only when the URL string changes, not when the remote document does. Without `WithBackend`, API Management takes the service URL from the document's `servers`, which generated documents often point at localhost.
+- **OpenAPI 3.1 caveat:** API Management supports OpenAPI 3.1 for import only and not fully. Documents emitted by `Microsoft.AspNetCore.OpenApi` (3.1) import, but 3.1-only keywords (for example `prefixItems`, `const`) and some `$ref` forms are ignored, downgraded or can fail the deployment. If an import fails, configure the generator for OpenAPI 3.0 (`OpenApiVersion = OpenApiSpecVersion.OpenApi3_0`). Swagger 2.0 documents are not supported by `WithOpenApi`. Recursive schemas are also unsupported by API Management.
 
 ## Not yet ported
 
