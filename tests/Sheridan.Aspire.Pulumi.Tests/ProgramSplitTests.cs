@@ -157,6 +157,23 @@ public sealed class ProgramSplitTests
             Assert.Contains(kept, full);
     }
 
+    [Fact]
+    public void Infrastructure_that_reaches_an_app_through_a_variable_is_deferred()
+    {
+        var p = new PulumiProgram();
+        p.Resources["storage"] = Res("azure-native:storage:StorageAccount");
+        p.AddAppResource("apiApp", Res("azure-native:app:ContainerApp"));
+        p.Variables["apiHost"] = "${apiApp.configuration.ingress.fqdn}";
+        p.Resources["backend"] = Res("azure-native:apimanagement:Backend", new() { ["url"] = "https://${apiHost}" });
+
+        Assert.Equal(["backend"], p.GetDeferredResources());
+        Assert.Equal(["storage"], p.GetInfrastructureTargets().Select(t => t.Name));
+        var yaml = p.ToProvisionYaml("split", "test")!;
+        Assert.DoesNotContain("apiHost", yaml);
+        Assert.DoesNotContain("backend:", yaml);
+        Assert.Contains("  apiApp:", yaml);
+    }
+
     /// <summary>
     /// Issue #204, against the real pulumi CLI: infrastructure that reads a nested property of an app (an API Management
     /// backend on a container app's ingress FQDN) cannot be evaluated before the app exists, even when it is not targeted.
@@ -196,6 +213,10 @@ public sealed class ProgramSplitTests
             var provision = new List<string> { "up", "--yes", "--skip-preview", "--non-interactive" };
             foreach (var (type, name) in p.GetInfrastructureTargets())
                 provision.AddRange(["--target", $"urn:pulumi:dev::split::{type}::{name}"]);
+
+            // Control: with the full program the same targeted update fails, although the backend is not targeted.
+            var failure = await Assert.ThrowsAnyAsync<Exception>(() => Pulumi(dir, env, provision.ToArray()));
+            Assert.Contains("receiver must be a list or object, not nil", failure.Message);
 
             // Provision pass, first deploy.
             await File.WriteAllTextAsync(program, p.ToProvisionYaml("split", "test"));

@@ -92,11 +92,11 @@ public sealed class PulumiProgram
             .ToList();
     }
 
-    /// <summary>The apps plus every resource that (transitively) references one.</summary>
+    /// <summary>The apps plus every resource and variable that (transitively, also through a variable) references one.</summary>
     private HashSet<string> AppSide()
     {
         var apps = new HashSet<string>(_appResources);
-        Close(apps, Resources);
+        Close(apps, Resources, Variables);
         return apps;
     }
 
@@ -121,6 +121,7 @@ public sealed class PulumiProgram
     {
         var deferred = AppSide();
         deferred.ExceptWith(_appResources);
+        deferred.IntersectWith(Resources.Keys);
         return deferred;
     }
 
@@ -137,7 +138,9 @@ public sealed class PulumiProgram
     /// </summary>
     public string? ToProvisionYaml(string name, string description)
     {
-        var omitted = new HashSet<string>(GetDeferredResources());
+        // Deferred resources, and variables that read an app.
+        var omitted = AppSide();
+        omitted.ExceptWith(_appResources);
         if (omitted.Count == 0) return null;
         Close(omitted, Resources, Variables);
 
