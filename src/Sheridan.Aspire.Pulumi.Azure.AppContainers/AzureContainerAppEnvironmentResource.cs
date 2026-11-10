@@ -425,8 +425,10 @@ public sealed class AzureContainerAppEnvironmentResource : PulumiAzureResource, 
                 continue;
             }
 
-            // TLS ends at the ingress, which forwards plain HTTP to the target port: the container must not also bind HTTPS there.
-            if (key is "HTTPS_PORTS") continue;
+            // Aspire's own listener settings for the app's endpoints (references to its own target ports). TLS ends at the ingress,
+            // which forwards plain HTTP to one target port, so the container must not be told to bind HTTPS, or several Kestrel
+            // endpoints, there; the app keeps its own configuration. Literal values set by the AppHost author pass through.
+            if (value is not string && IsListenerSetting(key)) continue;
 
             string? resolved;
             try
@@ -452,6 +454,10 @@ public sealed class AzureContainerAppEnvironmentResource : PulumiAzureResource, 
 
         return env;
     }
+
+    private static bool IsListenerSetting(string key) =>
+        key is "HTTPS_PORTS" ||
+        (key.StartsWith("Kestrel__Endpoints__", StringComparison.OrdinalIgnoreCase) && key.EndsWith("__Url", StringComparison.OrdinalIgnoreCase));
 
     /// <summary>
     /// Resolves an environment value. Endpoints of container apps in this environment (service discovery from
@@ -527,7 +533,8 @@ public sealed class AzureContainerAppEnvironmentResource : PulumiAzureResource, 
         {
             var domain = $"${{{Id}.defaultDomain}}";
             host = httpEndpoints.Any(e => e.IsExternal) ? $"{host}.{domain}" : $"{host}.internal.{domain}";
-            (scheme, port, targetPort) = ("https", 443, IngressTargetPort(httpEndpoints));
+            // An endpoint with its own target port keeps it, though only the ingress target port is reachable through the ingress.
+            (scheme, port, targetPort) = ("https", 443, annotation.TargetPort ?? IngressTargetPort(httpEndpoints));
         }
         else
         {

@@ -202,6 +202,71 @@ public sealed class ContainerAppServiceDiscoveryTests
     }
 
     [Fact]
+    public async Task Literal_listener_settings_pass_through()
+    {
+        var builder = PublishBuilder();
+        var env = builder.AddPulumiAzureContainerAppEnvironment("aca-env");
+        var web = Target(builder.AddContainer("web", "web")
+            .WithHttpEndpoint(targetPort: 8080)
+            .WithEnvironment("HTTPS_PORTS", "8443")
+            .WithEnvironment("Kestrel__Endpoints__grpc__Url", "http://*:9090"), env);
+
+        var vars = await EnvAsync(builder, env, web.Resource);
+
+        Assert.Equal("8443", vars["HTTPS_PORTS"]);
+        Assert.Equal("http://*:9090", vars["Kestrel__Endpoints__grpc__Url"]);
+    }
+
+    [Fact]
+    public async Task Kestrel_endpoint_overrides_from_own_endpoints_are_not_emitted_and_target_ports_stay_distinct()
+    {
+        var builder = PublishBuilder();
+        var env = builder.AddPulumiAzureContainerAppEnvironment("aca-env");
+        var api = Target(builder.AddContainer("api", "api")
+            .WithHttpEndpoint(targetPort: 8080)
+            .WithHttpsEndpoint(targetPort: 8443), env);
+        var http = api.GetEndpoint("http");
+        var https = api.GetEndpoint("https");
+        // What Aspire sets for a project with Kestrel:Endpoints configuration.
+        api.WithEnvironment("Kestrel__Endpoints__http__Url", ReferenceExpression.Create($"http://*:{http.Property(EndpointProperty.TargetPort)}"))
+            .WithEnvironment("Kestrel__Endpoints__https__Url", ReferenceExpression.Create($"https://*:{https.Property(EndpointProperty.TargetPort)}"))
+            .WithEnvironment("OWN_HTTP_TARGET", http.Property(EndpointProperty.TargetPort))
+            .WithEnvironment("OWN_HTTPS_TARGET", https.Property(EndpointProperty.TargetPort));
+
+        var vars = await EnvAsync(builder, env, api.Resource);
+
+        // As before the fix, the app binds from its own Kestrel configuration: no two listeners forced onto one port.
+        Assert.DoesNotContain("Kestrel__Endpoints__http__Url", vars.Keys);
+        Assert.DoesNotContain("Kestrel__Endpoints__https__Url", vars.Keys);
+        // Each endpoint reports its own target port rather than the ingress one.
+        Assert.Equal("8080", vars["OWN_HTTP_TARGET"]);
+        Assert.Equal("8443", vars["OWN_HTTPS_TARGET"]);
+    }
+
+    [Fact]
+    public async Task Mutual_references_do_not_read_the_other_apps_pulumi_resource()
+    {
+        var builder = PublishBuilder();
+        var env = builder.AddPulumiAzureContainerAppEnvironment("aca-env");
+        var a = Target(builder.AddContainer("svc-a", "a").WithHttpEndpoint(targetPort: 8080), env);
+        var b = Target(builder.AddContainer("svc-b", "b").WithHttpEndpoint(targetPort: 8080).WithExternalHttpEndpoints(), env);
+        a.WithReference(b.GetEndpoint("http"));
+        b.WithReference(a.GetEndpoint("http"));
+
+        var aVars = await EnvAsync(builder, env, a.Resource);
+        var bVars = await EnvAsync(builder, env, b.Resource);
+
+        Assert.Equal($"https://svc-b.{Domain(env)}", aVars["services__svc-b__http__0"]);
+        Assert.Equal($"https://svc-a.internal.{Domain(env)}", bVars["services__svc-a__http__0"]);
+        // Addresses come from the app name and the environment's domain only: no dependency (or cycle) between the two apps,
+        // and no nested read of an app that may not exist yet.
+        var aId = AzureContainerAppEnvironmentResource.AppId("svc-a");
+        var bId = AzureContainerAppEnvironmentResource.AppId("svc-b");
+        Assert.DoesNotContain(aVars.Values, v => v!.Contains("${" + bId) || v.Contains("${" + aId));
+        Assert.DoesNotContain(bVars.Values, v => v!.Contains("${" + aId) || v.Contains("${" + bId));
+    }
+
+    [Fact]
     public void Endpoints_outside_the_environment_are_not_mapped()
     {
         var builder = PublishBuilder();
