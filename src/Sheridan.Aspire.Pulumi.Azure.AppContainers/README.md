@@ -34,6 +34,31 @@ builder.Build().Run();
 - The environment's shared identity is granted data-plane roles by the data integrations (Cosmos DB, Storage, Service Bus, Key Vault, ...) automatically when an app references them.
 - Images are tagged with a per-deploy timestamp so every deploy creates a new revision.
 
+## Service discovery between apps
+
+`WithReference` to another resource deployed to the same environment sets the service-discovery variables on the caller, as the official Container Apps publisher does, so `https+http://catalog-api` resolves at runtime:
+
+```csharp
+var catalog = builder.AddProject<Projects.Catalog_Api>("catalog-api")
+    .WithComputeEnvironment(acaEnv);
+
+builder.AddProject<Projects.Web>("web")
+    .WithExternalHttpEndpoints()
+    .WithReference(catalog)              // services__catalog-api__http__0 and services__catalog-api__https__0
+    .WithComputeEnvironment(acaEnv);
+```
+
+| Target endpoint | Value |
+| --- | --- |
+| HTTP or HTTPS, internal ingress (default) | `https://<app>.internal.<environment default domain>` |
+| HTTP or HTTPS, external ingress (`WithExternalHttpEndpoints`) | `https://<app>.<environment default domain>` |
+| Other schemes (e.g. `tcp`) | `<scheme>://<app>:<port>` |
+
+- `<app>` is the target's container app name and the domain is the managed environment's `defaultDomain` (also for `AsExisting` environments).
+- Both `services__<name>__http__0` and `services__<name>__https__0` carry an `https://` URL: the ingress is created with `allowInsecure: false`, so HTTP endpoints are upgraded to HTTPS, matching upstream's default.
+- The same mapping applies to `WithReference(target.GetEndpoint("http"))` and to endpoint values in `WithEnvironment` (`GetEndpoint(...)`, `.Property(EndpointProperty.Host | Port | HostAndPort | Scheme | TargetPort)`, and `ReferenceExpression`s built from them); `Port` is `443` for ingress endpoints.
+- Endpoints of resources that aren't deployed to this environment, and of Container Apps jobs (which have no ingress), are not mapped.
+
 ## Deploying into an existing environment
 
 `AsExisting` (alias `PublishAsExisting`) looks up a managed environment created elsewhere with `azure-native:app:getManagedEnvironment` instead of creating it (no managed environment, Log Analytics workspace or dashboard is created). Container apps and jobs, the ACR pull identity and its AcrPull assignment are still created. The environment has no registry of its own in this mode, so pair it with `WithAzureContainerRegistry` (typically an `AsExisting` registry from the ContainerRegistry package). `WithAzureLogAnalyticsWorkspace`, `WithDelegatedSubnet`, Front Door private link and `WithDashboard(true)` aren't allowed with an existing environment (they throw at generation). Container apps and jobs are created in the existing environment's region (`location` is taken from the lookup).

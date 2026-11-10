@@ -1,3 +1,5 @@
+using System.Globalization;
+using Aspire.Hosting;
 using Aspire.Hosting.ApplicationModel;
 using Aspire.Hosting.Pipelines;
 using Sheridan.Aspire.Pulumi.Azure.Base;
@@ -398,21 +400,21 @@ public sealed class AzureContainerAppEnvironmentResource : PulumiAzureResource, 
     /// <summary>Program id of the container app or job emitted for the compute resource with the given Aspire name.</summary>
     internal static string AppId(string computeResourceName) => PulumiAzureProgramExtensions.ToPulumiId(computeResourceName) + "App";
 
-    private async Task<Dictionary<string, object?>> BuildContainerAppAsync(
-        IResource r, PulumiContainerAppJobAnnotation? job, PulumiStackResource stack, string rg, PipelineStepContext ctx, bool existingEnvironment)
-    {
-        var appName = ContainerAppName(r.Name, job is not null);
-        var imageName = r.Name.ToLowerInvariant();
+    private static List<EndpointAnnotation> HttpEndpoints(IResource r) =>
+        r.TryGetEndpoints(out var eps) ? eps.Where(e => e.UriScheme is "http" or "https").ToList() : [];
 
+    private static int IngressTargetPort(List<EndpointAnnotation> httpEndpoints) => httpEndpoints.FirstOrDefault()?.TargetPort ?? 8080;
+
+    /// <summary>Resolves the environment variables of a compute resource into the container's <c>env</c> entries.</summary>
+    internal async Task<List<object?>> BuildEnvironmentAsync(
+        IResource r, DistributedApplicationExecutionContext executionContext, ILogger logger, PulumiStackResource? stack, CancellationToken cancellationToken)
+    {
         var envVars = new Dictionary<string, object>();
-        var envContext = new EnvironmentCallbackContext(ctx.ExecutionContext, r, envVars, ctx.CancellationToken);
+        var envContext = new EnvironmentCallbackContext(executionContext, r, envVars, cancellationToken);
         foreach (var a in r.Annotations.OfType<EnvironmentCallbackAnnotation>())
             await a.Callback(envContext);
 
-        var httpEndpoints = r.TryGetEndpoints(out var eps)
-            ? eps.Where(e => e.UriScheme is "http" or "https").ToList()
-            : [];
-        var targetPort = httpEndpoints.FirstOrDefault()?.TargetPort ?? 8080;
+        var targetPort = IngressTargetPort(HttpEndpoints(r));
         var env = new List<object?>();
         foreach (var (key, value) in envVars)
         {
@@ -426,19 +428,14 @@ public sealed class AzureContainerAppEnvironmentResource : PulumiAzureResource, 
             string? resolved;
             try
             {
-                using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ctx.CancellationToken);
+                using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
                 timeout.CancelAfter(TimeSpan.FromSeconds(3));
-                resolved = value switch
-                {
-                    string s => s,
-                    IValueProvider p => await p.GetValueAsync(timeout.Token),
-                    _ => value.ToString(),
-                };
+                resolved = await ResolveValueAsync(value, timeout.Token);
             }
-            catch (Exception e) when (e is not OperationCanceledException || !ctx.CancellationToken.IsCancellationRequested)
+            catch (Exception e) when (e is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
             {
                 // Outputs of infrastructure that doesn't exist yet resolve after the provision pass, when deploy regenerates the program.
-                ctx.Logger.LogDeferredEnvironmentVariable(stack, key, r.Name, e);
+                logger.LogDeferredEnvironmentVariable(stack, key, r.Name, e);
                 continue;
             }
 
@@ -449,6 +446,111 @@ public sealed class AzureContainerAppEnvironmentResource : PulumiAzureResource, 
         // The app runs as the environment's user-assigned identity; DefaultAzureCredential only picks it when told its client id.
         if (!envVars.ContainsKey("AZURE_CLIENT_ID"))
             env.Add(new Dictionary<string, object?> { ["name"] = "AZURE_CLIENT_ID", ["value"] = $"${{{IdentityRef}.clientId}}" });
+
+        return env;
+    }
+
+    /// <summary>
+    /// Resolves an environment value. Endpoints of container apps in this environment (service discovery from
+    /// <c>WithReference(project)</c>, <c>GetEndpoint(...)</c>) have no allocated address at publish time, so they are mapped to the
+    /// app's ingress address the way the official Container Apps publisher does; everything else resolves through its value provider.
+    /// </summary>
+    private async Task<string?> ResolveValueAsync(object value, CancellationToken cancellationToken)
+    {
+        switch (value)
+        {
+            case string s:
+                return s;
+            case EndpointReference ep when TryGetEndpointValue(ep.Property(EndpointProperty.Url), out var url):
+                return url;
+            case EndpointReferenceExpression epExpr when TryGetEndpointValue(epExpr, out var endpointValue):
+                return endpointValue;
+            case ReferenceExpression { IsConditional: true } conditional when ReferencesEnvironmentEndpoint(conditional):
+                var condition = await ResolveValueAsync(conditional.Condition!, cancellationToken);
+                return await ResolveValueAsync(
+                    string.Equals(condition, conditional.MatchValue, StringComparison.OrdinalIgnoreCase) ? conditional.WhenTrue! : conditional.WhenFalse!,
+                    cancellationToken);
+            case ReferenceExpression { IsConditional: false } expr when ReferencesEnvironmentEndpoint(expr) && expr.StringFormats.All(f => f is null):
+                var args = new object?[expr.ValueProviders.Count];
+                for (var i = 0; i < args.Length; i++)
+                    args[i] = await ResolveValueAsync(expr.ValueProviders[i], cancellationToken);
+                return string.Format(CultureInfo.InvariantCulture, expr.Format, args);
+            case IValueProvider p:
+                return await p.GetValueAsync(cancellationToken);
+            default:
+                return value.ToString();
+        }
+    }
+
+    /// <summary>Whether an expression (at any depth) reads an endpoint of a container app in this environment.</summary>
+    private bool ReferencesEnvironmentEndpoint(object? value) => value switch
+    {
+        EndpointReference ep => TryGetEndpointValue(ep.Property(EndpointProperty.Url), out _),
+        EndpointReferenceExpression epExpr => TryGetEndpointValue(epExpr, out _),
+        ReferenceExpression { IsConditional: true } c =>
+            ReferencesEnvironmentEndpoint(c.Condition) || ReferencesEnvironmentEndpoint(c.WhenTrue) || ReferencesEnvironmentEndpoint(c.WhenFalse),
+        ReferenceExpression expr => expr.ValueProviders.Any(ReferencesEnvironmentEndpoint),
+        _ => false,
+    };
+
+    /// <summary>
+    /// The publish-time value of an endpoint property of a container app in this environment, as the official Container Apps
+    /// publisher maps it. HTTP(S) endpoints go through the app's ingress, which serves HTTPS on 443 (HTTP endpoints are upgraded;
+    /// the ingress has <c>allowInsecure: false</c>): <c>{app}.internal.{defaultDomain}</c> for internal ingress and
+    /// <c>{app}.{defaultDomain}</c> for external. Other endpoints are addressed by app name and port. False when the endpoint is not
+    /// one this environment deploys (another compute environment, a job, an unknown endpoint), leaving it to its own value provider.
+    /// </summary>
+    internal bool TryGetEndpointValue(EndpointReferenceExpression reference, out string? value)
+    {
+        value = null;
+        var endpoint = reference.Endpoint;
+        var target = endpoint.Resource;
+        if (!IsTargeted(target) || !endpoint.Exists || target.Annotations.OfType<PulumiContainerAppJobAnnotation>().Any()) return false;
+
+        var annotation = endpoint.EndpointAnnotation;
+        var host = ContainerAppName(target.Name);
+        var httpEndpoints = HttpEndpoints(target);
+        var isHttpIngress = annotation.UriScheme is "http" or "https";
+
+        string scheme;
+        int? port, targetPort;
+        if (isHttpIngress)
+        {
+            var domain = $"${{{Id}.defaultDomain}}";
+            host = httpEndpoints.Any(e => e.IsExternal) ? $"{host}.{domain}" : $"{host}.internal.{domain}";
+            (scheme, port, targetPort) = ("https", 443, IngressTargetPort(httpEndpoints));
+        }
+        else
+        {
+            (scheme, port, targetPort) = (annotation.UriScheme, annotation.Port ?? annotation.TargetPort, annotation.TargetPort);
+        }
+
+        value = reference.Property switch
+        {
+            EndpointProperty.Url when isHttpIngress => $"{scheme}://{host}",
+            EndpointProperty.Url when port is not null => $"{scheme}://{host}:{Port(port)}",
+            EndpointProperty.Host or EndpointProperty.IPV4Host => host,
+            EndpointProperty.Port when port is not null => Port(port),
+            EndpointProperty.HostAndPort when port is not null => $"{host}:{Port(port)}",
+            EndpointProperty.TargetPort when targetPort is not null => Port(targetPort),
+            EndpointProperty.Scheme => scheme,
+            EndpointProperty.TlsEnabled => isHttpIngress || annotation.TlsEnabled ? bool.TrueString : bool.FalseString,
+            _ => null,
+        };
+        return value is not null;
+
+        static string Port(int? p) => p!.Value.ToString(CultureInfo.InvariantCulture);
+    }
+
+    private async Task<Dictionary<string, object?>> BuildContainerAppAsync(
+        IResource r, PulumiContainerAppJobAnnotation? job, PulumiStackResource stack, string rg, PipelineStepContext ctx, bool existingEnvironment)
+    {
+        var appName = ContainerAppName(r.Name, job is not null);
+        var imageName = r.Name.ToLowerInvariant();
+
+        var httpEndpoints = HttpEndpoints(r);
+        var targetPort = IngressTargetPort(httpEndpoints);
+        var env = await BuildEnvironmentAsync(r, ctx.ExecutionContext, ctx.Logger, stack, ctx.CancellationToken);
 
         var registries = new List<object?>
         {
