@@ -46,6 +46,8 @@ apim.AddApi("people-api-gw", "people").WithBackend(backend);
 
 The resource needs an external http/https endpoint (`WithExternalHttpEndpoints()`) and must not be a Container Apps job. Routed APIs' policies are ordered after the backend they reference.
 
+During `aspire deploy` the container app is only created in the deploy step (after its image is pushed), so a backend that points at a compute resource, and the policy of any API routed to it, is created in that step too, not in the earlier provision step. The service, the APIs and their operations, and backends with a literal URL are still created in the provision step.
+
 ## Supported
 
 `AddApi`, `WithOpenApi` (see below), `AddOperation`, `AddBackend` (literal URL or compute resource) + `WithBackend` (a routed API with neither modeled operations nor an OpenAPI document gets wildcard proxy operations), `AddProduct` + `WithApi`, `AddNamedValue` (literal or secret), service/API/operation policies (`WithInboundPolicy`, `WithPolicy`), and `ConfigureInfrastructure` (root `ApiManagementService`).

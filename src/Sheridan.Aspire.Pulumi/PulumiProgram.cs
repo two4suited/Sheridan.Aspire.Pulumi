@@ -85,26 +85,73 @@ public sealed class PulumiProgram
     /// </summary>
     public List<(string Type, string Name)> GetInfrastructureTargets()
     {
-        var apps = new HashSet<string>(_appResources);
-        var refs = Resources.ToDictionary(kv => kv.Key, kv => ReferencedNames(kv.Value));
-        bool changed;
-        do
-        {
-            changed = false;
-            foreach (var (name, deps) in refs)
-                if (!apps.Contains(name) && deps.Overlaps(apps)) { apps.Add(name); changed = true; }
-        } while (changed);
-
+        var apps = AppSide();
         return Resources
             .Where(kv => !apps.Contains(kv.Key) && kv.Value is IDictionary<string, object?> d && d.ContainsKey("type"))
             .Select(kv => (Type: (string)((IDictionary<string, object?>)kv.Value!)["type"]!, Name: kv.Key))
             .ToList();
     }
 
+    /// <summary>The apps plus every resource that (transitively) references one.</summary>
+    private HashSet<string> AppSide()
+    {
+        var apps = new HashSet<string>(_appResources);
+        Close(apps, Resources);
+        return apps;
+    }
+
+    /// <summary>Grows <paramref name="names"/> with every entry of <paramref name="maps"/> that (transitively) references one of them.</summary>
+    private static void Close(HashSet<string> names, params Dictionary<string, object?>[] maps)
+    {
+        var refs = maps.SelectMany(m => m).Select(kv => (Name: kv.Key, Deps: ReferencedNames(kv.Value))).ToList();
+        bool changed;
+        do
+        {
+            changed = false;
+            foreach (var (name, deps) in refs)
+                if (!names.Contains(name) && deps.Overlaps(names)) { names.Add(name); changed = true; }
+        } while (changed);
+    }
+
+    /// <summary>
+    /// The infrastructure resources that are left to the deploy pass because they (transitively) reference an app, e.g.
+    /// an API Management backend whose URL is a container app's ingress FQDN, and the policy ordered after that backend.
+    /// </summary>
+    public IReadOnlyCollection<string> GetDeferredResources()
+    {
+        var deferred = AppSide();
+        deferred.ExceptWith(_appResources);
+        return deferred;
+    }
+
+    /// <summary>
+    /// The program for the provision pass, or null when it is the same as <see cref="ToYaml(string, string)"/>.
+    /// <para>
+    /// Not targeting a resource is not enough to keep it out of the provision pass: Pulumi YAML still evaluates every
+    /// resource of the program, and an app that is skipped (not targeted, not created yet) has no outputs, so a nested
+    /// access such as <c>${apiApp.configuration.ingress.fqdn}</c> fails the whole update with "receiver must be a list
+    /// or object, not nil". The provision program therefore leaves out the deferred resources
+    /// (<see cref="GetDeferredResources"/>) and whatever references them (resources, variables, outputs). The update is
+    /// targeted, so resources that are missing from the program are not deleted; the deploy pass runs the full program.
+    /// </para>
+    /// </summary>
+    public string? ToProvisionYaml(string name, string description)
+    {
+        var omitted = new HashSet<string>(GetDeferredResources());
+        if (omitted.Count == 0) return null;
+        Close(omitted, Resources, Variables);
+
+        Dictionary<string, object?> Keep(Dictionary<string, object?> map, bool byValue = false) => map
+            .Where(kv => !omitted.Contains(kv.Key) && !(byValue && ReferencedNames(kv.Value).Overlaps(omitted)))
+            .ToDictionary(kv => kv.Key, kv => kv.Value);
+        return ToYaml(name, description, Keep(Variables), Keep(Resources), Keep(Outputs, byValue: true));
+    }
+
     private static readonly System.Text.RegularExpressions.Regex InterpolationRef =
         new(@"(?<!\$)\$\{\s*([A-Za-z0-9_-]+)", System.Text.RegularExpressions.RegexOptions.Compiled);
 
-    private HashSet<string> ReferencedNames(object? definition)
+    /// <summary>The root names of every <c>${name...}</c> interpolation in a definition.</summary>
+    private static HashSet<string> ReferencedNames(object? definition)
     {
         var found = new HashSet<string>();
         void Walk(object? v)
@@ -113,7 +160,7 @@ public sealed class PulumiProgram
             {
                 case string s:
                     foreach (System.Text.RegularExpressions.Match m in InterpolationRef.Matches(s))
-                        if (Resources.ContainsKey(m.Groups[1].Value)) found.Add(m.Groups[1].Value);
+                        found.Add(m.Groups[1].Value);
                     break;
                 case IDictionary<string, object?> d:
                     foreach (var x in d.Values) Walk(x);
@@ -127,7 +174,10 @@ public sealed class PulumiProgram
         return found;
     }
 
-    public string ToYaml(string name, string description)
+    public string ToYaml(string name, string description) => ToYaml(name, description, Variables, Resources, Outputs);
+
+    private string ToYaml(string name, string description,
+        Dictionary<string, object?> variables, Dictionary<string, object?> resources, Dictionary<string, object?> outputs)
     {
         var sb = new StringBuilder();
         sb.Append("name: ").AppendLine(Scalar(name));
@@ -135,8 +185,8 @@ public sealed class PulumiProgram
         sb.AppendLine("runtime: yaml");
         foreach (var (section, values) in new[]
         {
-            ("config", Configuration), ("variables", Variables),
-            ("resources", Resources), ("outputs", Outputs),
+            ("config", Configuration), ("variables", variables),
+            ("resources", resources), ("outputs", outputs),
         })
         {
             sb.Append(section).Append(':');
