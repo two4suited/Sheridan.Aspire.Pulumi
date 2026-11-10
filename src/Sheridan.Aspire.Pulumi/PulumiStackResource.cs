@@ -16,6 +16,12 @@ public sealed class PulumiStackResource(string name, string stackName) : Resourc
     /// <summary>Logical names/types of the resources of every infrastructure (non-app) resource of the generated program; the provision pass creates exactly these.</summary>
     public List<(string Type, string Name)> InfraTargets { get; } = [];
 
+    /// <summary>
+    /// The program the provision pass runs instead of the full one, or null when they are the same. It leaves out the
+    /// infrastructure that depends on an app (see <see cref="PulumiProgram.ToProvisionYaml"/>), which the deploy pass creates.
+    /// </summary>
+    public string? ProvisionProgramYaml { get; set; }
+
     public bool HasApps { get; set; }
 
     /// <summary>
