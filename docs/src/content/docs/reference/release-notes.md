@@ -10,6 +10,20 @@ after a `vX.Y.Z` tag has been published. Packages are on
 
 <!-- releases:start -->
 
+## v1.6.1
+
+_2026-11-10_ · [GitHub release](https://github.com/two4suited/Sheridan.Aspire.Pulumi/releases/tag/v1.6.1)
+
+<!-- Release notes generated using configuration in .github/release.yml at v1.6.1 -->
+
+#### What's Changed
+* Leave app-dependent infrastructure (APIM compute backends) out of the provision pass by @two4suited in https://github.com/two4suited/Sheridan.Aspire.Pulumi/pull/206
+* AppContainers: service-discovery env vars for references to apps in the same environment by @two4suited in https://github.com/two4suited/Sheridan.Aspire.Pulumi/pull/205
+
+
+**Full Changelog**: https://github.com/two4suited/Sheridan.Aspire.Pulumi/compare/v1.6.0...v1.6.1
+
+
 ## v1.6.0
 
 _2026-11-09_ · [GitHub release](https://github.com/two4suited/Sheridan.Aspire.Pulumi/releases/tag/v1.6.0)
