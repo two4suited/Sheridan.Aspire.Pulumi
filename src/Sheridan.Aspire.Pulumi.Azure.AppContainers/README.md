@@ -56,8 +56,14 @@ builder.AddProject<Projects.Web>("web")
 
 - `<app>` is the target's container app name and the domain is the managed environment's `defaultDomain` (also for `AsExisting` environments).
 - Both `services__<name>__http__0` and `services__<name>__https__0` carry an `https://` URL: the ingress is created with `allowInsecure: false`, so HTTP endpoints are upgraded to HTTPS, matching upstream's default.
-- The same mapping applies to `WithReference(target.GetEndpoint("http"))` and to endpoint values in `WithEnvironment` (`GetEndpoint(...)`, `.Property(EndpointProperty.Host | Port | HostAndPort | Scheme | TargetPort)`, and `ReferenceExpression`s built from them); `Port` is `443` for ingress endpoints.
-- Endpoints of resources that aren't deployed to this environment, and of Container Apps jobs (which have no ingress), are not mapped.
+- The same mapping applies to `WithReference(target.GetEndpoint("http"))`, to endpoint values in `WithEnvironment` (`GetEndpoint(...)`, `.Property(EndpointProperty.Host | Port | HostAndPort | Scheme | TargetPort)`, and `ReferenceExpression`s built from them) and to connection strings built from such endpoints; `Port` is `443` for ingress endpoints.
+- Endpoints of resources that aren't deployed to this environment, and of Container Apps jobs (which have no ingress), are not mapped. Neither are expressions that apply a format specifier to an endpoint value; those variables are left out.
+- `HTTPS_PORTS` is not set on the container: TLS ends at the ingress, which forwards to the port in `HTTP_PORTS`.
+
+Limitations compared to the official publisher:
+
+- The ingress forwards to the first HTTP endpoint's target port. A second HTTP endpoint on a different target port gets the same ingress URL, so it reaches the first one's port.
+- Non-HTTP endpoints get the upstream address format, but the container app is not given additional TCP port mappings yet, so those addresses are not reachable until the ports are exposed (for example with `ConfigureInfrastructure`).
 
 ## Deploying into an existing environment
 

@@ -150,6 +150,58 @@ public sealed class ContainerAppServiceDiscoveryTests
     }
 
     [Fact]
+    public async Task A_projects_own_https_endpoint_does_not_make_the_container_bind_https()
+    {
+        var builder = PublishBuilder();
+        var env = builder.AddPulumiAzureContainerAppEnvironment("aca-env");
+        var catalog = Target(builder.AddProject<CatalogProject>("catalog-api").WithHttpEndpoint().WithHttpsEndpoint(), env);
+        var https = catalog.GetEndpoint("https");
+        catalog.WithEnvironment("HTTP_PORTS", catalog.GetEndpoint("http").Property(EndpointProperty.TargetPort))
+            .WithEnvironment("HTTPS_PORTS", https.Property(EndpointProperty.TargetPort));
+
+        var vars = await EnvAsync(builder, env, catalog.Resource);
+
+        Assert.Equal("8080", vars["HTTP_PORTS"]);
+        Assert.DoesNotContain("HTTPS_PORTS", vars.Keys);
+    }
+
+    [Fact]
+    public async Task Conditional_expressions_literal_braces_and_connection_strings_over_endpoints_resolve()
+    {
+        var builder = PublishBuilder();
+        var env = builder.AddPulumiAzureContainerAppEnvironment("aca-env");
+        var api = Target(builder.AddContainer("orders-api", "orders").WithHttpEndpoint(targetPort: 8080), env);
+        var http = api.GetEndpoint("http");
+        var cs = builder.AddConnectionString("orders", ReferenceExpression.Create($"Endpoint={http};Mode=x"));
+        var web = Target(builder.AddContainer("web", "web")
+            .WithEnvironment("BRACES", ReferenceExpression.Create($"{{literal}}-{http.Property(EndpointProperty.Scheme)}"))
+            .WithEnvironment("COND", ReferenceExpression.CreateConditional(
+                http.Property(EndpointProperty.Scheme), "https",
+                ReferenceExpression.Create($"secure:{http.Property(EndpointProperty.Port)}"),
+                ReferenceExpression.Create($"plain")))
+            .WithReference(cs), env);
+
+        var vars = await EnvAsync(builder, env, web.Resource);
+
+        Assert.Equal("{literal}-https", vars["BRACES"]);
+        Assert.Equal("secure:443", vars["COND"]);
+        Assert.Equal($"Endpoint=https://orders-api.internal.{Domain(env)};Mode=x", vars["ConnectionStrings__orders"]);
+    }
+
+    [Fact]
+    public async Task Existing_environments_use_the_looked_up_default_domain()
+    {
+        var builder = PublishBuilder();
+        var env = builder.AddPulumiAzureContainerAppEnvironment("aca-env").AsExisting("shared-env", "shared-rg");
+        var api = Target(builder.AddContainer("orders-api", "orders").WithHttpEndpoint(targetPort: 8080), env);
+        var web = Target(builder.AddContainer("web", "web").WithReference(api.GetEndpoint("http")), env);
+
+        var vars = await EnvAsync(builder, env, web.Resource);
+
+        Assert.Equal($"https://orders-api.internal.{Domain(env)}", vars["services__orders-api__http__0"]);
+    }
+
+    [Fact]
     public void Endpoints_outside_the_environment_are_not_mapped()
     {
         var builder = PublishBuilder();

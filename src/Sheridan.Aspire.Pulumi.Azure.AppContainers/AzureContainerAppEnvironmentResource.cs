@@ -425,6 +425,9 @@ public sealed class AzureContainerAppEnvironmentResource : PulumiAzureResource, 
                 continue;
             }
 
+            // TLS ends at the ingress, which forwards plain HTTP to the target port: the container must not also bind HTTPS there.
+            if (key is "HTTPS_PORTS") continue;
+
             string? resolved;
             try
             {
@@ -465,6 +468,10 @@ public sealed class AzureContainerAppEnvironmentResource : PulumiAzureResource, 
                 return url;
             case EndpointReferenceExpression epExpr when TryGetEndpointValue(epExpr, out var endpointValue):
                 return endpointValue;
+            case ConnectionStringReference cs when ReferencesEnvironmentEndpoint(cs):
+                return await ResolveValueAsync(cs.Resource.ConnectionStringExpression, cancellationToken);
+            case IResourceWithConnectionString withConnectionString when ReferencesEnvironmentEndpoint(withConnectionString):
+                return await ResolveValueAsync(withConnectionString.ConnectionStringExpression, cancellationToken);
             case ReferenceExpression { IsConditional: true } conditional when ReferencesEnvironmentEndpoint(conditional):
                 var condition = await ResolveValueAsync(conditional.Condition!, cancellationToken);
                 return await ResolveValueAsync(
@@ -487,6 +494,8 @@ public sealed class AzureContainerAppEnvironmentResource : PulumiAzureResource, 
     {
         EndpointReference ep => TryGetEndpointValue(ep.Property(EndpointProperty.Url), out _),
         EndpointReferenceExpression epExpr => TryGetEndpointValue(epExpr, out _),
+        ConnectionStringReference cs => ReferencesEnvironmentEndpoint(cs.Resource.ConnectionStringExpression),
+        IResourceWithConnectionString withConnectionString => ReferencesEnvironmentEndpoint(withConnectionString.ConnectionStringExpression),
         ReferenceExpression { IsConditional: true } c =>
             ReferencesEnvironmentEndpoint(c.Condition) || ReferencesEnvironmentEndpoint(c.WhenTrue) || ReferencesEnvironmentEndpoint(c.WhenFalse),
         ReferenceExpression expr => expr.ValueProviders.Any(ReferencesEnvironmentEndpoint),
