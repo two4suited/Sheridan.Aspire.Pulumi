@@ -271,4 +271,61 @@ public sealed class ApiManagementTests
             .ConfigureInfrastructure(i => _ = i.ApiManagementService);
         Assert.Throws<InvalidOperationException>(() => apim.Resource.Contribute(new PulumiProgram(), "shared-rg", "westus"));
     }
+
+    /// <summary>Issue #204: the container app only exists after the deploy pass, so nothing that needs its FQDN may be part of the provision pass.</summary>
+    [Fact]
+    public void Compute_backend_and_the_policy_routed_to_it_are_left_to_the_deploy_pass()
+    {
+        var (apim, app) = NewApim();
+        apim.WithPulumiStack(app.AddPulumiStack("s", "dev"));
+        var env = app.AddPulumiAzureContainerAppEnvironment("env");
+        var people = app.AddContainer("people-api", "img").WithHttpEndpoint(targetPort: 8080).WithExternalHttpEndpoints().WithComputeEnvironment(env);
+        apim.AddApi("people-gateway-api", "people").WithBackend(apim.AddBackend("people-backend", people));
+        apim.AddApi("catalog-api", "catalog").WithBackend(apim.AddBackend("catalog-backend", "https://catalog.example.com"));
+
+        var program = new PulumiProgram();
+        apim.Resource.Contribute(program, "rg", "westus");
+        var id = apim.Resource.Id;
+        var appId = AzureContainerAppEnvironmentResource.AppId("people-api");
+        program.AddAppResource(appId, new() { ["type"] = "azure-native:app:ContainerApp" });
+
+        Assert.Equal([$"{id}ApiPeopleGatewayApiPolicy", $"{id}BackendPeopleBackend"], program.GetDeferredResources().Order());
+
+        var targets = program.GetInfrastructureTargets().Select(t => t.Name).ToList();
+        Assert.DoesNotContain($"{id}BackendPeopleBackend", targets);
+        Assert.DoesNotContain($"{id}ApiPeopleGatewayApiPolicy", targets);
+        Assert.DoesNotContain(appId, targets);
+        // The API itself, and a backend with a literal URL together with its policy, are still provisioned up front.
+        Assert.Contains(id, targets);
+        Assert.Contains($"{id}ApiPeopleGatewayApi", targets);
+        Assert.Contains($"{id}BackendCatalogBackend", targets);
+        Assert.Contains($"{id}ApiCatalogApiPolicy", targets);
+
+        // The provision pass runs a program without them: an untargeted resource is still evaluated, and the FQDN of an
+        // app that does not exist yet is nil.
+        var provision = program.ToProvisionYaml("p", "d")!;
+        Assert.DoesNotContain("ingress.fqdn", provision);
+        Assert.DoesNotContain($"{id}BackendPeopleBackend", provision);
+        Assert.DoesNotContain($"{id}ApiPeopleGatewayApiPolicy", provision);
+        Assert.Contains($"  {id}BackendCatalogBackend:", provision);
+        Assert.Contains($"  {id}ApiPeopleGatewayApi:", provision);
+        Assert.Contains($"  {appId}:", provision);
+        Assert.Contains($"https://${{{appId}.configuration.ingress.fqdn}}", program.ToYaml("p", "d"));
+    }
+
+    [Fact]
+    public void Literal_backends_keep_the_provision_program_identical_to_the_full_program()
+    {
+        var (apim, app) = NewApim();
+        apim.WithPulumiStack(app.AddPulumiStack("s", "dev"));
+        apim.AddApi("catalog-api", "catalog").WithBackend(apim.AddBackend("catalog-backend", "https://catalog.example.com"));
+
+        var program = new PulumiProgram();
+        apim.Resource.Contribute(program, "rg", "westus");
+        program.AddAppResource("otherApp", new() { ["type"] = "azure-native:app:ContainerApp" });
+
+        Assert.Empty(program.GetDeferredResources());
+        Assert.Null(program.ToProvisionYaml("p", "d"));
+        Assert.Contains(program.GetInfrastructureTargets(), t => t.Name == $"{apim.Resource.Id}BackendCatalogBackend");
+    }
 }
