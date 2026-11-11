@@ -28,7 +28,7 @@ builder.AddProject<Projects.MyApi>("api")
 builder.Build().Run();
 ```
 
-Then `aspire publish` to generate the Pulumi program, or `aspire deploy` to deploy it. Prerequisites: the Aspire CLI, the Pulumi CLI (`pulumi login`) and an Azure subscription.
+Then `aspire publish` to generate the Pulumi program, or `aspire deploy` to deploy it. Prerequisites: the .NET 11 SDK (packages target `net11.0`, so the AppHost must too), the Aspire CLI, the Pulumi CLI (`pulumi login`) and an Azure subscription.
 
 ## Packages
 
