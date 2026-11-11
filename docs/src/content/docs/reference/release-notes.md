@@ -10,6 +10,19 @@ after a `vX.Y.Z` tag has been published. Packages are on
 
 <!-- releases:start -->
 
+## v2.0.0
+
+_2026-11-11_ · [GitHub release](https://github.com/two4suited/Sheridan.Aspire.Pulumi/releases/tag/v2.0.0)
+
+<!-- Release notes generated using configuration in .github/release.yml at v2.0.0 -->
+
+#### What's Changed
+* Target .NET 11 by @two4suited in https://github.com/two4suited/Sheridan.Aspire.Pulumi/pull/208
+
+
+**Full Changelog**: https://github.com/two4suited/Sheridan.Aspire.Pulumi/compare/v1.6.1...v2.0.0
+
+
 ## v1.6.1
 
 _2026-11-10_ · [GitHub release](https://github.com/two4suited/Sheridan.Aspire.Pulumi/releases/tag/v1.6.1)
