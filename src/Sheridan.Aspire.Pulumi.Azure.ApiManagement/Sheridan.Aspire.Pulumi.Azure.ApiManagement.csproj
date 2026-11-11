@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net10.0</TargetFramework>
+    <TargetFramework>net11.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <Description>Azure API Management provisioned by Pulumi instead of Bicep. A drop-in for AddAzureApiManagement: call AddPulumiAzureApiManagement(...), then add APIs, backends, products, named values and policies. Docs: https://github.com/two4suited/Sheridan.Aspire.Pulumi/tree/main/src/Sheridan.Aspire.Pulumi.Azure.ApiManagement#readme</Description>
