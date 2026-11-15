@@ -15,7 +15,9 @@ internal static class PulumiBackend
 
     /// <summary>Normalises a directory path or URL to a <c>file://</c> backend URL.</summary>
     public static string ToFileUrl(string pathOrUrl) =>
-        pathOrUrl.Contains("://", StringComparison.Ordinal) ? pathOrUrl : "file://" + pathOrUrl;
+        pathOrUrl.Contains("://", StringComparison.Ordinal) ? pathOrUrl
+        : pathOrUrl == "~" || pathOrUrl.StartsWith("~/", StringComparison.Ordinal) ? "file://" + pathOrUrl
+        : "file://" + Path.GetFullPath(pathOrUrl).Replace('\\', '/');
 
     /// <summary>The backend URL the CLI will use: explicit opt-in, else PULUMI_BACKEND_URL, else the current <c>pulumi login</c>.</summary>
     public static string? Resolve(string? explicitUrl)

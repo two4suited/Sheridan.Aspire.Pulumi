@@ -16,7 +16,7 @@ public sealed class PulumiOutputReference(PulumiStackResource stack, string outp
             ?? throw new InvalidOperationException($"Pulumi project for '{stack.Name}' has not been generated yet.");
         try
         {
-            var value = await PulumiCli.CaptureAsync(dir, ["stack", "output", outputName, "--stack", stack.QualifiedStack], cancellationToken);
+            var value = await PulumiCli.CaptureAsync(dir, ["stack", "output", outputName, "--stack", stack.QualifiedStack], cancellationToken, stack.CliEnvironment);
             // A targeted 'pulumi up' records outputs of resources it did not create as null: "not available yet", not a value.
             if (value == "null") throw new PulumiOutputNotAvailableException(stack.Name, outputName);
             return value;

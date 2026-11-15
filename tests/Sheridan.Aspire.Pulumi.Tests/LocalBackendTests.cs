@@ -26,6 +26,23 @@ public sealed class LocalBackendTests
     }
 
     [Fact]
+    public void ToFileUrl_makes_relative_paths_absolute()
+    {
+        var url = PulumiBackend.ToFileUrl("./state");
+        Assert.StartsWith("file://", url);
+        Assert.DoesNotContain("./", url);
+    }
+
+    [Fact]
+    public void WithLocalBackend_passes_the_url_per_call_not_via_the_process_environment()
+    {
+        var builder = DistributedApplication.CreateBuilder();
+        var stack = builder.AddPulumiStack("infra", "dev").WithLocalBackend("/tmp/s");
+        Assert.Equal("file:///tmp/s", stack.Resource.CliEnvironment!["PULUMI_BACKEND_URL"]);
+        Assert.NotEqual("file:///tmp/s", Environment.GetEnvironmentVariable("PULUMI_BACKEND_URL"));
+    }
+
+    [Fact]
     public void WithLocalBackend_makes_the_stack_local_and_uses_the_plain_stack_name()
     {
         var builder = DistributedApplication.CreateBuilder();

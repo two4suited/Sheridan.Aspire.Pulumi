@@ -17,7 +17,12 @@ public sealed class PulumiStackResource(string name, string stackName) : Resourc
     public Dictionary<string, string> StackConfig { get; } = [];
 
     /// <summary>The backend URL in effect (explicit, PULUMI_BACKEND_URL, or the current login), or null when unknown.</summary>
-    public string? BackendUrl => PulumiBackend.Resolve(LocalBackendUrl);
+    public string? BackendUrl => _backendUrl ??= PulumiBackend.Resolve(LocalBackendUrl) ?? "";  // resolved once so every step agrees
+    private string? _backendUrl;
+
+    /// <summary>Per-process environment for this stack's <c>pulumi</c> calls (never mutates the AppHost's own environment).</summary>
+    public IReadOnlyDictionary<string, string>? CliEnvironment =>
+        LocalBackendUrl is null ? null : new Dictionary<string, string> { ["PULUMI_BACKEND_URL"] = LocalBackendUrl };
 
     /// <summary>True when the backend is self-managed (not Pulumi Cloud): no <c>whoami</c> check, no ESC.</summary>
     public bool UsesLocalBackend => PulumiBackend.IsLocalUrl(BackendUrl);
