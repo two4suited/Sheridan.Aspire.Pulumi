@@ -73,6 +73,28 @@ public static class PulumiExtensions
     }
 
     /// <summary>
+    /// Uses a self-managed Pulumi backend instead of Pulumi Cloud: <c>aspire deploy</c>/<c>destroy</c> skip <c>pulumi whoami</c> and ESC,
+    /// create the stack with <c>pulumi stack init</c>, and run every <c>pulumi</c> command with PULUMI_BACKEND_URL set.
+    /// <paramref name="pathOrUrl"/> is a directory or a backend URL (<c>file://...</c>, <c>s3://...</c>); it defaults to <c>file://~</c>.
+    /// Without this call a local backend is still detected from PULUMI_BACKEND_URL or <c>pulumi login file://...</c>.
+    /// Passphrase-encrypted stacks read PULUMI_CONFIG_PASSPHRASE (or PULUMI_CONFIG_PASSPHRASE_FILE) from the environment.
+    /// </summary>
+    public static IResourceBuilder<PulumiStackResource> WithLocalBackend(
+        this IResourceBuilder<PulumiStackResource> builder, string? pathOrUrl = null)
+    {
+        builder.Resource.LocalBackendUrl = PulumiBackend.ToFileUrl(pathOrUrl ?? "~");
+        return builder;
+    }
+
+    /// <summary>Adds plain stack config (<c>pulumi config set</c>) to <c>Pulumi.&lt;stack&gt;.yaml</c>, e.g. <c>WithConfig("azure-native:metadataHost", "localhost:4577")</c>. Works with or without ESC.</summary>
+    public static IResourceBuilder<PulumiStackResource> WithConfig(
+        this IResourceBuilder<PulumiStackResource> builder, string key, string value)
+    {
+        builder.Resource.StackConfig[key] = value;
+        return builder;
+    }
+
+    /// <summary>
     /// Deploys <paramref name="dependency"/> to completion before this stack's infrastructure is provisioned.
     /// Only orders the two stacks' provision/deploy steps. This is implied automatically whenever a resource in this
     /// stack references (WithReference/WaitFor/<see cref="PulumiOutputReference"/>) a resource in <paramref name="dependency"/>;
@@ -107,7 +129,7 @@ public static class PulumiExtensions
         var provision = new PipelineStep
         {
             Name = $"pulumi-provision-{resource.Name}",
-            Description = $"Log in, ensure the ESC environment and stack exist, and create the infrastructure images are pushed to for '{resource.Name}'",
+            Description = $"Check the login (Pulumi Cloud) or use the local backend, ensure the ESC environment (Cloud only) and stack exist, and create the infrastructure images are pushed to for '{resource.Name}'",
             Resource = resource,
             Tags = [WellKnownPipelineTags.ProvisionInfrastructure],
             Action = ctx => ProvisionAsync(ctx, resource),
@@ -164,9 +186,11 @@ public static class PulumiExtensions
         await File.WriteAllTextAsync(Path.Combine(dir, "Pulumi.yaml"),
             program.ToYaml(resource.ProjectName, description), ctx.CancellationToken);
 
-        var imports = string.Concat(resource.StackEscReferences.Select(e => $"  - {e}\n"));
-        await File.WriteAllTextAsync(Path.Combine(dir, $"Pulumi.{resource.StackName}.yaml"),
-            "environment:\n" + imports, ctx.CancellationToken);
+        var stackFile = Path.Combine(dir, $"Pulumi.{resource.StackName}.yaml");
+        await File.WriteAllTextAsync(stackFile,
+            PulumiBackend.RenderStackFile(resource.UsesLocalBackend ? null : resource.StackEscReferences, resource.StackConfig,
+                File.Exists(stackFile) ? await File.ReadAllTextAsync(stackFile, ctx.CancellationToken) : null),
+            ctx.CancellationToken);
 
         ctx.Logger.LogInformation("Wrote Pulumi project to {Directory}", dir);
     }
@@ -177,18 +201,31 @@ public static class PulumiExtensions
         var ct = ctx.CancellationToken;
         var log = ctx.Logger;
 
-        if (await PulumiCli.RunAsync(dir, ["whoami"], log, ct) != 0)
+        var local = resource.UsesLocalBackend;
+
+        if (local)
+        {
+            PulumiBackend.EnsureFileBackendDirectory(resource.BackendUrl);
+            log.LogInformation("Using self-managed Pulumi backend {Backend}; skipping 'pulumi whoami' and ESC.", resource.BackendUrl);
+            if (Environment.GetEnvironmentVariable("PULUMI_CONFIG_PASSPHRASE") is null
+                && Environment.GetEnvironmentVariable("PULUMI_CONFIG_PASSPHRASE_FILE") is null)
+                log.LogWarning("PULUMI_CONFIG_PASSPHRASE is not set; the non-interactive pulumi calls will fail on a passphrase-encrypted stack (set it to an empty string for none).");
+        }
+        else if (await PulumiCli.RunAsync(dir, ["whoami"], log, ct, env: resource.CliEnvironment) != 0)
             throw new InvalidOperationException("Not logged in to a Pulumi backend. Run 'pulumi login' (or set PULUMI_ACCESS_TOKEN) and retry.");
 
-        if (resource.UsesDefaultEscEnvironment
-            && await PulumiCli.RunAsync(dir, ["env", "get", resource.QualifiedDefaultEscEnvironment], log, ct) != 0)
+        if (!local && resource.UsesDefaultEscEnvironment
+            && await PulumiCli.RunAsync(dir, ["env", "get", resource.QualifiedDefaultEscEnvironment], log, ct, env: resource.CliEnvironment) != 0)
         {
             log.LogInformation("Creating ESC environment {Environment}", resource.QualifiedDefaultEscEnvironment);
             await PulumiCli.RunOrThrowAsync(dir, ["env", "init", resource.QualifiedDefaultEscEnvironment, "--file", "-"], log, ct,
-                stdin: "values:\n  pulumiConfig: {}\n");
+                stdin: "values:\n  pulumiConfig: {}\n", env: resource.CliEnvironment);
         }
 
-        await PulumiCli.RunOrThrowAsync(dir, ["stack", "select", resource.QualifiedStack, "--create"], log, ct);
+        if (local && resource.EscEnvironments.Count > 0)
+            log.LogWarning("ESC environments are ignored with a self-managed backend: {Environments}", string.Join(", ", resource.EscEnvironments));
+        // --create also initialises a missing stack on self-managed backends.
+        await PulumiCli.RunOrThrowAsync(dir, ["stack", "select", resource.QualifiedStack, "--create"], log, ct, env: resource.CliEnvironment);
 
         if (!resource.HasApps)
         {
@@ -212,7 +249,7 @@ public static class PulumiExtensions
             try
             {
                 if (fullProgram is not null) await File.WriteAllTextAsync(programFile, resource.ProvisionProgramYaml, ct);
-                await PulumiCli.RunOrThrowAsync(dir, args, log, ct);
+                await PulumiCli.RunOrThrowAsync(dir, args, log, ct, env: resource.CliEnvironment);
             }
             finally
             {
@@ -228,13 +265,13 @@ public static class PulumiExtensions
         // values read from stack outputs (e.g. a new storage account's endpoint) that were unavailable when the program was
         // first generated resolve now.
         if (resource.HasApps) await WriteProjectAsync(ctx, resource);
-        await PulumiCli.RunOrThrowAsync(ProjectDirectory(ctx, resource), ["up", "--yes", "--skip-preview", "--non-interactive"], ctx.Logger, ctx.CancellationToken);
+        await PulumiCli.RunOrThrowAsync(ProjectDirectory(ctx, resource), ["up", "--yes", "--skip-preview", "--non-interactive"], ctx.Logger, ctx.CancellationToken, env: resource.CliEnvironment);
     }
 
     private static async Task DestroyAsync(PipelineStepContext ctx, PulumiStackResource resource)
     {
         var dir = ProjectDirectory(ctx, resource);
-        await PulumiCli.RunOrThrowAsync(dir, ["stack", "select", resource.QualifiedStack], ctx.Logger, ctx.CancellationToken);
-        await PulumiCli.RunOrThrowAsync(dir, ["destroy", "--yes", "--non-interactive"], ctx.Logger, ctx.CancellationToken);
+        await PulumiCli.RunOrThrowAsync(dir, ["stack", "select", resource.QualifiedStack], ctx.Logger, ctx.CancellationToken, env: resource.CliEnvironment);
+        await PulumiCli.RunOrThrowAsync(dir, ["destroy", "--yes", "--non-interactive"], ctx.Logger, ctx.CancellationToken, env: resource.CliEnvironment);
     }
 }
