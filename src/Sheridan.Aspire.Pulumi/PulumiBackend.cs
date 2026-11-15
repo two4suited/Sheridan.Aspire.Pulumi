@@ -19,6 +19,16 @@ internal static class PulumiBackend
         : pathOrUrl == "~" || pathOrUrl.StartsWith("~/", StringComparison.Ordinal) ? "file://" + pathOrUrl
         : "file://" + Path.GetFullPath(pathOrUrl).Replace('\\', '/');
 
+    /// <summary>Creates the state directory of a <c>file://</c> backend (pulumi refuses to open a missing one). No-op for other schemes and <c>~</c>.</summary>
+    public static void EnsureFileBackendDirectory(string? url)
+    {
+        const string prefix = "file://";
+        if (url is null || !url.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)) return;
+        var path = url[prefix.Length..].Split('?')[0];
+        if (path.Length == 0 || path == "~" || path.StartsWith("~/", StringComparison.Ordinal)) return;
+        Directory.CreateDirectory(path);
+    }
+
     /// <summary>The backend URL the CLI will use: explicit opt-in, else PULUMI_BACKEND_URL, else the current <c>pulumi login</c>.</summary>
     public static string? Resolve(string? explicitUrl)
     {

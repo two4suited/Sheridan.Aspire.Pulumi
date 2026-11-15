@@ -203,6 +203,7 @@ public static class PulumiExtensions
 
         if (local)
         {
+            PulumiBackend.EnsureFileBackendDirectory(resource.BackendUrl);
             log.LogInformation("Using self-managed Pulumi backend {Backend}; skipping 'pulumi whoami' and ESC.", resource.BackendUrl);
             if (Environment.GetEnvironmentVariable("PULUMI_CONFIG_PASSPHRASE") is null
                 && Environment.GetEnvironmentVariable("PULUMI_CONFIG_PASSPHRASE_FILE") is null)

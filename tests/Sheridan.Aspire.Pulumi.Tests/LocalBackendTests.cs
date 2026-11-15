@@ -26,6 +26,18 @@ public sealed class LocalBackendTests
     }
 
     [Fact]
+    public void EnsureFileBackendDirectory_creates_the_state_directory()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), "pulumi-state-" + Guid.NewGuid().ToString("N"), "nested");
+        try
+        {
+            PulumiBackend.EnsureFileBackendDirectory(PulumiBackend.ToFileUrl(dir));
+            Assert.True(Directory.Exists(dir));
+        }
+        finally { Directory.Delete(Path.GetDirectoryName(dir)!, true); }
+    }
+
+    [Fact]
     public void ToFileUrl_makes_relative_paths_absolute()
     {
         var url = PulumiBackend.ToFileUrl("./state");
