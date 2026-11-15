@@ -1,18 +1,51 @@
 :root {
-  --sl-color-accent-low: #2a1a4a;
-  --sl-color-accent: #7c4dff;
-  --sl-color-accent-high: #c9b6ff;
+  /* Aspire purple blended with Pulumi magenta, plus Pulumi yellow as a spark */
+  --sl-color-accent-low: #2e1a55;
+  --sl-color-accent: #9a5fd0;
+  --sl-color-accent-high: #e3c2f0;
+  --brand-yellow: #f7bf2a;
   --sl-font-system-mono: ui-monospace, 'SF Mono', 'Cascadia Code', Menlo, Consolas, monospace;
-  --brand-gradient: linear-gradient(135deg, #7c4dff 0%, #3b82f6 100%);
+  --brand-gradient: linear-gradient(135deg, #7455dd 0%, #b24a9a 55%, #f7bf2a 130%);
 }
 :root[data-theme='light'] {
-  --sl-color-accent-low: #e6dcff;
-  --sl-color-accent: #5b2fd6;
-  --sl-color-accent-high: #3a1b94;
+  --sl-color-accent-low: #f1e0f5;
+  --sl-color-accent: #8a3391;
+  --sl-color-accent-high: #4b1f6e;
 }
 
-/* Header */
+/* Dark theme: tint the neutral surfaces toward the brand purple */
+:root {
+  --sl-color-bg: #14101f;
+  --sl-color-bg-nav: #1b1529;
+  --sl-color-bg-sidebar: #17121f;
+  --sl-color-hairline-light: #35294d;
+  --sl-color-hairline: #261d38;
+}
+:root[data-theme='light'] {
+  --sl-color-bg-nav: #faf6fc;
+  --sl-color-bg-sidebar: #faf6fc;
+  --sl-color-hairline-light: #e6d8ee;
+  --sl-color-hairline: #efe5f4;
+}
+
+/* Header: brand gradient hairline */
 .site-title { font-weight: 700; letter-spacing: -0.01em; }
+header.header { border-bottom: 0; position: relative; }
+header.header::after {
+  content: ''; position: absolute; inset: auto 0 0 0; height: 2px;
+  background: linear-gradient(90deg, #512bd4, #8a3391 55%, #f7bf2a);
+}
+
+/* Sidebar */
+.sidebar-content a[aria-current='page'] { font-weight: 600; }
+
+/* Page titles: short gradient accent bar */
+[data-page-title]::after {
+  content: ''; display: block; width: 3rem; height: 4px; margin-top: 0.6rem; border-radius: 2px;
+  background: var(--brand-gradient);
+}
+:root:not([data-has-hero]) .content-panel { --sl-color-text-accent: var(--sl-color-accent-high); }
+:root[data-theme='light'] .content-panel { --sl-color-text-accent: var(--sl-color-accent); }
 
 /* Landing page */
 [data-has-hero] .hero { padding-block: clamp(2rem, 6vw, 5rem); }
@@ -25,7 +58,7 @@
   letter-spacing: -0.02em;
 }
 [data-has-hero] .hero .tagline { max-width: 34rem; }
-[data-has-hero] .hero img, [data-has-hero] .hero svg { max-width: 100%; filter: drop-shadow(0 12px 32px rgba(124, 77, 255, 0.25)); }
+[data-has-hero] .hero img, [data-has-hero] .hero svg { max-width: 100%; filter: drop-shadow(0 12px 32px rgba(138, 51, 145, 0.3)); }
 [data-has-hero] .card-grid { gap: 1rem; }
 [data-has-hero] .card {
   border-radius: 0.75rem;
@@ -38,6 +71,8 @@
 /* Content */
 .sl-markdown-content :not(a, strong, em, del, span, input, code, br) + :not(a, strong, em, del, span, input, code, br, :where(.not-content *)) { margin-top: 1.1rem; }
 .sl-markdown-content .sl-heading-wrapper.level-h2 { margin-top: 2.25rem; padding-bottom: 0.35rem; border-bottom: 1px solid var(--sl-color-hairline-light); }
+.sl-markdown-content blockquote { border-inline-start-color: var(--sl-color-accent); }
+.sl-markdown-content :not(pre) > code { background: color-mix(in srgb, var(--sl-color-accent) 12%, transparent); }
 .sl-markdown-content .sl-heading-wrapper.level-h2 > h2 { margin-top: 0; }
 .sl-markdown-content table { display: block; overflow-x: auto; width: 100%; border-collapse: collapse; font-size: var(--sl-text-sm); }
 .sl-markdown-content th { background: var(--sl-color-bg-nav); text-align: left; }
