@@ -136,18 +136,58 @@ public sealed class PulumiProgram
     /// targeted, so resources that are missing from the program are not deleted; the deploy pass runs the full program.
     /// </para>
     /// </summary>
-    public string? ToProvisionYaml(string name, string description)
-    {
-        // Deferred resources, and variables that read an app.
-        var omitted = AppSide();
-        omitted.ExceptWith(_appResources);
-        if (omitted.Count == 0) return null;
-        Close(omitted, Resources, Variables);
+    public string? ToProvisionYaml(string name, string description) => ToProvisionYaml(name, description, OmittedFor(_appResources));
 
+    /// <summary>The resources and variables that (transitively) reference one of <paramref name="missingApps"/>, excluding the apps themselves.</summary>
+    private HashSet<string> OmittedFor(IEnumerable<string> missingApps)
+    {
+        var apps = missingApps.ToHashSet();
+        var omitted = new HashSet<string>(apps);
+        Close(omitted, Resources, Variables);
+        omitted.ExceptWith(apps);
+        Close(omitted, Resources, Variables); // an app that reads an omitted resource cannot be evaluated either
+        return omitted;
+    }
+
+    private string? ToProvisionYaml(string name, string description, HashSet<string> omitted)
+    {
+        if (omitted.Count == 0) return null;
         Dictionary<string, object?> Keep(Dictionary<string, object?> map, bool byValue = false) => map
             .Where(kv => !omitted.Contains(kv.Key) && !(byValue && ReferencedNames(kv.Value).Overlaps(omitted)))
             .ToDictionary(kv => kv.Key, kv => kv.Value);
         return ToYaml(name, description, Keep(Variables), Keep(Resources), Keep(Outputs, byValue: true));
+    }
+
+    /// <summary>The state key (<c>type::name</c>) of a resource of this program, or null when it has no type.</summary>
+    private string? StateKey(string resourceName) =>
+        Resources.TryGetValue(resourceName, out var v) && v is IDictionary<string, object?> d && d.TryGetValue("type", out var t) && t is string type
+            ? $"{type}::{resourceName}" : null;
+
+    /// <summary>
+    /// What the provision pass of a redeploy runs, given the resources already in the stack's state (<c>type::name</c> keys).
+    /// <para>
+    /// Only the resources that depend on an app missing from state are left out of the program (the nil-evaluation problem
+    /// of <see cref="ToProvisionYaml(string, string)"/>); the rest of the app-dependent infrastructure stays in the program.
+    /// Pulumi refuses to delete a resource that is missing from the program but not targeted, so every app-dependent resource
+    /// is targeted: those in the program are updated in place, and those left out are removed when they are in state (the
+    /// deploy pass recreates them). Resources not in state and not in the program are never targeted (an unknown target fails).
+    /// </para>
+    /// </summary>
+    public ProvisionPlan PlanProvision(string name, string description, IReadOnlySet<string> state)
+    {
+        var deferred = GetDeferredResources();
+        if (deferred.Count == 0) return new(null, []);
+
+        var missingApps = _appResources.Where(a => StateKey(a) is not { } k || !state.Contains(k)).ToList();
+        var omitted = OmittedFor(missingApps);
+        var targets = new List<(string Type, string Name)>();
+        foreach (var n in deferred.Concat(omitted).Distinct())
+        {
+            if (StateKey(n) is not { } key) continue;
+            if (omitted.Contains(n) && !state.Contains(key)) continue;
+            targets.Add((((string)((IDictionary<string, object?>)Resources[n]!)["type"]!), n));
+        }
+        return new(ToProvisionYaml(name, description, omitted), targets);
     }
 
     private static readonly System.Text.RegularExpressions.Regex InterpolationRef =
@@ -243,3 +283,6 @@ public sealed class PulumiProgram
         }
     }
 }
+
+/// <summary>The program a provision pass runs (null: the full program) and the app-dependent resources it must also target.</summary>
+public sealed record ProvisionPlan(string? ProvisionYaml, List<(string Type, string Name)> ExtraTargets);

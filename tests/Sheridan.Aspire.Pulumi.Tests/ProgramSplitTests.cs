@@ -190,8 +190,8 @@ public sealed class ProgramSplitTests
         p.Resources["storage"] = Res(Random, new() { ["byteLength"] = 4 });
         p.Resources["literalBackend"] = Res(Random, new() { ["byteLength"] = 4, ["prefix"] = "https://example.com" });
         p.AddAppResource("apiApp", Res(Random, new() { ["byteLength"] = 4, ["keepers"] = new Dictionary<string, object?> { ["fqdn"] = "api.example" } }));
-        p.AddInfraResource("backend", Random, Res(Random, new() { ["byteLength"] = 4, ["prefix"] = "https://${apiApp.keepers.fqdn}" }));
-        p.Resources["policy"] = Res(Random, new() { ["byteLength"] = 4 }, new() { ["dependsOn"] = new List<object?> { "${backend}" } });
+        p.AddInfraResource("backend", Random, Res(Random, new() { ["byteLength"] = 4, ["prefix"] = "https://${apiApp.keepers.fqdn}/${storage.hex}" }));
+        p.Resources["policy"] = Res(Random, new() { ["byteLength"] = 4, ["prefix"] = "${storage.hex}" }, new() { ["dependsOn"] = new List<object?> { "${backend}" } });
         p.Outputs["storageEndpoint"] = "${storage.hex}";
         p.Outputs["backendUrl"] = "${backend.prefix}";
 
@@ -231,20 +231,115 @@ public sealed class ProgramSplitTests
             // Deploy pass: the full program creates the app, then the backend and the policy that depend on it.
             await File.WriteAllTextAsync(program, p.ToYaml("split", "test"));
             await Pulumi(dir, env, "up", "--yes", "--skip-preview", "--non-interactive");
-            Assert.Equal("https://api.example", (await Pulumi(dir, env, "stack", "output", "backendUrl")).Trim());
+            Assert.StartsWith("https://api.example/", (await Pulumi(dir, env, "stack", "output", "backendUrl")).Trim());
 
-            // Provision pass of a redeploy: resources missing from the provision program are not targeted, so they survive.
+            // Control (issue #228): a redeploy's provision pass with the reduced program and without targeting the app-dependent
+            // resources, which are in state, makes Pulumi refuse to delete them.
             await File.WriteAllTextAsync(program, p.ToProvisionYaml("split", "test"));
-            await Pulumi(dir, env, provision.ToArray());
-            urns = await Pulumi(dir, env, "stack", "--show-urns");
+            var refusal = await Assert.ThrowsAnyAsync<Exception>(() => Pulumi(dir, env, provision.ToArray()));
+            Assert.Contains("will be destroyed but was not specified in --target list", refusal.Message);
+
+            // Redeploy, apps in state: the planner keeps the full program and targets the app-dependent resources.
+            async Task<string> Redeploy()
+            {
+                var state = PulumiExtensions.ParseStateResources(await Pulumi(dir, env, "stack", "export"));
+                var plan = p.PlanProvision("split", "test", state);
+                var args = provision.ToList();
+                foreach (var (type, name) in plan.ExtraTargets) args.AddRange(["--target", $"urn:pulumi:dev::split::{type}::{name}"]);
+                await File.WriteAllTextAsync(program, plan.ProvisionYaml ?? p.ToYaml("split", "test"));
+                await Pulumi(dir, env, args.ToArray());
+                return await Pulumi(dir, env, "stack", "--show-urns");
+            }
+            urns = await Redeploy();
             foreach (var name in new[] { "storage", "literalBackend", "apiApp", "backend", "policy" })
                 Assert.Contains($"::{name}", urns);
+
+            // Redeploy, the app is missing from state while its dependents are still there: they are removed (and recreated
+            // by the deploy pass) instead of failing the update.
+            var exported = System.Text.Json.Nodes.JsonNode.Parse(await Pulumi(dir, env, "stack", "export"))!;
+            var resources = exported["deployment"]!["resources"]!.AsArray();
+            var appUrn = resources.Single(r => r!["urn"]!.GetValue<string>().EndsWith("::apiApp"))!["urn"]!.GetValue<string>();
+            resources.Remove(resources.Single(r => r!["urn"]!.GetValue<string>() == appUrn));
+            foreach (var r in resources)
+            {
+                // Forget the app wherever the others recorded a dependency on it, so the edited state stays consistent.
+                if (r!["dependencies"] is System.Text.Json.Nodes.JsonArray deps)
+                    foreach (var d in deps.Where(d => d!.GetValue<string>() == appUrn).ToList()) deps.Remove(d);
+                if (r["propertyDependencies"] is System.Text.Json.Nodes.JsonObject pd)
+                    foreach (var (_, v) in pd)
+                        if (v is System.Text.Json.Nodes.JsonArray a)
+                            foreach (var d in a.Where(d => d!.GetValue<string>() == appUrn).ToList()) a.Remove(d);
+            }
+            var statePath = Path.Combine(dir, "state.json");
+            await File.WriteAllTextAsync(statePath, exported.ToJsonString());
+            await Pulumi(dir, env, "stack", "import", "--file", statePath);
+            urns = await Redeploy();
+            Assert.DoesNotContain("::apiApp", urns);
+            Assert.DoesNotContain("::backend", urns);
+            Assert.DoesNotContain("::policy", urns);
+            Assert.Contains("::storage", urns);
+            await File.WriteAllTextAsync(program, p.ToYaml("split", "test"));
+            await Pulumi(dir, env, "up", "--yes", "--skip-preview", "--non-interactive");
+            Assert.Contains("::backend", await Pulumi(dir, env, "stack", "--show-urns"));
         }
         finally
         {
             Directory.Delete(dir, true);
             Directory.Delete(backend, true);
         }
+    }
+
+    [Fact]
+    public void State_resources_are_read_as_type_and_name_from_a_stack_export()
+    {
+        const string Export = """{"version":3,"deployment":{"resources":[{"urn":"urn:pulumi:dev::p::pulumi:pulumi:Stack::p-dev"},{"urn":"urn:pulumi:dev::p::azure-native:apimanagement:Backend::apimBackend"},{"urn":"urn:pulumi:dev::p::a:b:Parent$a:b:Child::c"}]}}""";
+        Assert.Equal(["a:b:Child::c", "azure-native:apimanagement:Backend::apimBackend", "pulumi:pulumi:Stack::p-dev"], PulumiExtensions.ParseStateResources(Export).Order());
+        Assert.Empty(PulumiExtensions.ParseStateResources(""));
+        Assert.Empty(PulumiExtensions.ParseStateResources("""{"version":3,"deployment":{}}"""));
+        Assert.Empty(PulumiExtensions.ParseStateResources("""{"version":3,"deployment":{"resources":null}}"""));
+    }
+
+    private static PulumiProgram TwoApps()
+    {
+        var p = new PulumiProgram();
+        p.Resources["infra"] = Res("t:x:Infra", []);
+        p.AddAppResource("appA", Res("t:x:App", []));
+        p.AddAppResource("appB", Res("t:x:App", []));
+        p.AddInfraResource("backendA", "t:x:Backend", Res("t:x:Backend", new() { ["url"] = "${appA.fqdn}" }));
+        p.AddInfraResource("backendB", "t:x:Backend", Res("t:x:Backend", new() { ["url"] = "${appB.fqdn}" }));
+        return p;
+    }
+
+    [Fact]
+    public void Plan_keeps_the_full_program_and_targets_app_dependent_resources_when_every_app_is_in_state()
+    {
+        var plan = TwoApps().PlanProvision("p", "d", new HashSet<string> { "t:x:Infra::infra", "t:x:App::appA", "t:x:App::appB", "t:x:Backend::backendA", "t:x:Backend::backendB" });
+        Assert.Null(plan.ProvisionYaml);
+        Assert.Equal(["backendA", "backendB"], plan.ExtraTargets.Select(t => t.Name).Order());
+    }
+
+    [Fact]
+    public void Plan_only_removes_the_resources_that_depend_on_a_missing_app()
+    {
+        var plan = TwoApps().PlanProvision("p", "d", new HashSet<string> { "t:x:Infra::infra", "t:x:App::appA", "t:x:Backend::backendA", "t:x:Backend::backendB" });
+        Assert.DoesNotContain("backendB", plan.ProvisionYaml);
+        Assert.Contains("backendA", plan.ProvisionYaml);
+        Assert.Equal(["backendA", "backendB"], plan.ExtraTargets.Select(t => t.Name).Order());
+    }
+
+    [Fact]
+    public void Plan_does_not_target_omitted_resources_that_are_not_in_state_and_matches_on_type()
+    {
+        // First deploy: nothing in state, so nothing is targeted and every app-dependent resource is left out.
+        var first = TwoApps().PlanProvision("p", "d", new HashSet<string>());
+        Assert.Empty(first.ExtraTargets);
+        Assert.DoesNotContain("backend", first.ProvisionYaml);
+
+        // An app of the same name but another type counts as missing.
+        var retyped = TwoApps().PlanProvision("p", "d", new HashSet<string> { "t:x:Other::appA", "t:x:App::appB", "t:x:Backend::backendA", "t:x:Backend::backendB" });
+        Assert.DoesNotContain("backendA", retyped.ProvisionYaml);
+        Assert.Contains("backendB", retyped.ProvisionYaml);
+        Assert.Equal(["backendA", "backendB"], retyped.ExtraTargets.Select(t => t.Name).Order());
     }
 
     private static bool PulumiOnPath()
