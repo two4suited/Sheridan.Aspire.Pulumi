@@ -2,7 +2,16 @@
 
 Azure API Management provisioned by Pulumi, a port of the core of `Aspire.Hosting.Azure.ApiManagement` (`AddAzureApiManagement`).
 
-`AddPulumiAzureApiManagement` (alias `AddPulumiApiManagement`) provisions an `azure-native:apimanagement:ApiManagementService` with a system-assigned identity (outputs `gatewayUrl`, `name`, `id`, `principalId`). Set `SystemAssignedIdentity = false` on `AzureApiManagementOptions` to omit the identity and the `principalId` output (the resource's `PrincipalId` then throws): Pulumi YAML has no null-safe property access, so `${apim.identity.principalId}` fails the update on emulators that return no identity (for example floci-az). SKU and capacity are validated like the official integration (Developer by default; capacity 0 for Consumption, otherwise 1).
+`AddPulumiAzureApiManagement` (alias `AddPulumiApiManagement`) provisions an `azure-native:apimanagement:ApiManagementService` with a system-assigned identity (outputs `gatewayUrl`, `name`, `id`, `principalId`). Set `SystemAssignedIdentity = false` on `AzureApiManagementOptions` to omit the identity and the `principalId` output (the resource's `PrincipalId` then throws): Pulumi YAML has no null-safe property access, so `${apim.identity.principalId}` fails the update on emulators that return no identity (for example floci-az):
+
+```csharp
+builder.AddPulumiAzureApiManagement("apim", new AzureApiManagementOptions
+{
+    PublisherEmail = "admin@example.com",
+    PublisherName = "Example",
+    SystemAssignedIdentity = false,
+});
+``` SKU and capacity are validated like the official integration (Developer by default; capacity 0 for Consumption, otherwise 1).
 
 ## Install
 

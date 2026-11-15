@@ -286,6 +286,15 @@ public sealed class ApiManagementTests
     }
 
     [Fact]
+    public void Existing_service_reports_existing_error_even_when_identity_is_disabled()
+    {
+        var app = DistributedApplication.CreateBuilder();
+        var apim = app.AddPulumiAzureApiManagement("apim", new AzureApiManagementOptions { PublisherEmail = "a@b.c", PublisherName = "p", SystemAssignedIdentity = false }).AsExisting("a", "rg");
+        var ex = Assert.Throws<InvalidOperationException>(() => apim.Resource.PrincipalId);
+        Assert.Contains("existing", ex.Message);
+    }
+
+    [Fact]
     public void New_service_without_options_throws_at_generation()
     {
         var builder = DistributedApplication.CreateBuilder();
