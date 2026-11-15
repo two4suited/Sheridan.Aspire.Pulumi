@@ -322,6 +322,7 @@ public sealed class AzureApiManagementResource(string name, AzureApiManagementOp
     /// <summary>The backend URL as a literal or a Pulumi expression (<c>https://${app.configuration.ingress.fqdn}</c>) that also orders the backend after the app.</summary>
     internal string ResolveBackendUrl(AzureApiManagementBackendResource backend, PulumiStackResource? generating)
     {
+        if (backend.UrlOverride is { } urlOverride) return urlOverride;
         if (backend.Compute is { } compute)
         {
             var env = compute.GetComputeEnvironment()

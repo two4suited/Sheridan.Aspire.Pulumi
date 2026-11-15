@@ -55,9 +55,11 @@ apim.AddApi("people-api-gw", "people").WithBackend(backend);
 
 Or in one call: `apim.AddApi("people-api-gw", "people", people)` adds the API, a backend named `people-api-gw-backend` for the resource, and routes the API to it (`displayName`, `subscriptionRequired` and `apiName` pass through; the backend always uses the default `http` protocol with certificate validation on and is named from `name`, so use `AddBackend` + `WithBackend` for anything else).
 
-The resource needs an external http/https endpoint (`WithExternalHttpEndpoints()`) and must not be a Container Apps job. Routed APIs' policies are ordered after the backend they reference.
+To point the gateway at an address other than the public FQDN (an emulator such as floci-az, an internal-only app, a custom domain), override the URL: `apim.AddBackend("people-backend", people).WithUrl("http://host.docker.internal:8080")`, or `apim.AddApi("people-api-gw", "people", people, backendUrl: "http://...")`. The override replaces the derived URL and skips all compute checks (environment, external endpoint, stack, job). A literal must be an absolute http(s) URL; it may instead contain a Pulumi expression for a resource in the same program (e.g. `http://${peopleApiApp.configuration.ingress.fqdn}`). `WithUrl` is only valid on a backend created from a compute resource.
 
-During `aspire deploy` the container app is only created in the deploy step (after its image is pushed), so a backend that points at a compute resource, and the policy of any API routed to it, is created in that step too, not in the earlier provision step. The service, the APIs and their operations, and backends with a literal URL are still created in the provision step.
+Unless its URL is overridden, the resource needs an external http/https endpoint (`WithExternalHttpEndpoints()`) and must not be a Container Apps job. Routed APIs' policies are ordered after the backend they reference.
+
+During `aspire deploy` (unless the URL is overridden with a literal that doesn't reference the app, in which case the backend is created in the provision step) the container app is only created in the deploy step (after its image is pushed), so a backend that points at a compute resource, and the policy of any API routed to it, is created in that step too, not in the earlier provision step. The service, the APIs and their operations, and backends with a literal URL are still created in the provision step.
 
 ## Supported
 

@@ -174,6 +174,44 @@ public sealed class ApiManagementTests
     }
 
     [Fact]
+    public void Compute_backend_url_can_be_overridden()
+    {
+        var (apim, app) = NewApim();
+        var env = app.AddPulumiAzureContainerAppEnvironment("env");
+        var people = app.AddContainer("people-api", "img").WithHttpEndpoint(targetPort: 8080).WithComputeEnvironment(env);
+
+        var backend = apim.AddBackend("people-backend", people).WithUrl("http://host.docker.internal:8080");
+        var viaAddApi = apim.AddApi("gw", "gw", people, backendUrl: "http://internal:80");
+
+        Assert.Throws<InvalidOperationException>(() => apim.AddBackend("lit", "https://x.example.com").WithUrl("http://y"));
+        Assert.Throws<ArgumentException>(() => backend.WithUrl("foo"));
+        // Overridden URLs skip the external-endpoint check (people has no external endpoint).
+        Assert.Equal("http://host.docker.internal:8080", apim.Resource.ResolveBackendUrl(backend.Resource, null));
+        Assert.Equal("http://internal:80", apim.Resource.ResolveBackendUrl(viaAddApi.Resource.Backend!, null));
+    }
+
+    [Fact]
+    public void Overridden_backend_url_is_deferred_only_when_it_references_the_app()
+    {
+        var (apim, app) = NewApim();
+        apim.WithPulumiStack(app.AddPulumiStack("s", "dev"));
+        var env = app.AddPulumiAzureContainerAppEnvironment("env");
+        var people = app.AddContainer("people-api", "img").WithHttpEndpoint(targetPort: 8080).WithComputeEnvironment(env);
+        var appId = AzureContainerAppEnvironmentResource.AppId("people-api");
+        apim.AddApi("lit", "lit", people, backendUrl: "http://host.docker.internal:8080");
+        apim.AddApi("ref", "ref", people, backendUrl: $"http://${{{appId}.configuration.ingress.fqdn}}");
+
+        var program = new PulumiProgram();
+        apim.Resource.Contribute(program, "rg", "westus");
+        program.AddAppResource(appId, new() { ["type"] = "azure-native:app:ContainerApp" });
+
+        var deferred = program.GetDeferredResources().ToList();
+        Assert.Contains(deferred, d => d.EndsWith("BackendRefBackend"));
+        Assert.DoesNotContain(deferred, d => d.EndsWith("BackendLitBackend"));
+        Assert.Throws<ArgumentException>("backendUrl", () => apim.AddApi("bad", "bad", people, backendUrl: " "));
+    }
+
+    [Fact]
     public void Compute_backend_requires_an_http_endpoint_and_a_container_apps_environment()
     {
         var (apim, app) = NewApim();
