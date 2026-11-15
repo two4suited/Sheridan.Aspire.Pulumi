@@ -64,12 +64,12 @@ api.PublishWithFederatedManagedIdentityCredential(workerIdentity);      // secre
 - Removing an enabled scope or role is rejected by Graph: set `IsEnabled = false`, deploy, then remove it. Removing `PublishWithAppRoleAssignment` or `WithAdminConsent` does not revoke an existing grant.
 - Consent and role assignments need `DelegatedPermissionGrant.ReadWrite.All` / `AppRoleAssignment.ReadWrite.All` and `Application.Read.All` on the deploying principal.
 - Federated credentials and role assignments reference the identity in the same Pulumi program.
-- Not mirrored: the run-mode local developer certificate and Key Vault certificate credentials; see [decision 0002](https://two4suited.github.io/Sheridan.Aspire.Pulumi/reference/decisions/0002-entraid-upstream-sync/).
-- Customize anything else with `ConfigureInfrastructure(infra => infra.Application.Set(...))`; see the [overlay notes](https://two4suited.github.io/Sheridan.Aspire.Pulumi/reference/overlays/entraid/).
+- Not mirrored: the run-mode local developer certificate and Key Vault certificate credentials; see [decision 0002](https://brianpsheridan.com/Sheridan.Aspire.Pulumi/reference/decisions/0002-entraid-upstream-sync/).
+- Customize anything else with `ConfigureInfrastructure(infra => infra.Application.Set(...))`; see the [overlay notes](https://brianpsheridan.com/Sheridan.Aspire.Pulumi/reference/overlays/entraid/).
 
 ## Learn more
 
-- Mirrors the official [`Aspire.Hosting.Azure.EntraId`](https://www.nuget.org/packages/Aspire.Hosting.Azure.EntraId) integration, so moving from Bicep to Pulumi is a drop-in change in your AppHost.
+- Mirrors the official [`Aspire.Hosting.Azure.EntraId`](https://github.com/dotnet/aspire/tree/main/src/Aspire.Hosting.Azure.EntraId) integration, so moving from Bicep to Pulumi is a drop-in change in your AppHost.
 - Stack, ESC and deploy setup: [repository README](https://github.com/two4suited/Sheridan.Aspire.Pulumi#readme).
-- Customizing generated resources with `ConfigureInfrastructure`: [provisioning guide](https://two4suited.github.io/Sheridan.Aspire.Pulumi/concepts/provisioning/).
-- Resource naming: [naming guide](https://two4suited.github.io/Sheridan.Aspire.Pulumi/concepts/naming/).
+- Customizing generated resources with `ConfigureInfrastructure`: [provisioning guide](https://brianpsheridan.com/Sheridan.Aspire.Pulumi/concepts/provisioning/).
+- Resource naming: [naming guide](https://brianpsheridan.com/Sheridan.Aspire.Pulumi/concepts/naming/).
