@@ -30,7 +30,7 @@ builder.Build().Run();
 ## Features
 
 - `PulumiStackResource`, `PulumiProgram`, `PulumiCli` and `PulumiOutputReference`: the stack, the generated program, the Pulumi CLI wrapper and cross-resource output references.
-- `AddPulumiStack(name, stack?)`, `WithOrganization`, `WithProjectName`, `WithEscEnvironment`, `WithLocalBackend`, `WithConfig` and `DependsOnStack`.
+- `AddPulumiStack(name, stack?)`, `WithOrganization`, `WithProjectName`, `WithEscEnvironment`, `WithLocalBackend`, `WithConfig`, `WithProviderConfig` and `DependsOnStack`.
 - Pipeline steps for `aspire publish`, `aspire deploy` and `aspire destroy` (`pulumi whoami` check, ESC/stack creation, `pulumi up`, `pulumi destroy`). State lives in Pulumi Cloud unless a local backend is used (see below).
 - Multiple stacks: bind each resource to its stack with `WithPulumiStack(...)` and order stacks with `DependsOnStack(...)` or simply by referencing resources across them.
 - Command-line overrides: `aspire deploy -- --Pulumi:Stack=qa --Pulumi:Esc=shared/qa` (also `Pulumi__Stack` / `Pulumi__Esc` environment variables).
@@ -42,10 +42,11 @@ builder.Build().Run();
 ```csharp
 builder.AddPulumiStack("my-app", "dev")
     .WithLocalBackend("/path/to/state")                                // or omit to rely on PULUMI_BACKEND_URL / `pulumi login file://...`
-    .WithConfig("azure-native:metadataHost", "localhost:4577");        // plain stack config
+    .WithProviderConfig("azure-native", "metadataHost", "localhost:4577")   // = WithConfig("azure-native:metadataHost", ...)
+    .WithConfig("app:apiKey", builder.Configuration["ApiKey"]!, secret: true);                        // encrypted secret config
 ```
 
-When the backend is not Pulumi Cloud (`WithLocalBackend`, `PULUMI_BACKEND_URL`, or a current `pulumi login` to a `file://`, `s3://`, `azblob://` or `gs://` URL), the pipeline skips `pulumi whoami` and the ESC environment create/import (no `environment:` entry is written to `Pulumi.<stack>.yaml`), creates the stack with `pulumi stack select` / `pulumi stack init`, and ignores `WithOrganization`. Set `PULUMI_CONFIG_PASSPHRASE` (empty string for none) for the passphrase secrets provider. `WithLocalBackend(path)` sets `PULUMI_BACKEND_URL` on this stack's `pulumi` child processes only (so stacks can use different backends); relative paths are made absolute; the default is `file://~`. `WithConfig(key, value)` writes plain config under `config:` in `Pulumi.<stack>.yaml` for any backend, and an existing `encryptionsalt` is preserved when the file is regenerated.
+When the backend is not Pulumi Cloud (`WithLocalBackend`, `PULUMI_BACKEND_URL`, or a current `pulumi login` to a `file://`, `s3://`, `azblob://` or `gs://` URL), the pipeline skips `pulumi whoami` and the ESC environment create/import (no `environment:` entry is written to `Pulumi.<stack>.yaml`), creates the stack with `pulumi stack select` / `pulumi stack init`, and ignores `WithOrganization`. Set `PULUMI_CONFIG_PASSPHRASE` (empty string for none) for the passphrase secrets provider. `WithLocalBackend(path)` sets `PULUMI_BACKEND_URL` on this stack's `pulumi` child processes only (so stacks can use different backends); relative paths are made absolute; the default is `file://~`. `WithConfig(key, value)` writes plain config under `config:` in `Pulumi.<stack>.yaml` for any backend, and an existing `encryptionsalt` is preserved when the file is regenerated. `WithConfig(key, value, secret: true)` never writes the value to the generated file: after the stack is selected/created (provision, deploy and destroy steps) the pipeline runs `pulumi config set --secret key` with the value on stdin, so Pulumi stores it encrypted with the stack's secrets provider (only during `aspire deploy`/`destroy`, so the stack file from a plain `aspire publish` has no secrets; values are passed as-is, a trailing newline may be trimmed by Pulumi; stack-file config overrides ESC `pulumiConfig`; re-applied each time the file is regenerated; with the passphrase provider `PULUMI_CONFIG_PASSPHRASE` must be set). `WithProviderConfig(provider, key, value, secret: false)` is shorthand that sets `<provider>:<key>`.
 
 ## Run mode
 

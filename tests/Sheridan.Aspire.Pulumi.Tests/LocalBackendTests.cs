@@ -73,6 +73,39 @@ public sealed class LocalBackendTests
     }
 
     [Fact]
+    public void WithProviderConfig_prefixes_the_key_with_the_provider()
+    {
+        var builder = DistributedApplication.CreateBuilder();
+        var stack = builder.AddPulumiStack("infra", "dev").WithProviderConfig("azure-native", "metadataHost", "localhost:4577");
+        Assert.Equal("localhost:4577", stack.Resource.StackConfig["azure-native:metadataHost"]);
+    }
+
+    [Fact]
+    public void Secret_config_is_kept_out_of_the_plain_config_that_is_written_to_the_stack_file()
+    {
+        var builder = DistributedApplication.CreateBuilder();
+        var stack = builder.AddPulumiStack("infra", "dev")
+            .WithConfig("app:token", "plain")
+            .WithProviderConfig("azure-native", "clientSecret", "s3cr3t", secret: true)
+            .WithConfig("app:token", "now-secret", secret: true);
+        Assert.Equal("s3cr3t", stack.Resource.StackSecretConfig["azure-native:clientSecret"]);
+        Assert.Equal("now-secret", stack.Resource.StackSecretConfig["app:token"]);
+        Assert.Empty(stack.Resource.StackConfig);
+        var yaml = PulumiBackend.RenderStackFile(null, stack.Resource.StackConfig, null);
+        Assert.DoesNotContain("s3cr3t", yaml);
+        Assert.DoesNotContain("now-secret", yaml);
+    }
+
+    [Fact]
+    public void Switching_a_secret_key_back_to_plain_removes_the_secret()
+    {
+        var builder = DistributedApplication.CreateBuilder();
+        var stack = builder.AddPulumiStack("infra", "dev").WithConfig("a:b", "x", secret: true).WithConfig("a:b", "y");
+        Assert.Empty(stack.Resource.StackSecretConfig);
+        Assert.Equal("y", stack.Resource.StackConfig["a:b"]);
+    }
+
+    [Fact]
     public void Stack_file_for_a_local_backend_has_no_environment_import()
     {
         var yaml = PulumiBackend.RenderStackFile(null, new Dictionary<string, string> { ["azure-native:metadataHost"] = "localhost:4577" }, null);
@@ -94,6 +127,16 @@ public sealed class LocalBackendTests
         var existing = "encryptionsalt: v1:abc:xyz\nconfig:\n  a:b: c\n";
         var yaml = PulumiBackend.RenderStackFile(null, new Dictionary<string, string>(), existing);
         Assert.Contains("encryptionsalt: v1:abc:xyz", yaml);
+    }
+
+    [Fact]
+    public void Stack_file_rewrite_preserves_kms_secrets_provider_keys()
+    {
+        var existing = "secretsprovider: azurekeyvault://v/k\nencryptedkey: abc\nconfig:\n  a:b:\n    secure: zzz\n";
+        var yaml = PulumiBackend.RenderStackFile(null, new Dictionary<string, string>(), existing);
+        Assert.Contains("secretsprovider: azurekeyvault://v/k", yaml);
+        Assert.Contains("encryptedkey: abc", yaml);
+        Assert.DoesNotContain("zzz", yaml);
     }
 
     [Fact]
