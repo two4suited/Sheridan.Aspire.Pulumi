@@ -130,6 +130,16 @@ public sealed class LocalBackendTests
     }
 
     [Fact]
+    public void Stack_file_rewrite_preserves_kms_secrets_provider_keys()
+    {
+        var existing = "secretsprovider: azurekeyvault://v/k\nencryptedkey: abc\nconfig:\n  a:b:\n    secure: zzz\n";
+        var yaml = PulumiBackend.RenderStackFile(null, new Dictionary<string, string>(), existing);
+        Assert.Contains("secretsprovider: azurekeyvault://v/k", yaml);
+        Assert.Contains("encryptedkey: abc", yaml);
+        Assert.DoesNotContain("zzz", yaml);
+    }
+
+    [Fact]
     public void Empty_stack_file_is_valid_yaml()
     {
         Assert.Equal("{}\n", PulumiBackend.RenderStackFile(null, new Dictionary<string, string>(), null).Replace("\r\n", "\n"));

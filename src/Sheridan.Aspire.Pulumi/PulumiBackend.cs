@@ -56,7 +56,7 @@ internal static class PulumiBackend
         }
     }
 
-    /// <summary>Renders <c>Pulumi.&lt;stack&gt;.yaml</c>, keeping an existing <c>encryptionsalt</c> (written by <c>pulumi stack init</c> for passphrase-encrypted stacks).</summary>
+    /// <summary>Renders <c>Pulumi.&lt;stack&gt;.yaml</c>, keeping an existing <c>encryptionsalt</c>, <c>secretsprovider</c> and <c>encryptedkey</c> (written by <c>pulumi stack init</c>).</summary>
     public static string RenderStackFile(IReadOnlyList<string>? escImports, IReadOnlyDictionary<string, string> config, string? existingFile)
     {
         var sb = new System.Text.StringBuilder();
@@ -65,8 +65,7 @@ internal static class PulumiBackend
             sb.AppendLine("environment:");
             foreach (var e in escImports) sb.Append("  - ").AppendLine(e);
         }
-        var salt = ExistingSalt(existingFile);
-        if (salt is not null) sb.Append("encryptionsalt: ").AppendLine(salt);
+        foreach (var line in PreservedLines(existingFile)) sb.AppendLine(line);
         if (config.Count > 0)
         {
             sb.AppendLine("config:");
@@ -76,12 +75,16 @@ internal static class PulumiBackend
         return sb.Length == 0 ? "{}\n" : sb.ToString();
     }
 
-    private static string? ExistingSalt(string? existingFile)
+    // Written by `pulumi stack init`/`config set --secret`; losing them would orphan existing ciphertext.
+    private static readonly string[] PreservedKeys = ["secretsprovider:", "encryptedkey:", "encryptionsalt:"];
+
+    private static IEnumerable<string> PreservedLines(string? existingFile)
     {
-        if (existingFile is null) return null;
-        foreach (var line in existingFile.Split('\n'))
-            if (line.StartsWith("encryptionsalt:", StringComparison.Ordinal))
-                return line["encryptionsalt:".Length..].Trim();
-        return null;
+        if (existingFile is null) yield break;
+        foreach (var raw in existingFile.Split('\n'))
+        {
+            var line = raw.TrimEnd('\r');
+            if (PreservedKeys.Any(k => line.StartsWith(k, StringComparison.Ordinal))) yield return line;
+        }
     }
 }

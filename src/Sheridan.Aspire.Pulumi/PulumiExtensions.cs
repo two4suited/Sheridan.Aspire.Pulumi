@@ -92,8 +92,9 @@ public static class PulumiExtensions
     /// (value on stdin) so Pulumi stores it encrypted with the stack's secrets provider.
     /// </summary>
     public static IResourceBuilder<PulumiStackResource> WithConfig(
-        this IResourceBuilder<PulumiStackResource> builder, string key, string value, bool secret = false)
+        this IResourceBuilder<PulumiStackResource> builder, string key, string value, bool secret)
     {
+        ArgumentNullException.ThrowIfNull(value);
         var resource = builder.Resource;
         if (secret)
         {
@@ -108,7 +109,12 @@ public static class PulumiExtensions
         return builder;
     }
 
-    /// <summary>Shorthand for <see cref="WithConfig"/> that prefixes the key with the provider namespace: <c>WithProviderConfig("azure-native", "metadataHost", "localhost:4577")</c> sets <c>azure-native:metadataHost</c>.</summary>
+    /// <summary>Adds plain stack config; see <see cref="WithConfig(IResourceBuilder{PulumiStackResource}, string, string, bool)"/>.</summary>
+    public static IResourceBuilder<PulumiStackResource> WithConfig(
+        this IResourceBuilder<PulumiStackResource> builder, string key, string value) =>
+        builder.WithConfig(key, value, secret: false);
+
+    /// <summary>Shorthand for <c>WithConfig</c> that prefixes the key with the provider namespace: <c>WithProviderConfig("azure-native", "metadataHost", "localhost:4577")</c> sets <c>azure-native:metadataHost</c>.</summary>
     public static IResourceBuilder<PulumiStackResource> WithProviderConfig(
         this IResourceBuilder<PulumiStackResource> builder, string provider, string key, string value, bool secret = false)
     {
