@@ -48,6 +48,7 @@ builder.Build().Run();
 - Prompt agents and toolboxes are unit tested only, not against a deployed project. The deploying principal needs *Azure AI User* on the project.
 - Provider gaps: the project capability host cannot set `capabilityHostKind` / `enablePublicHostingEnvironment`, and the Bing grounding key cannot be read with `listKeys()`, so `AddBingGroundingConnection` takes the key as a secret parameter.
 - Not ported: Foundry hosted agents, the Foundry Local model lifecycle, and toolbox run-mode deployment and MCP approval policies.
+- This package depends on the prerelease `Azure.AI.Projects` 2.1.0-beta.1, because the toolbox APIs are not in a stable release yet. It is a transitive dependency of your AppHost, and the NuGet prerelease warning (NU5104) is suppressed at pack time.
 
 ## Learn more
 

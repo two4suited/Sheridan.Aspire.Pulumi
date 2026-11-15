@@ -53,7 +53,7 @@ public sealed class AzureStorageResource(string name) : PulumiAzureResource(name
             .Concat(BlobContainers).Concat(Queues).Concat(DataLakeFileSystems);
 
     /// <summary>Publishes <paramref name="state"/> for the account and each of its children (the dashboard shows Unknown otherwise).</summary>
-    internal async Task PublishStateAsync(ResourceNotificationService notifications, ResourceStateSnapshot state)
+    internal async Task PublishStateAsync(ResourceNotificationService notifications, string state)
     {
         foreach (var resource in Children.Prepend(this))
             await notifications.PublishUpdateAsync(resource, s => s with { State = state }).ConfigureAwait(false);
