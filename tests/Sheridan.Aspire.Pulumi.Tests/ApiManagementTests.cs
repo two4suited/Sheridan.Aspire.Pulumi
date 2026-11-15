@@ -183,6 +183,8 @@ public sealed class ApiManagementTests
         var backend = apim.AddBackend("people-backend", people).WithUrl("http://host.docker.internal:8080");
         var viaAddApi = apim.AddApi("gw", "gw", people, backendUrl: "http://internal:80");
 
+        Assert.Throws<InvalidOperationException>(() => apim.AddBackend("lit", "https://x.example.com").WithUrl("http://y"));
+        Assert.Throws<ArgumentException>(() => backend.WithUrl("foo"));
         // Overridden URLs skip the external-endpoint check (people has no external endpoint).
         Assert.Equal("http://host.docker.internal:8080", apim.Resource.ResolveBackendUrl(backend.Resource, null));
         Assert.Equal("http://internal:80", apim.Resource.ResolveBackendUrl(viaAddApi.Resource.Backend!, null));

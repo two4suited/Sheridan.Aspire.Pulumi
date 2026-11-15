@@ -106,7 +106,7 @@ public static class AzureApiManagementExtensions
             throw new InvalidOperationException($"A resource or backend named '{backendName}' already exists; use AddApi, AddBackend and WithBackend separately.");
         var api = builder.AddApi(name, path, displayName, subscriptionRequired, apiName);
         var backend = builder.AddBackend($"{name}-backend", compute);
-        if (backendUrl is not null) backend.WithUrl(backendUrl);
+        if (backendUrl is not null) backend.WithUrl(backendUrl);  // validated here, before the API is added
         return api.WithBackend(backend);
     }
 
@@ -140,14 +140,20 @@ public static class AzureApiManagementExtensions
 
     /// <summary>
     /// Overrides the backend URL, replacing the <c>https://&lt;ingress FQDN&gt;</c> derived from a compute resource. Use it when the
-    /// gateway cannot reach the public FQDN (an emulator, an internal-only app, a custom domain). The value is written as-is and may
-    /// contain a Pulumi expression such as <c>http://${other.outputs.host}</c>. The compute resource's endpoint and stack checks are skipped.
+    /// gateway cannot reach the public FQDN (an emulator, an internal-only app, a custom domain). Only valid on a backend created from
+    /// a compute resource (a literal-URL backend already has its URL). The value is written as-is and may contain a Pulumi expression
+    /// for a resource in the same program, such as <c>http://${peopleApiApp.configuration.ingress.fqdn}</c>; a literal URL must be an
+    /// absolute http(s) URL. All compute checks (environment, endpoint, stack) are skipped.
     /// </summary>
     public static IResourceBuilder<AzureApiManagementBackendResource> WithUrl(
         this IResourceBuilder<AzureApiManagementBackendResource> builder, string url)
     {
         ArgumentNullException.ThrowIfNull(builder);
-        ArgumentException.ThrowIfNullOrEmpty(url);
+        ArgumentException.ThrowIfNullOrWhiteSpace(url);
+        if (builder.Resource.Compute is null)
+            throw new InvalidOperationException($"Backend '{builder.Resource.Name}' already has a literal URL; WithUrl only overrides the URL of a backend created from a compute resource.");
+        if (!url.Contains("${", StringComparison.Ordinal) && (!Uri.TryCreate(url, UriKind.Absolute, out var uri) || uri.Scheme is not ("http" or "https")))
+            throw new ArgumentException($"'{url}' is not an absolute http(s) URL.", nameof(url));
         builder.Resource.UrlOverride = url;
         return builder;
     }
