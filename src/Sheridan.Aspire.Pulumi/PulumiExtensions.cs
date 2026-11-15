@@ -235,8 +235,32 @@ public static class PulumiExtensions
     }
 
     /// <summary>The <c>type::name</c> keys of the resources in the stack's state (empty for a new stack).</summary>
-    private static async Task<HashSet<string>> StateResourcesAsync(string dir, PulumiStackResource resource, CancellationToken ct) =>
-        ParseStateResources(await PulumiCli.CaptureAsync(dir, ["stack", "export", "--stack", resource.QualifiedStack], ct, resource.CliEnvironment));
+    private static async Task<string> StateExportAsync(string dir, PulumiStackResource resource, CancellationToken ct) =>
+        await PulumiCli.CaptureAsync(dir, ["stack", "export", "--stack", resource.QualifiedStack], ct, resource.CliEnvironment);
+
+    /// <summary>
+    /// The URNs of the resources in the stack's state that the program no longer declares (removed or renamed in the model).
+    /// Pulumi plans them for deletion, and refuses a targeted update that would delete a resource it does not target.
+    /// The stack itself and provider resources are not candidates (Pulumi manages them).
+    /// </summary>
+    internal static List<string> ParseStaleUrns(string stackExportJson, Func<string, bool> inProgram)
+    {
+        var stale = new List<string>();
+        if (string.IsNullOrWhiteSpace(stackExportJson)) return stale;
+        using var doc = System.Text.Json.JsonDocument.Parse(stackExportJson);
+        if (doc.RootElement.TryGetProperty("deployment", out var d) && d.ValueKind == System.Text.Json.JsonValueKind.Object
+            && d.TryGetProperty("resources", out var rs) && rs.ValueKind == System.Text.Json.JsonValueKind.Array)
+            foreach (var r in rs.EnumerateArray())
+                if (r.TryGetProperty("urn", out var u) && u.GetString() is { } urn)
+                {
+                    var parts = urn.Split("::", 4);
+                    if (parts.Length != 4) continue;
+                    var type = parts[2][(parts[2].LastIndexOf('$') + 1)..];
+                    if (type.StartsWith("pulumi:pulumi:") || type.StartsWith("pulumi:providers:")) continue;
+                    if (!inProgram($"{type}::{parts[3]}")) stale.Add(urn);
+                }
+        return stale;
+    }
 
     internal static HashSet<string> ParseStateResources(string stackExportJson)
     {
@@ -310,10 +334,17 @@ public static class PulumiExtensions
             // planned for deletion, which Pulumi refuses unless it is targeted. When the apps are in state too the full
             // program evaluates fine, so it is used and the app-dependent resources are targeted (no churn); otherwise
             // they are targeted for removal and the deploy pass recreates them.
-            var plan = resource.Program!.PlanProvision(resource.ProjectName, resource.ProgramDescription,
-                resource.Program.GetDeferredResources().Count == 0 ? new HashSet<string>() : await StateResourcesAsync(dir, resource, ct));
+            //
+            // Resources removed from (or renamed in) the model are in state but not in the program: Pulumi plans them for
+            // deletion and refuses the targeted update unless they are targeted too, so they are added to the targets.
+            var stateJson = await StateExportAsync(dir, resource, ct);
+            var program = resource.Program!;
+            var plan = program.PlanProvision(resource.ProjectName, resource.ProgramDescription,
+                program.GetDeferredResources().Count == 0 ? new HashSet<string>() : ParseStateResources(stateJson));
             foreach (var (type, name) in plan.ExtraTargets)
                 args.AddRange(["--target", $"urn:pulumi:{resource.StackName}::{resource.ProjectName}::{type}::{name}"]);
+            foreach (var urn in ParseStaleUrns(stateJson, program.DeclaresResource))
+                args.AddRange(["--target", urn]);
 
             var programFile = Path.Combine(dir, "Pulumi.yaml");
             var fullProgram = plan.ProvisionYaml is null ? null : await File.ReadAllTextAsync(programFile, ct);

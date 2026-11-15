@@ -163,6 +163,9 @@ public sealed class PulumiProgram
         Resources.TryGetValue(resourceName, out var v) && v is IDictionary<string, object?> d && d.TryGetValue("type", out var t) && t is string type
             ? $"{type}::{resourceName}" : null;
 
+    /// <summary>Whether the program declares the resource with this state key (<c>type::name</c>).</summary>
+    public bool DeclaresResource(string stateKey) => Resources.Keys.Any(n => StateKey(n) == stateKey);
+
     /// <summary>
     /// What the provision pass of a redeploy runs, given the resources already in the stack's state (<c>type::name</c> keys).
     /// <para>

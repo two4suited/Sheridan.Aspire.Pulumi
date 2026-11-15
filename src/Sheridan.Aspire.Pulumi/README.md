@@ -56,7 +56,7 @@ When the AppHost runs locally (`aspire start` / F5), deploy-only resources with 
 
 Each stack contributes `pulumi-publish` → `pulumi-provision` → `pulumi-deploy` steps. The generated program is split in two halves: **app resources** (container apps, web apps, Kubernetes workloads) and **infrastructure** (everything else).
 
-1. `pulumi-provision` runs `pulumi up --target` for all infrastructure, so the outputs that apps consume (endpoints, hosts, ...) exist.
+1. `pulumi-provision` runs `pulumi up --target` for all infrastructure, so the outputs that apps consume (endpoints, hosts, ...) exist. Resources that are in the stack's state but no longer in the model (removed or renamed between deploys) are targeted too, so Pulumi can delete them instead of aborting with "will be destroyed but was not specified in --target list".
 2. Images are built and pushed to the registry created in step 1.
 3. `pulumi-deploy` regenerates the program, now that the outputs resolve, and runs the full `pulumi up` to create the apps.
 

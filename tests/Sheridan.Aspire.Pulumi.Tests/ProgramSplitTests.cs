@@ -342,6 +342,80 @@ public sealed class ProgramSplitTests
         Assert.Equal(["backendA", "backendB"], retyped.ExtraTargets.Select(t => t.Name).Order());
     }
 
+    [Fact]
+    public void Stale_urns_are_the_state_resources_the_program_no_longer_declares()
+    {
+        var p = new PulumiProgram();
+        p.Resources["keep"] = Res("t:x:Keep");
+        var json = """
+        { "deployment": { "resources": [
+          { "urn": "urn:pulumi:dev::proj::pulumi:pulumi:Stack::proj-dev" },
+          { "urn": "urn:pulumi:dev::proj::pulumi:providers:azure-native::default_1" },
+          { "urn": "urn:pulumi:dev::proj::t:x:Keep::keep" },
+          { "urn": "urn:pulumi:dev::proj::t:x:Op::removedOp" },
+          { "urn": "urn:pulumi:dev::proj::t:x:Keep::renamed" },
+          { "urn": "urn:pulumi:dev::proj::t:x:Parent$t:x:Child::nested" }
+        ] } }
+        """;
+        Assert.Equal(
+            ["urn:pulumi:dev::proj::t:x:Op::removedOp", "urn:pulumi:dev::proj::t:x:Keep::renamed", "urn:pulumi:dev::proj::t:x:Parent$t:x:Child::nested"],
+            PulumiExtensions.ParseStaleUrns(json, p.DeclaresResource));
+        Assert.Empty(PulumiExtensions.ParseStaleUrns("", p.DeclaresResource));
+    }
+
+    /// <summary>Issue #236: a resource removed from the model between two deploys must be targeted by the provision pass, or Pulumi refuses to delete it.</summary>
+    [Fact]
+    public async Task Provision_pass_deletes_a_resource_removed_from_the_model()
+    {
+        if (!PulumiOnPath()) return;
+
+        var p = new PulumiProgram();
+        p.Resources["storage"] = Res("random:index/randomId:RandomId", new() { ["byteLength"] = 4 });
+        // Like an APIM operation under its API: it references a targeted resource, so Pulumi insists on targeting its deletion.
+        p.Resources["operation"] = Res("random:index/randomId:RandomId", new() { ["byteLength"] = 4, ["keepers"] = new Dictionary<string, object?> { ["s"] = "${storage.hex}" } });
+        p.AddAppResource("apiApp", Res("random:index/randomId:RandomId", new() { ["byteLength"] = 4 }));
+
+        var dir = Directory.CreateTempSubdirectory("pulumi-split-").FullName;
+        var backend = Directory.CreateTempSubdirectory("pulumi-state-").FullName;
+        try
+        {
+            var env = new Dictionary<string, string>
+            {
+                ["PULUMI_BACKEND_URL"] = "file://" + backend,
+                ["PULUMI_CONFIG_PASSPHRASE"] = "x",
+                ["PULUMI_SKIP_UPDATE_CHECK"] = "true",
+            };
+            await File.WriteAllTextAsync(Path.Combine(dir, "Pulumi.yaml"), p.ToYaml("split", "test"));
+            await Pulumi(dir, env, "stack", "init", "dev");
+            await Pulumi(dir, env, "up", "--yes", "--skip-preview", "--non-interactive");
+
+            // The next model no longer has the operation.
+            p.Resources.Remove("operation");
+            await File.WriteAllTextAsync(Path.Combine(dir, "Pulumi.yaml"), p.ToYaml("split", "test"));
+
+            var args = new List<string> { "up", "--yes", "--skip-preview", "--non-interactive" };
+            foreach (var (type, name) in p.GetInfrastructureTargets())
+                args.AddRange(["--target", $"urn:pulumi:dev::split::{type}::{name}"]);
+
+            var refusal = await Assert.ThrowsAnyAsync<Exception>(() => Pulumi(dir, env, args.ToArray()));
+            Assert.Contains("will be destroyed but was not specified in --target list", refusal.Message);
+
+            foreach (var urn in PulumiExtensions.ParseStaleUrns(await Pulumi(dir, env, "stack", "export"), p.DeclaresResource))
+                args.AddRange(["--target", urn]);
+            await Pulumi(dir, env, args.ToArray());
+
+            var urns = await Pulumi(dir, env, "stack", "--show-urns");
+            Assert.Contains("::storage", urns);
+            Assert.Contains("::apiApp", urns);
+            Assert.DoesNotContain("::operation", urns);
+        }
+        finally
+        {
+            Directory.Delete(dir, true);
+            Directory.Delete(backend, true);
+        }
+    }
+
     private static bool PulumiOnPath()
     {
         try { using var pr = Process.Start(new ProcessStartInfo("pulumi", "version") { RedirectStandardOutput = true, RedirectStandardError = true })!; pr.WaitForExit(); return pr.ExitCode == 0; }
