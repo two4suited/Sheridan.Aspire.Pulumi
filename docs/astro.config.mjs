@@ -9,7 +9,7 @@ const integrations = existsSync('./integrations.generated.json')
   : [{ autogenerate: { directory: 'integrations' } }];
 
 export default defineConfig({
-  site: 'https://two4suited.github.io',
+  site: 'https://brianpsheridan.com',
   base: '/Sheridan.Aspire.Pulumi',
   integrations: [
     starlight({

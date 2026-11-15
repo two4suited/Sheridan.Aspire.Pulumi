@@ -98,5 +98,5 @@ var storage = builder.AddPulumiStorage("storage")
 
 - Mirrors the official [`Aspire.Hosting.Azure.Storage`](https://www.nuget.org/packages/Aspire.Hosting.Azure.Storage) integration, so moving from Bicep to Pulumi is a drop-in change in your AppHost.
 - Stack, ESC and deploy setup: [repository README](https://github.com/two4suited/Sheridan.Aspire.Pulumi#readme).
-- Customizing generated resources with `ConfigureInfrastructure`: [provisioning guide](https://two4suited.github.io/Sheridan.Aspire.Pulumi/concepts/provisioning/).
-- Resource naming: [naming guide](https://two4suited.github.io/Sheridan.Aspire.Pulumi/concepts/naming/).
+- Customizing generated resources with `ConfigureInfrastructure`: [provisioning guide](https://brianpsheridan.com/Sheridan.Aspire.Pulumi/concepts/provisioning/).
+- Resource naming: [naming guide](https://brianpsheridan.com/Sheridan.Aspire.Pulumi/concepts/naming/).

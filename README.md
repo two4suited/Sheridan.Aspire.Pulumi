@@ -2,7 +2,7 @@
 
 Aspire hosting integrations that provision Azure infrastructure with [Pulumi](https://www.pulumi.com) instead of Bicep/ARM. Each package mirrors the official `Aspire.Hosting.Azure.*` integration (`AddPulumiX` instead of `AddAzureX`, same `WithX` calls), so swapping Bicep for Pulumi is a drop-in change in your AppHost.
 
-**Documentation: https://two4suited.github.io/Sheridan.Aspire.Pulumi/**
+**Documentation: https://brianpsheridan.com/Sheridan.Aspire.Pulumi/**
 
 ## Quick start
 
@@ -90,7 +90,7 @@ aspire deploy -- --Pulumi:Stack=qa --Pulumi:Esc=shared/qa,myproj/qa
 
 ## Resource naming
 
-Azure names are built from the app (Pulumi project) name, the Aspire resource name and the stack name, shortened deterministically (with a hash only when lossy) to fit each resource type's limits. Pin one with `WithAzureName(AzureNameKind.X, "name")`. See [docs/naming.md](https://two4suited.github.io/Sheridan.Aspire.Pulumi/concepts/naming/).
+Azure names are built from the app (Pulumi project) name, the Aspire resource name and the stack name, shortened deterministically (with a hash only when lossy) to fit each resource type's limits. Pin one with `WithAzureName(AzureNameKind.X, "name")`. See [docs/naming.md](https://brianpsheridan.com/Sheridan.Aspire.Pulumi/concepts/naming/).
 
 ## Multiple stacks
 
@@ -121,13 +121,13 @@ var acaEnv = builder.AddPulumiAzureContainerAppEnvironment("aca-env")
 
 ## Breaking changes
 
-- **Entra ID (`Sheridan.Aspire.Pulumi.Azure.EntraId`, issue #144):** `WithRedirectUris`, `WithApplicationOwners`, `WithServicePrincipalOwners`, `WithOwners` and `WithIdTokenIssuance` now throw `InvalidOperationException` on existing applications instead of silently doing nothing, and `AsExistingApplication` throws if such settings were applied first. `WithReference` gains optional connection and downstream-API key parameters. See [decision 0002](https://two4suited.github.io/Sheridan.Aspire.Pulumi/reference/decisions/0002-entraid-upstream-sync/).
+- **Entra ID (`Sheridan.Aspire.Pulumi.Azure.EntraId`, issue #144):** `WithRedirectUris`, `WithApplicationOwners`, `WithServicePrincipalOwners`, `WithOwners` and `WithIdTokenIssuance` now throw `InvalidOperationException` on existing applications instead of silently doing nothing, and `AsExistingApplication` throws if such settings were applied first. `WithReference` gains optional connection and downstream-API key parameters. See [decision 0002](https://brianpsheridan.com/Sheridan.Aspire.Pulumi/reference/decisions/0002-entraid-upstream-sync/).
 
 ## Repository layout
 
 - `src/`: one class library per package (`Sheridan.Aspire.Pulumi*`).
 - `tests/`: unit tests; run with `dotnet test Sheridan.Aspire.Pulumi.slnx`.
-- `docs/`: the [documentation site](https://two4suited.github.io/Sheridan.Aspire.Pulumi/) (Astro Starlight; run `npm install && npm run dev` in `docs/`), including the [naming scheme](https://two4suited.github.io/Sheridan.Aspire.Pulumi/concepts/naming/), [provisioning / `ConfigureInfrastructure`](https://two4suited.github.io/Sheridan.Aspire.Pulumi/concepts/provisioning/) and per-service overlay notes, and the [release notes](https://two4suited.github.io/Sheridan.Aspire.Pulumi/reference/release-notes/).
+- `docs/`: the [documentation site](https://brianpsheridan.com/Sheridan.Aspire.Pulumi/) (Astro Starlight; run `npm install && npm run dev` in `docs/`), including the [naming scheme](https://brianpsheridan.com/Sheridan.Aspire.Pulumi/concepts/naming/), [provisioning / `ConfigureInfrastructure`](https://brianpsheridan.com/Sheridan.Aspire.Pulumi/concepts/provisioning/) and per-service overlay notes, and the [release notes](https://brianpsheridan.com/Sheridan.Aspire.Pulumi/reference/release-notes/).
 
 See [CLAUDE.md](CLAUDE.md) for how new resource integrations are added.
 
