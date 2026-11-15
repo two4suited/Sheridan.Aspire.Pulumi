@@ -17,10 +17,20 @@ namespace Sheridan.Aspire.Pulumi.Azure.AppContainers;
 /// that target it are built, pushed to the registry and deployed as container apps (or container jobs).
 /// </summary>
 #pragma warning disable ASPIRECOMPUTE002
-public sealed class AzureContainerAppEnvironmentResource : PulumiAzureResource, IComputeEnvironmentResource, IContainerRegistry, IPulumiManagedIdentityResource
+public sealed class AzureContainerAppEnvironmentResource : PulumiAzureResource, IComputeEnvironmentResource, IContainerRegistry, IPulumiManagedIdentityResource, IPulumiPrivateEndpointTarget
 {
     private const string AcrLoginTag = "acr-login";
     private const string AcrPullRoleId = "7f951dda-4ed3-4680-a7ca-43fe172d538d";
+
+    // IPulumiPrivateEndpointTarget: group 'managedEnvironments'. The zone name embeds the region, so it is taken from WithLocation
+    // (default 'eastus', the generated stack's default 'location'); set WithLocation when the stack deploys elsewhere.
+    string IPulumiAzureResourceWithId.IdExpression => $"${{{Id}.id}}";
+    string IPulumiPrivateEndpointTarget.PrivateLinkGroupId => "managedEnvironments";
+    string IPulumiPrivateEndpointTarget.PrivateDnsZoneName => $"privatelink.{(Location ?? "eastus").Replace(" ", "").ToLowerInvariant()}.azurecontainerapps.io";
+
+    /// <summary>True when a private endpoint (<c>AddPrivateEndpoint</c>) targets this environment.</summary>
+    internal bool HasPrivateEndpoint(DistributedApplicationModel model) =>
+        model.Resources.OfType<PulumiPrivateEndpointResource>().Any(e => ReferenceEquals(e.Target, this));
 
     public AzureContainerAppEnvironmentResource(string name) : base(name)
     {
@@ -338,8 +348,9 @@ public sealed class AzureContainerAppEnvironmentResource : PulumiAzureResource, 
             properties["vnetConfiguration"] = new Dictionary<string, object?> { ["infrastructureSubnetId"] = subnet.IdExpression };
         }
 
-        // Private Link from Front Door (WithAzureFrontDoorPrivateLink): the environment is only reachable privately.
-        if (Annotations.OfType<PulumiPrivateLinkTargetAnnotation>().Any())
+        // Private Link from Front Door (WithAzureFrontDoorPrivateLink) or a private endpoint (AddPrivateEndpoint): the environment is
+        // only reachable privately. Azure requires a workload-profiles environment (as created here) for private endpoints.
+        if (Annotations.OfType<PulumiPrivateLinkTargetAnnotation>().Any() || HasPrivateEndpoint(ctx.Model))
         {
             properties["publicNetworkAccess"] = "Disabled";
         }
