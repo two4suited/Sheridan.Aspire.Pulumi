@@ -86,12 +86,35 @@ public static class PulumiExtensions
         return builder;
     }
 
-    /// <summary>Adds plain stack config (<c>pulumi config set</c>) to <c>Pulumi.&lt;stack&gt;.yaml</c>, e.g. <c>WithConfig("azure-native:metadataHost", "localhost:4577")</c>. Works with or without ESC.</summary>
+    /// <summary>
+    /// Adds stack config (<c>pulumi config set</c>) for <c>Pulumi.&lt;stack&gt;.yaml</c>, e.g. <c>WithConfig("azure-native:metadataHost", "localhost:4577")</c>. Works with or without ESC.
+    /// With <paramref name="secret"/> the value is never written to the generated file: the pipeline runs <c>pulumi config set --secret</c>
+    /// (value on stdin) so Pulumi stores it encrypted with the stack's secrets provider.
+    /// </summary>
     public static IResourceBuilder<PulumiStackResource> WithConfig(
-        this IResourceBuilder<PulumiStackResource> builder, string key, string value)
+        this IResourceBuilder<PulumiStackResource> builder, string key, string value, bool secret = false)
     {
-        builder.Resource.StackConfig[key] = value;
+        var resource = builder.Resource;
+        if (secret)
+        {
+            resource.StackConfig.Remove(key);
+            resource.StackSecretConfig[key] = value;
+        }
+        else
+        {
+            resource.StackSecretConfig.Remove(key);
+            resource.StackConfig[key] = value;
+        }
         return builder;
+    }
+
+    /// <summary>Shorthand for <see cref="WithConfig"/> that prefixes the key with the provider namespace: <c>WithProviderConfig("azure-native", "metadataHost", "localhost:4577")</c> sets <c>azure-native:metadataHost</c>.</summary>
+    public static IResourceBuilder<PulumiStackResource> WithProviderConfig(
+        this IResourceBuilder<PulumiStackResource> builder, string provider, string key, string value, bool secret = false)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(provider);
+        ArgumentException.ThrowIfNullOrWhiteSpace(key);
+        return builder.WithConfig($"{provider}:{key}", value, secret);
     }
 
     /// <summary>
@@ -195,6 +218,15 @@ public static class PulumiExtensions
         ctx.Logger.LogInformation("Wrote Pulumi project to {Directory}", dir);
     }
 
+    // Secret config lives encrypted in Pulumi.<stack>.yaml, which is regenerated on every write, so it is (re)applied
+    // after each regeneration. Values go over stdin, never on the command line or into the generated file.
+    private static async Task ApplySecretConfigAsync(string dir, PulumiStackResource resource, ILogger log, CancellationToken ct)
+    {
+        foreach (var (key, value) in resource.StackSecretConfig)
+            await PulumiCli.RunOrThrowAsync(dir, ["config", "set", "--secret", "--non-interactive", "--stack", resource.QualifiedStack, "--", key],
+                log, ct, stdin: value, env: resource.CliEnvironment);
+    }
+
     private static async Task ProvisionAsync(PipelineStepContext ctx, PulumiStackResource resource)
     {
         var dir = ProjectDirectory(ctx, resource);
@@ -226,6 +258,7 @@ public static class PulumiExtensions
             log.LogWarning("ESC environments are ignored with a self-managed backend: {Environments}", string.Join(", ", resource.EscEnvironments));
         // --create also initialises a missing stack on self-managed backends.
         await PulumiCli.RunOrThrowAsync(dir, ["stack", "select", resource.QualifiedStack, "--create"], log, ct, env: resource.CliEnvironment);
+        await ApplySecretConfigAsync(dir, resource, log, ct);
 
         if (!resource.HasApps)
         {
@@ -265,6 +298,7 @@ public static class PulumiExtensions
         // values read from stack outputs (e.g. a new storage account's endpoint) that were unavailable when the program was
         // first generated resolve now.
         if (resource.HasApps) await WriteProjectAsync(ctx, resource);
+        await ApplySecretConfigAsync(ProjectDirectory(ctx, resource), resource, ctx.Logger, ctx.CancellationToken);
         await PulumiCli.RunOrThrowAsync(ProjectDirectory(ctx, resource), ["up", "--yes", "--skip-preview", "--non-interactive"], ctx.Logger, ctx.CancellationToken, env: resource.CliEnvironment);
     }
 
@@ -272,6 +306,7 @@ public static class PulumiExtensions
     {
         var dir = ProjectDirectory(ctx, resource);
         await PulumiCli.RunOrThrowAsync(dir, ["stack", "select", resource.QualifiedStack], ctx.Logger, ctx.CancellationToken, env: resource.CliEnvironment);
+        await ApplySecretConfigAsync(dir, resource, ctx.Logger, ctx.CancellationToken);
         await PulumiCli.RunOrThrowAsync(dir, ["destroy", "--yes", "--non-interactive"], ctx.Logger, ctx.CancellationToken, env: resource.CliEnvironment);
     }
 }

@@ -16,6 +16,12 @@ public sealed class PulumiStackResource(string name, string stackName) : Resourc
     /// <summary>Plain (non-ESC) stack config written to <c>Pulumi.&lt;stack&gt;.yaml</c>, e.g. <c>azure-native:metadataHost</c>.</summary>
     public Dictionary<string, string> StackConfig { get; } = [];
 
+    /// <summary>
+    /// Secret stack config (<c>WithConfig(..., secret: true)</c>). Never written to <c>Pulumi.&lt;stack&gt;.yaml</c> as plaintext;
+    /// applied with <c>pulumi config set --secret</c> so Pulumi stores it encrypted.
+    /// </summary>
+    public Dictionary<string, string> StackSecretConfig { get; } = [];
+
     /// <summary>The backend URL in effect (explicit, PULUMI_BACKEND_URL, or the current login), or null when unknown.</summary>
     public string? BackendUrl => _backendUrl ??= PulumiBackend.Resolve(LocalBackendUrl) ?? "";  // resolved once so every step agrees
     private string? _backendUrl;
