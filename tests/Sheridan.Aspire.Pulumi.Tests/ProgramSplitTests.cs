@@ -190,8 +190,8 @@ public sealed class ProgramSplitTests
         p.Resources["storage"] = Res(Random, new() { ["byteLength"] = 4 });
         p.Resources["literalBackend"] = Res(Random, new() { ["byteLength"] = 4, ["prefix"] = "https://example.com" });
         p.AddAppResource("apiApp", Res(Random, new() { ["byteLength"] = 4, ["keepers"] = new Dictionary<string, object?> { ["fqdn"] = "api.example" } }));
-        p.AddInfraResource("backend", Random, Res(Random, new() { ["byteLength"] = 4, ["prefix"] = "https://${apiApp.keepers.fqdn}" }));
-        p.Resources["policy"] = Res(Random, new() { ["byteLength"] = 4 }, new() { ["dependsOn"] = new List<object?> { "${backend}" } });
+        p.AddInfraResource("backend", Random, Res(Random, new() { ["byteLength"] = 4, ["prefix"] = "https://${apiApp.keepers.fqdn}/${storage.hex}" }));
+        p.Resources["policy"] = Res(Random, new() { ["byteLength"] = 4, ["prefix"] = "${storage.hex}" }, new() { ["dependsOn"] = new List<object?> { "${backend}" } });
         p.Outputs["storageEndpoint"] = "${storage.hex}";
         p.Outputs["backendUrl"] = "${backend.prefix}";
 
@@ -231,20 +231,48 @@ public sealed class ProgramSplitTests
             // Deploy pass: the full program creates the app, then the backend and the policy that depend on it.
             await File.WriteAllTextAsync(program, p.ToYaml("split", "test"));
             await Pulumi(dir, env, "up", "--yes", "--skip-preview", "--non-interactive");
-            Assert.Equal("https://api.example", (await Pulumi(dir, env, "stack", "output", "backendUrl")).Trim());
+            Assert.StartsWith("https://api.example/", (await Pulumi(dir, env, "stack", "output", "backendUrl")).Trim());
 
-            // Provision pass of a redeploy: resources missing from the provision program are not targeted, so they survive.
+            // Control (issue #228): a redeploy's provision pass with the reduced program and without targeting the app-dependent
+            // resources, which are in state, makes Pulumi refuse to delete them.
             await File.WriteAllTextAsync(program, p.ToProvisionYaml("split", "test"));
-            await Pulumi(dir, env, provision.ToArray());
+            var refusal = await Assert.ThrowsAnyAsync<Exception>(() => Pulumi(dir, env, provision.ToArray()));
+            Assert.Contains("will be destroyed but was not specified in --target list", refusal.Message);
+
+            // Redeploy, apps in state: the full program with the app-dependent resources targeted leaves everything in place.
+            var redeploy = provision.ToList();
+            foreach (var (type, name) in p.GetDeferredTargets())
+                redeploy.AddRange(["--target", $"urn:pulumi:dev::split::{type}::{name}"]);
+            await File.WriteAllTextAsync(program, p.ToYaml("split", "test"));
+            await Pulumi(dir, env, redeploy.ToArray());
             urns = await Pulumi(dir, env, "stack", "--show-urns");
             foreach (var name in new[] { "storage", "literalBackend", "apiApp", "backend", "policy" })
                 Assert.Contains($"::{name}", urns);
+
+            // Redeploy, an app missing from state: the reduced program is used and only the app-dependent resources that are in
+            // state are targeted (those that are not would be an unknown target). Here none are left, so the pass just succeeds.
+            await Pulumi(dir, env, "destroy", "--yes", "--skip-preview", "--non-interactive", "--target", "urn:pulumi:dev::split::random:index/randomId:RandomId::apiApp", "--target-dependents");
+            await File.WriteAllTextAsync(program, p.ToProvisionYaml("split", "test"));
+            await Pulumi(dir, env, provision.ToArray());
+            urns = await Pulumi(dir, env, "stack", "--show-urns");
+            Assert.DoesNotContain("::apiApp", urns);
+            Assert.DoesNotContain("::backend", urns);
+            Assert.Contains("::storage", urns);
         }
         finally
         {
             Directory.Delete(dir, true);
             Directory.Delete(backend, true);
         }
+    }
+
+    [Fact]
+    public void State_resource_names_are_read_from_a_stack_export()
+    {
+        const string Export = """{"version":3,"deployment":{"resources":[{"urn":"urn:pulumi:dev::p::pulumi:pulumi:Stack::p-dev"},{"urn":"urn:pulumi:dev::p::azure-native:apimanagement:Backend::apimBackend"}]}}""";
+        Assert.Equal(["apimBackend", "p-dev"], PulumiExtensions.ParseStateResourceNames(Export).Order());
+        Assert.Empty(PulumiExtensions.ParseStateResourceNames(""));
+        Assert.Empty(PulumiExtensions.ParseStateResourceNames("""{"version":3,"deployment":{}}"""));
     }
 
     private static bool PulumiOnPath()

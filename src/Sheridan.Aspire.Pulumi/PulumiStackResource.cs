@@ -45,6 +45,12 @@ public sealed class PulumiStackResource(string name, string stackName) : Resourc
     /// </summary>
     public string? ProvisionProgramYaml { get; set; }
 
+    /// <summary>Infrastructure left out of the provision program because it references an app (see <see cref="PulumiProgram.GetDeferredResources"/>).</summary>
+    public List<(string Type, string Name)> DeferredTargets { get; } = [];
+
+    /// <summary>Logical names of the app resources of the generated program.</summary>
+    public List<string> AppResourceNames { get; } = [];
+
     public bool HasApps { get; set; }
 
     /// <summary>

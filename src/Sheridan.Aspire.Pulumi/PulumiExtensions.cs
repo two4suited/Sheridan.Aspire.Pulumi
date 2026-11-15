@@ -207,6 +207,10 @@ public static class PulumiExtensions
             await c.ContributeAsync(program, ctx);
 
         resource.HasApps = program.HasApps;
+        resource.AppResourceNames.Clear();
+        resource.AppResourceNames.AddRange(program.AppResources);
+        resource.DeferredTargets.Clear();
+        resource.DeferredTargets.AddRange(program.GetDeferredTargets());
         resource.InfraTargets.Clear();
         resource.InfraTargets.AddRange(program.GetInfrastructureTargets());
 
@@ -231,6 +235,25 @@ public static class PulumiExtensions
         foreach (var (key, value) in resource.StackSecretConfig)
             await PulumiCli.RunOrThrowAsync(dir, ["config", "set", "--secret", "--non-interactive", "--stack", resource.QualifiedStack, "--", key],
                 log, ct, stdin: value, env: resource.CliEnvironment);
+    }
+
+    /// <summary>The logical names of the resources in the stack's state (empty for a new stack).</summary>
+    private static async Task<HashSet<string>> StateResourceNamesAsync(string dir, PulumiStackResource resource, CancellationToken ct)
+    {
+        var json = await PulumiCli.CaptureAsync(dir, ["stack", "export", "--stack", resource.QualifiedStack], ct, resource.CliEnvironment);
+        return ParseStateResourceNames(json);
+    }
+
+    internal static HashSet<string> ParseStateResourceNames(string stackExportJson)
+    {
+        var names = new HashSet<string>();
+        if (string.IsNullOrWhiteSpace(stackExportJson)) return names;
+        using var doc = System.Text.Json.JsonDocument.Parse(stackExportJson);
+        if (doc.RootElement.TryGetProperty("deployment", out var d) && d.TryGetProperty("resources", out var rs))
+            foreach (var r in rs.EnumerateArray())
+                if (r.TryGetProperty("urn", out var u) && u.GetString() is { } urn)
+                    names.Add(urn[(urn.LastIndexOf("::", StringComparison.Ordinal) + 2)..]);
+        return names;
     }
 
     private static async Task ProvisionAsync(PipelineStepContext ctx, PulumiStackResource resource)
@@ -280,14 +303,25 @@ public static class PulumiExtensions
         if (resource.InfraTargets.Count > 0)
         {
             // Infrastructure that depends on an app (e.g. an API Management backend on a container app's ingress FQDN) is
-            // not only untargeted but left out of the program for this pass: Pulumi YAML evaluates untargeted resources
-            // too, and a nested property of an app that does not exist yet is nil, which fails the update. The deploy
-            // pass creates it with the full program.
+            // not only untargeted but, on a first deploy, left out of the program for this pass: Pulumi YAML evaluates
+            // untargeted resources too, and a nested property of an app that does not exist yet is nil, which fails the
+            // update. The deploy pass creates it with the full program.
+            //
+            // On a redeploy that infrastructure is already in state. A resource missing from the program but in state is
+            // planned for deletion, which Pulumi refuses unless it is targeted. When the apps are in state too the full
+            // program evaluates fine, so it is used and the app-dependent resources are targeted (no churn); otherwise
+            // they are targeted for removal and the deploy pass recreates them.
+            var inState = await StateResourceNamesAsync(dir, resource, ct);
+            var appsInState = resource.AppResourceNames.All(inState.Contains);
+            foreach (var (type, name) in resource.DeferredTargets.Where(t => appsInState || inState.Contains(t.Name)))
+                args.AddRange(["--target", $"urn:pulumi:{resource.StackName}::{resource.ProjectName}::{type}::{name}"]);
+
             var programFile = Path.Combine(dir, "Pulumi.yaml");
-            var fullProgram = resource.ProvisionProgramYaml is null ? null : await File.ReadAllTextAsync(programFile, ct);
+            var useProvisionProgram = resource.ProvisionProgramYaml is not null && !appsInState;
+            var fullProgram = useProvisionProgram ? await File.ReadAllTextAsync(programFile, ct) : null;
             try
             {
-                if (fullProgram is not null) await File.WriteAllTextAsync(programFile, resource.ProvisionProgramYaml, ct);
+                if (fullProgram is not null) await File.WriteAllTextAsync(programFile, resource.ProvisionProgramYaml!, ct);
                 await PulumiCli.RunOrThrowAsync(dir, args, log, ct, env: resource.CliEnvironment);
             }
             finally

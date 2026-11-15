@@ -125,6 +125,12 @@ public sealed class PulumiProgram
         return deferred;
     }
 
+    /// <summary>Type and name of each <see cref="GetDeferredResources"/> entry.</summary>
+    public List<(string Type, string Name)> GetDeferredTargets() => GetDeferredResources()
+        .Where(n => Resources[n] is IDictionary<string, object?> d && d.ContainsKey("type"))
+        .Select(n => (Type: (string)((IDictionary<string, object?>)Resources[n]!)["type"]!, Name: n))
+        .ToList();
+
     /// <summary>
     /// The program for the provision pass, or null when it is the same as <see cref="ToYaml(string, string)"/>.
     /// <para>
