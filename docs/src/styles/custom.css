@@ -1,7 +1,7 @@
 :root {
   /* Aspire purple blended with Pulumi magenta, plus Pulumi yellow as a spark */
   --sl-color-accent-low: #2e1a55;
-  --sl-color-accent: #9a5fd0;
+  --sl-color-accent: #a56be0;
   --sl-color-accent-high: #e3c2f0;
   --brand-yellow: #f7bf2a;
   --sl-font-system-mono: ui-monospace, 'SF Mono', 'Cascadia Code', Menlo, Consolas, monospace;
@@ -22,6 +22,8 @@
   --sl-color-hairline: #261d38;
 }
 :root[data-theme='light'] {
+  --sl-color-bg: #fff;
+  --brand-gradient: linear-gradient(135deg, #512bd4 0%, #8a3391 60%, #b24a9a 100%);
   --sl-color-bg-nav: #faf6fc;
   --sl-color-bg-sidebar: #faf6fc;
   --sl-color-hairline-light: #e6d8ee;
@@ -30,22 +32,18 @@
 
 /* Header: brand gradient hairline */
 .site-title { font-weight: 700; letter-spacing: -0.01em; }
-header.header { border-bottom: 0; position: relative; }
+header.header { border-bottom: 0; }
 header.header::after {
   content: ''; position: absolute; inset: auto 0 0 0; height: 2px;
   background: linear-gradient(90deg, #512bd4, #8a3391 55%, #f7bf2a);
 }
-
-/* Sidebar */
-.sidebar-content a[aria-current='page'] { font-weight: 600; }
 
 /* Page titles: short gradient accent bar */
 [data-page-title]::after {
   content: ''; display: block; width: 3rem; height: 4px; margin-top: 0.6rem; border-radius: 2px;
   background: var(--brand-gradient);
 }
-:root:not([data-has-hero]) .content-panel { --sl-color-text-accent: var(--sl-color-accent-high); }
-:root[data-theme='light'] .content-panel { --sl-color-text-accent: var(--sl-color-accent); }
+
 
 /* Landing page */
 [data-has-hero] .hero { padding-block: clamp(2rem, 6vw, 5rem); }
