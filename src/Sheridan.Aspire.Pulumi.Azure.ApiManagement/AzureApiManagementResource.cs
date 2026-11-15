@@ -167,10 +167,21 @@ public sealed class AzureApiManagementResource(string name, AzureApiManagementOp
                 $"'{Name}': the {sku} SKU does not support virtual network type {type}. Use Developer, Premium or PremiumV2 (External or Internal), or StandardV2 (External only).");
     }
 
+    /// <summary>Private endpoints are unsupported on the Consumption SKU and on VNet-injected services.</summary>
+    internal void ValidatePrivateEndpointSupport()
+    {
+        if (Options?.Sku == AzureApiManagementSku.Consumption)
+            throw new InvalidOperationException($"'{Name}': private endpoints are not supported on the Consumption SKU.");
+        if (Annotations.OfType<PulumiDelegatedSubnetAnnotation>().Any())
+            throw new InvalidOperationException($"'{Name}': private endpoints are not supported on a service integrated with a virtual network (WithDelegatedSubnet).");
+    }
+
     private PulumiStackResource? _generating;
 
     protected override Task ContributeResourcesAsync(PulumiProgram program, PipelineStepContext context, string rg, string location)
     {
+        if (context.Model.Resources.OfType<PulumiPrivateEndpointResource>().Any(e => ReferenceEquals(e.Target, this)))
+            ValidatePrivateEndpointSupport();
         _generating = ResolveStack(context);
         Contribute(program, rg, location);
         return Task.CompletedTask;

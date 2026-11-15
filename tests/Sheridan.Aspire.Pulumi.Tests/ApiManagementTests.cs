@@ -465,4 +465,40 @@ public sealed class ApiManagementTests
         var pe = subnet.AddPrivateEndpoint(apim);
         Assert.Same(apim.Resource, pe.Resource.Target);
     }
+
+    [Fact]
+    public void Private_endpoint_is_rejected_for_Consumption_and_vnet_integrated_services()
+    {
+        var (consumption, _) = NewNetworkedApim(AzureApiManagementSku.Consumption);
+        Assert.Throws<InvalidOperationException>(() => consumption.Resource.ValidatePrivateEndpointSupport());
+        var (injected, subnet) = NewNetworkedApim(AzureApiManagementSku.Developer);
+        injected.WithDelegatedSubnet(subnet);
+        Assert.Throws<InvalidOperationException>(() => injected.Resource.ValidatePrivateEndpointSupport());
+        var (plain, _) = NewNetworkedApim(AzureApiManagementSku.Developer);
+        plain.Resource.ValidatePrivateEndpointSupport();
+    }
+
+    [Theory]
+    [InlineData(AzureApiManagementSku.Developer, AzureApiManagementVirtualNetworkType.Internal)]
+    [InlineData(AzureApiManagementSku.PremiumV2, AzureApiManagementVirtualNetworkType.External)]
+    [InlineData(AzureApiManagementSku.PremiumV2, AzureApiManagementVirtualNetworkType.Internal)]
+    public void Supported_sku_and_vnet_type_combinations_emit_the_type(AzureApiManagementSku sku, AzureApiManagementVirtualNetworkType type)
+    {
+        var (apim, subnet) = NewNetworkedApim(sku);
+        apim.WithDelegatedSubnet(subnet).WithVirtualNetworkType(type);
+        var program = new PulumiProgram();
+        apim.Resource.Contribute(program, "rg", "westus");
+        Assert.Equal(type.ToString(), ServiceProps(program, apim.Resource)["virtualNetworkType"]);
+    }
+
+    [Fact]
+    public void BasicV2_does_not_support_vnet_integration_and_existing_services_reject_a_subnet()
+    {
+        var (basicV2, subnet) = NewNetworkedApim(AzureApiManagementSku.BasicV2);
+        basicV2.WithDelegatedSubnet(subnet);
+        Assert.Throws<InvalidOperationException>(() => basicV2.Resource.Contribute(new PulumiProgram(), "rg", "westus"));
+        var (existing, subnet2) = NewNetworkedApim(AzureApiManagementSku.Developer);
+        existing.AsExisting("shared", "rg").WithDelegatedSubnet(subnet2);
+        Assert.Throws<InvalidOperationException>(() => existing.Resource.Contribute(new PulumiProgram(), "rg", "westus"));
+    }
 }
