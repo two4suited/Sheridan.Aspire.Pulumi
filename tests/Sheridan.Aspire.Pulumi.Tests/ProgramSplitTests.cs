@@ -354,11 +354,13 @@ public sealed class ProgramSplitTests
           { "urn": "urn:pulumi:dev::proj::t:x:Keep::keep" },
           { "urn": "urn:pulumi:dev::proj::t:x:Op::removedOp" },
           { "urn": "urn:pulumi:dev::proj::t:x:Keep::renamed" },
-          { "urn": "urn:pulumi:dev::proj::t:x:Parent$t:x:Child::nested" }
+          { "urn": "urn:pulumi:dev::proj::t:x:Keep$t:x:Child::liveChild", "parent": "urn:pulumi:dev::proj::t:x:Keep::keep" },
+          { "urn": "urn:pulumi:dev::proj::t:x:Gone::gone" },
+          { "urn": "urn:pulumi:dev::proj::t:x:Gone$t:x:Child::goneChild", "parent": "urn:pulumi:dev::proj::t:x:Gone::gone" }
         ] } }
         """;
         Assert.Equal(
-            ["urn:pulumi:dev::proj::t:x:Op::removedOp", "urn:pulumi:dev::proj::t:x:Keep::renamed", "urn:pulumi:dev::proj::t:x:Parent$t:x:Child::nested"],
+            ["urn:pulumi:dev::proj::t:x:Op::removedOp", "urn:pulumi:dev::proj::t:x:Keep::renamed", "urn:pulumi:dev::proj::t:x:Gone::gone", "urn:pulumi:dev::proj::t:x:Gone$t:x:Child::goneChild"],
             PulumiExtensions.ParseStaleUrns(json, p.DeclaresResource));
         Assert.Empty(PulumiExtensions.ParseStaleUrns("", p.DeclaresResource));
     }

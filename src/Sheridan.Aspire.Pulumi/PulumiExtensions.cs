@@ -247,9 +247,11 @@ public static class PulumiExtensions
     {
         var stale = new List<string>();
         if (string.IsNullOrWhiteSpace(stackExportJson)) return stale;
+        var staleSet = new HashSet<string>();
         using var doc = System.Text.Json.JsonDocument.Parse(stackExportJson);
         if (doc.RootElement.TryGetProperty("deployment", out var d) && d.ValueKind == System.Text.Json.JsonValueKind.Object
             && d.TryGetProperty("resources", out var rs) && rs.ValueKind == System.Text.Json.JsonValueKind.Array)
+            // State lists parents before their children.
             foreach (var r in rs.EnumerateArray())
                 if (r.TryGetProperty("urn", out var u) && u.GetString() is { } urn)
                 {
@@ -257,7 +259,12 @@ public static class PulumiExtensions
                     if (parts.Length != 4) continue;
                     var type = parts[2][(parts[2].LastIndexOf('$') + 1)..];
                     if (type.StartsWith("pulumi:pulumi:") || type.StartsWith("pulumi:providers:")) continue;
-                    if (!inProgram($"{type}::{parts[3]}")) stale.Add(urn);
+                    var parent = r.TryGetProperty("parent", out var pp) ? pp.GetString() : null;
+                    var topLevel = parent is null || parent.Contains("::pulumi:pulumi:Stack::");
+                    // A child of a component (e.g. a ConfigGroup's workloads) is only stale together with its parent.
+                    var isStale = topLevel ? !inProgram($"{type}::{parts[3]}") : staleSet.Contains(parent!);
+                    if (!isStale || !staleSet.Add(urn)) continue;
+                    stale.Add(urn);
                 }
         return stale;
     }
