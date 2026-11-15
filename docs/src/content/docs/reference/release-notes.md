@@ -10,6 +10,25 @@ after a `vX.Y.Z` tag has been published. Packages are on
 
 <!-- releases:start -->
 
+## v2.1.0
+
+_2026-11-15_ · [GitHub release](https://github.com/two4suited/Sheridan.Aspire.Pulumi/releases/tag/v2.1.0)
+
+<!-- Release notes generated using configuration in .github/release.yml at v2.1.0 -->
+
+#### What's Changed
+* Support local Pulumi backends and plain stack config by @two4suited in https://github.com/two4suited/Sheridan.Aspire.Pulumi/pull/218
+* AppContainers: WithoutAcrPullRoleAssignment for emulators by @two4suited in https://github.com/two4suited/Sheridan.Aspire.Pulumi/pull/219
+* APIM: SystemAssignedIdentity option to avoid failing principalId output on emulators by @two4suited in https://github.com/two4suited/Sheridan.Aspire.Pulumi/pull/222
+* AppContainers: IPulumiPrivateEndpointTarget for the Container Apps environment by @two4suited in https://github.com/two4suited/Sheridan.Aspire.Pulumi/pull/220
+* ApiManagement: networking (VNet integration, private endpoint, publicNetworkAccess) by @two4suited in https://github.com/two4suited/Sheridan.Aspire.Pulumi/pull/221
+* AppContainers: deploy locally built images without pushing (#213) by @two4suited in https://github.com/two4suited/Sheridan.Aspire.Pulumi/pull/223
+* ApiManagement: AddApi<T>(name, path, compute) convenience overload by @two4suited in https://github.com/two4suited/Sheridan.Aspire.Pulumi/pull/224
+
+
+**Full Changelog**: https://github.com/two4suited/Sheridan.Aspire.Pulumi/compare/v2.0.0...v2.1.0
+
+
 ## v2.0.0
 
 _2026-11-11_ · [GitHub release](https://github.com/two4suited/Sheridan.Aspire.Pulumi/releases/tag/v2.0.0)
