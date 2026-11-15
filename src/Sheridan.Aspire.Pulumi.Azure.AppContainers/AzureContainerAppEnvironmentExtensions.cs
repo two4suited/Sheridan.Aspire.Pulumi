@@ -110,6 +110,8 @@ public static class AzureContainerAppEnvironmentExtensions
     {
         ArgumentNullException.ThrowIfNull(builder);
         ArgumentException.ThrowIfNullOrWhiteSpace(tag);
+        if (!System.Text.RegularExpressions.Regex.IsMatch(tag, "^[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}$"))
+            throw new ArgumentException($"'{tag}' is not a valid container image tag.", nameof(tag));
         builder.Resource.ImageTag = tag;
         return builder;
     }

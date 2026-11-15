@@ -32,8 +32,8 @@ builder.Build().Run();
 - Customize with `WithAzureContainerRegistry`, `WithAzureLogAnalyticsWorkspace`, `WithAcrPullIdentity` and `WithDashboard`; add VNet integration with `WithDelegatedSubnet`.
 - Container Apps jobs via `PublishAsPulumiContainerAppJob` and `PublishAsScheduledPulumiContainerAppJob`.
 - The environment's shared identity is granted data-plane roles by the data integrations (Cosmos DB, Storage, Service Bus, Key Vault, ...) automatically when an app references them.
-- Images are tagged with a per-deploy timestamp so every deploy creates a new revision. `WithImageTag("dev")` uses a stable tag instead (an unchanged tag does not create a new revision).
-- `WithLocalImages()` builds into the local container runtime and tags each image `<loginServer>/<app>:<tag>` without pushing or running `az acr login`, for emulators (such as floci-az) that run replicas through the host Docker daemon, which uses a locally present image as-is:
+- Images are tagged with a per-deploy timestamp so every deploy creates a new revision. `WithImageTag("dev")` uses a stable tag instead; note that re-deploying a rebuilt image under an unchanged tag does not create a new revision, so the new code is not rolled out until the tag changes or a restart is forced.
+- `WithLocalImages()` tags the locally built image (instead of pushing it) `<loginServer>/<app>:<tag>` without pushing or running `az acr login`, for emulators (such as floci-az) that run replicas through the host Docker daemon, which uses a locally present image as-is:
 
 ```csharp
 builder.AddPulumiAzureContainerAppEnvironment("aca-env")
