@@ -10,6 +10,20 @@ after a `vX.Y.Z` tag has been published. Packages are on
 
 <!-- releases:start -->
 
+## v2.3.0
+
+_2026-11-15_ · [GitHub release](https://github.com/two4suited/Sheridan.Aspire.Pulumi/releases/tag/v2.3.0)
+
+<!-- Release notes generated using configuration in .github/release.yml at v2.3.0 -->
+
+#### What's Changed
+* Fix aspire deploy redeploy: provision step wants to destroy APIM backend/policy by @two4suited in https://github.com/two4suited/Sheridan.Aspire.Pulumi/pull/231
+* ApiManagement: override the backend URL of a compute-targeted backend by @two4suited in https://github.com/two4suited/Sheridan.Aspire.Pulumi/pull/232
+
+
+**Full Changelog**: https://github.com/two4suited/Sheridan.Aspire.Pulumi/compare/v2.2.0...v2.3.0
+
+
 ## v2.2.0
 
 _2026-11-15_ · [GitHub release](https://github.com/two4suited/Sheridan.Aspire.Pulumi/releases/tag/v2.2.0)
