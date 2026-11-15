@@ -36,10 +36,13 @@ public sealed class AzureApiManagementResource(string name, AzureApiManagementOp
     public PulumiOutputReference GatewayUrl => OutputRef("GatewayUrl");
     public PulumiOutputReference NameOutput => OutputRef("Name");
     /// <summary>Principal id of the service's system-assigned identity (for role assignments on backend targets).</summary>
-    /// <remarks>Not available for an existing service (its identity is not managed here).</remarks>
-    public PulumiOutputReference PrincipalId => ExistingServiceName is null
-        ? OutputRef("PrincipalId")
-        : throw new InvalidOperationException($"'{Name}' is an existing API Management service; its principal id is not exposed.");
+    /// <remarks>Not available for an existing service (its identity is not managed here) or when <see cref="AzureApiManagementOptions.SystemAssignedIdentity"/> is false.</remarks>
+    public PulumiOutputReference PrincipalId =>
+        ExistingServiceName is not null
+            ? throw new InvalidOperationException($"'{Name}' is an existing API Management service; its principal id is not exposed.")
+            : Options is { SystemAssignedIdentity: false }
+                ? throw new InvalidOperationException($"'{Name}' has no system-assigned identity (AzureApiManagementOptions.SystemAssignedIdentity is false); its principal id is not exposed.")
+                : OutputRef("PrincipalId");
 
     private static string Child(string parentId, string name)
     {
@@ -127,7 +130,7 @@ public sealed class AzureApiManagementResource(string name, AzureApiManagementOp
             var options = Options ?? throw new InvalidOperationException(
                 $"'{Name}' needs AzureApiManagementOptions (publisher email and name) unless it is an existing service; pass them to AddPulumiAzureApiManagement or call AsExisting.");
             // Named by the naming layer ({project}-{resource}-{stack}); override with WithAzureName.
-            program.AddInfraResource(Id, "azure-native:apimanagement:ApiManagementService", new Dictionary<string, object?>
+            var props = new Dictionary<string, object?>
             {
                 ["type"] = "azure-native:apimanagement:ApiManagementService",
                 ["properties"] = new Dictionary<string, object?>
@@ -138,12 +141,16 @@ public sealed class AzureApiManagementResource(string name, AzureApiManagementOp
                     ["publisherEmail"] = options.PublisherEmail,
                     ["publisherName"] = options.PublisherName,
                     ["sku"] = new Dictionary<string, object?> { ["name"] = options.Sku.ToString(), ["capacity"] = options.Capacity },
-                    ["identity"] = new Dictionary<string, object?> { ["type"] = "SystemAssigned" },
                     ["tags"] = new Dictionary<string, object?> { ["aspire-resource-name"] = Name },
                 },
-            });
+            };
+            if (options.SystemAssignedIdentity)
+                ((Dictionary<string, object?>)props["properties"]!)["identity"] = new Dictionary<string, object?> { ["type"] = "SystemAssigned" };
+            program.AddInfraResource(Id, "azure-native:apimanagement:ApiManagementService", props);
 
-            program.Outputs[$"{Id}PrincipalId"] = $"${{{Id}.identity.principalId}}";
+            // Not null-safe in Pulumi YAML (a missing identity fails the update), so only emitted when the identity is requested.
+            if (options.SystemAssignedIdentity)
+                program.Outputs[$"{Id}PrincipalId"] = $"${{{Id}.identity.principalId}}";
         }
 
         var service = $"${{{Id}.name}}";
