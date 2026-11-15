@@ -92,6 +92,28 @@ public static class AzureContainerAppEnvironmentExtensions
         return builder;
     }
 
+    /// <summary>
+    /// Builds images into the local container runtime and tags them with the registry reference (<c>&lt;loginServer&gt;/&lt;app&gt;:&lt;tag&gt;</c>)
+    /// without pushing or running <c>az acr login</c>. For emulators that run replicas through the host Docker daemon (for example floci-az).
+    /// </summary>
+    public static IResourceBuilder<AzureContainerAppEnvironmentResource> WithLocalImages(
+        this IResourceBuilder<AzureContainerAppEnvironmentResource> builder, bool enable = true)
+    {
+        ArgumentNullException.ThrowIfNull(builder);
+        builder.Resource.LocalImages = enable;
+        return builder;
+    }
+
+    /// <summary>Uses a stable, caller-supplied image tag instead of the per-deploy timestamp. An unchanged tag does not create a new revision.</summary>
+    public static IResourceBuilder<AzureContainerAppEnvironmentResource> WithImageTag(
+        this IResourceBuilder<AzureContainerAppEnvironmentResource> builder, string tag)
+    {
+        ArgumentNullException.ThrowIfNull(builder);
+        ArgumentException.ThrowIfNullOrWhiteSpace(tag);
+        builder.Resource.ImageTag = tag;
+        return builder;
+    }
+
     /// <summary>Enables or disables the Aspire dashboard component on the environment. Mirrors <c>WithDashboard</c> (default enabled).</summary>
     public static IResourceBuilder<AzureContainerAppEnvironmentResource> WithDashboard(
         this IResourceBuilder<AzureContainerAppEnvironmentResource> builder, bool enable = true)
