@@ -93,8 +93,36 @@ apim.AddApi("catalog-api", "catalog");
 
 Note that service-scope policies (`WithPolicy`/`WithInboundPolicy`) replace the existing service's policy; omit them to leave it untouched.
 
+## Networking
+
+VNet integration, private endpoints and public network access, using the `Sheridan.Aspire.Pulumi.Azure.Network` package:
+
+```csharp
+var vnet = builder.AddPulumiVirtualNetwork("vnet");
+
+// VNet injection (Developer/Premium/PremiumV2) or outbound integration (StandardV2).
+var apimSubnet = vnet.AddSubnet("apim", "10.0.2.0/24");
+var apim = builder.AddPulumiAzureApiManagement("apim", new AzureApiManagementOptions
+    {
+        PublisherEmail = "admin@contoso.com", PublisherName = "Contoso", Sku = AzureApiManagementSku.Developer,
+    })
+    .WithDelegatedSubnet(apimSubnet)                                          // virtualNetworkConfiguration.subnetResourceId
+    .WithVirtualNetworkType(AzureApiManagementVirtualNetworkType.Internal);   // External (default) or Internal
+
+// Alternatively, a service outside the VNet reached through a private endpoint.
+var peSubnet = vnet.AddSubnet("pe", "10.0.3.0/24");
+var gateway = builder.AddPulumiAzureApiManagement("gateway", options);        // no WithDelegatedSubnet
+peSubnet.AddPrivateEndpoint(gateway);                                         // group 'Gateway', zone privatelink.azure-api.net
+```
+
+- `WithDelegatedSubnet(subnet)` sets `virtualNetworkType` (External unless `WithVirtualNetworkType` says otherwise) and `virtualNetworkConfiguration.subnetResourceId`. Developer, Premium and PremiumV2 support External and Internal; StandardV2 supports External only (outbound integration). Other SKUs throw at generation time.
+- `WithPublicNetworkAccess(bool)` sets `publicNetworkAccess`. Azure only accepts `Disabled` once a private endpoint exists, so create the service with public access first, then disable it. It is not switched off automatically when a private endpoint is added.
+- Subnet prerequisites are not set up for you: StandardV2/PremiumV2 integration needs the subnet delegated (e.g. `WithServiceDelegation("Microsoft.Web/serverFarms")`), while classic Developer/Premium injection needs an undelegated subnet with an NSG allowing APIM management traffic. On the v2 tiers External means outbound-only integration.
+- The service implements `IPulumiPrivateEndpointTarget`, so `AddPrivateEndpoint` works. Private endpoints are not supported on Consumption or VNet-injected services; generation throws for those combinations.
+- Networking cannot be combined with `AsExisting`/`PublishAsExisting` (it throws at generation time).
+
 ## Not yet ported
 
-Compute-targeted `AddApi<T>`, Foundry/OpenAI/Blob backends and backend pools, policy fragments, subscriptions, Key Vault named values, Application Insights diagnostics, custom domains, networking.
+Compute-targeted `AddApi<T>`, Foundry/OpenAI/Blob backends and backend pools, policy fragments, subscriptions, Key Vault named values, Application Insights diagnostics, custom domains.
 
 Upstream status: `Aspire.Hosting.Azure.ApiManagement` is experimental and was merged after Aspire 13.6.4; track changes in [#138](https://github.com/two4suited/Sheridan.Aspire.Pulumi/issues/138).
