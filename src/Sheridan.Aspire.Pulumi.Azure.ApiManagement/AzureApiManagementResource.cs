@@ -3,6 +3,7 @@ using Aspire.Hosting.ApplicationModel;
 using Sheridan.Aspire.Pulumi.Azure.AppContainers;
 using Aspire.Hosting.Pipelines;
 using Sheridan.Aspire.Pulumi.Azure.Base;
+using Sheridan.Aspire.Pulumi.Azure.Network;
 
 namespace Sheridan.Aspire.Pulumi.Azure.ApiManagement;
 
@@ -11,7 +12,7 @@ namespace Sheridan.Aspire.Pulumi.Azure.ApiManagement;
 /// <c>Microsoft.ApiManagement/service</c> with a system-assigned identity, plus the APIs, operations, backends, policies,
 /// products and named values declared beneath it.
 /// </summary>
-public sealed class AzureApiManagementResource(string name, AzureApiManagementOptions? options = null) : PulumiAzureResource(name)
+public sealed class AzureApiManagementResource(string name, AzureApiManagementOptions? options = null) : PulumiAzureResource(name), IPulumiPrivateEndpointTarget
 {
     /// <summary>Options for a new service; null for a service that is only referenced via <c>AsExisting</c>.</summary>
     public AzureApiManagementOptions? Options { get; } = options;
@@ -21,6 +22,17 @@ public sealed class AzureApiManagementResource(string name, AzureApiManagementOp
 
     /// <summary>Resource group of the existing service (set by <c>AsExisting</c>); null means the resource group configured for this resource.</summary>
     public string? ExistingServiceResourceGroup { get; internal set; }
+
+    /// <summary>VNet mode used with <c>WithDelegatedSubnet</c> (External when not set).</summary>
+    public AzureApiManagementVirtualNetworkType? VirtualNetworkType { get; internal set; }
+
+    /// <summary>Whether the gateway accepts public traffic (<c>publicNetworkAccess</c>); null leaves the service default.</summary>
+    public bool? PublicNetworkAccess { get; internal set; }
+
+    // IPulumiPrivateEndpointTarget: group 'Gateway', zone 'privatelink.azure-api.net'.
+    string IPulumiAzureResourceWithId.IdExpression => $"${{{Id}.id}}";
+    string IPulumiPrivateEndpointTarget.PrivateLinkGroupId => "Gateway";
+    string IPulumiPrivateEndpointTarget.PrivateDnsZoneName => "privatelink.azure-api.net";
 
     internal List<AzureApiManagementApiResource> Apis { get; } = [];
     internal List<AzureApiManagementBackendResource> Backends { get; } = [];
@@ -112,6 +124,49 @@ public sealed class AzureApiManagementResource(string name, AzureApiManagementOp
         return rg;
     }
 
+    /// <summary>The <c>ApiManagementService</c> properties, including VNet integration and public network access when configured.</summary>
+    internal Dictionary<string, object?> ServiceProperties(AzureApiManagementOptions options, string rg, string location, PulumiSubnetResource? subnet)
+    {
+        var properties = new Dictionary<string, object?>
+        {
+            ["serviceName"] = NameFor(AzureNameKind.ApiManagementService),
+            ["resourceGroupName"] = rg,
+            ["location"] = location,
+            ["publisherEmail"] = options.PublisherEmail,
+            ["publisherName"] = options.PublisherName,
+            ["sku"] = new Dictionary<string, object?> { ["name"] = options.Sku.ToString(), ["capacity"] = options.Capacity },
+            ["tags"] = new Dictionary<string, object?> { ["aspire-resource-name"] = Name },
+        };
+        if (options.SystemAssignedIdentity)
+            properties["identity"] = new Dictionary<string, object?> { ["type"] = "SystemAssigned" };
+
+        if (subnet is null && VirtualNetworkType is not null)
+            throw new InvalidOperationException($"'{Name}' sets a virtual network type but has no subnet; call WithDelegatedSubnet.");
+        if (subnet is not null)
+        {
+            var type = VirtualNetworkType ?? AzureApiManagementVirtualNetworkType.External;
+            ValidateVirtualNetworkSupport(options.Sku, type);
+            properties["virtualNetworkType"] = type.ToString();
+            properties["virtualNetworkConfiguration"] = new Dictionary<string, object?> { ["subnetResourceId"] = subnet.IdExpression };
+        }
+        if (PublicNetworkAccess is { } pna) properties["publicNetworkAccess"] = pna ? "Enabled" : "Disabled";
+        return properties;
+    }
+
+    /// <summary>VNet integration needs Developer/Premium (External or Internal), PremiumV2 (External or Internal) or StandardV2 (External, outbound only).</summary>
+    private void ValidateVirtualNetworkSupport(AzureApiManagementSku sku, AzureApiManagementVirtualNetworkType type)
+    {
+        var supported = sku switch
+        {
+            AzureApiManagementSku.Developer or AzureApiManagementSku.Premium or AzureApiManagementSku.PremiumV2 => true,
+            AzureApiManagementSku.StandardV2 => type == AzureApiManagementVirtualNetworkType.External,
+            _ => false,
+        };
+        if (!supported)
+            throw new InvalidOperationException(
+                $"'{Name}': the {sku} SKU does not support virtual network type {type}. Use Developer, Premium or PremiumV2 (External or Internal), or StandardV2 (External only).");
+    }
+
     private PulumiStackResource? _generating;
 
     protected override Task ContributeResourcesAsync(PulumiProgram program, PipelineStepContext context, string rg, string location)
@@ -123,30 +178,22 @@ public sealed class AzureApiManagementResource(string name, AzureApiManagementOp
 
     internal void Contribute(PulumiProgram program, string rg, string location)
     {
+        var subnet = Annotations.OfType<PulumiDelegatedSubnetAnnotation>().LastOrDefault()?.Subnet;
+        if (ExistingServiceName is not null && (subnet is not null || VirtualNetworkType is not null || PublicNetworkAccess is not null))
+            throw new InvalidOperationException($"'{Name}' is an existing API Management service; its networking is not managed here (remove WithDelegatedSubnet/WithVirtualNetworkType/WithPublicNetworkAccess).");
         if (ExistingServiceName is not null)
             rg = AddExistingLookup(program, rg);
         else
         {
             var options = Options ?? throw new InvalidOperationException(
                 $"'{Name}' needs AzureApiManagementOptions (publisher email and name) unless it is an existing service; pass them to AddPulumiAzureApiManagement or call AsExisting.");
+            var properties = ServiceProperties(options, rg, location, subnet);
             // Named by the naming layer ({project}-{resource}-{stack}); override with WithAzureName.
-            var props = new Dictionary<string, object?>
+            program.AddInfraResource(Id, "azure-native:apimanagement:ApiManagementService", new Dictionary<string, object?>
             {
                 ["type"] = "azure-native:apimanagement:ApiManagementService",
-                ["properties"] = new Dictionary<string, object?>
-                {
-                    ["serviceName"] = NameFor(AzureNameKind.ApiManagementService),
-                    ["resourceGroupName"] = rg,
-                    ["location"] = location,
-                    ["publisherEmail"] = options.PublisherEmail,
-                    ["publisherName"] = options.PublisherName,
-                    ["sku"] = new Dictionary<string, object?> { ["name"] = options.Sku.ToString(), ["capacity"] = options.Capacity },
-                    ["tags"] = new Dictionary<string, object?> { ["aspire-resource-name"] = Name },
-                },
-            };
-            if (options.SystemAssignedIdentity)
-                ((Dictionary<string, object?>)props["properties"]!)["identity"] = new Dictionary<string, object?> { ["type"] = "SystemAssigned" };
-            program.AddInfraResource(Id, "azure-native:apimanagement:ApiManagementService", props);
+                ["properties"] = properties,
+            });
 
             // Not null-safe in Pulumi YAML (a missing identity fails the update), so only emitted when the identity is requested.
             if (options.SystemAssignedIdentity)

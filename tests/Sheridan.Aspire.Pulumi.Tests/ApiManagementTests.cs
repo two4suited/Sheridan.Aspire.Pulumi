@@ -4,6 +4,7 @@ using Sheridan.Aspire.Pulumi;
 using Sheridan.Aspire.Pulumi.Azure.Base;
 using Sheridan.Aspire.Pulumi.Azure.ApiManagement;
 using Sheridan.Aspire.Pulumi.Azure.AppContainers;
+using Sheridan.Aspire.Pulumi.Azure.Network;
 using Xunit;
 
 namespace Sheridan.Aspire.Pulumi.Tests;
@@ -366,5 +367,102 @@ public sealed class ApiManagementTests
         Assert.Empty(program.GetDeferredResources());
         Assert.Null(program.ToProvisionYaml("p", "d"));
         Assert.Contains(program.GetInfrastructureTargets(), t => t.Name == $"{apim.Resource.Id}BackendCatalogBackend");
+    }
+
+    private static Dictionary<string, object?> ServiceProps(PulumiProgram program, AzureApiManagementResource r) =>
+        (Dictionary<string, object?>)((Dictionary<string, object?>)program.Resources[r.Id]!)["properties"]!;
+
+    private static (IResourceBuilder<AzureApiManagementResource> Apim, IResourceBuilder<PulumiSubnetResource> Subnet) NewNetworkedApim(AzureApiManagementSku sku)
+    {
+        var app = DistributedApplication.CreateBuilder();
+        var subnet = app.AddPulumiVirtualNetwork("vnet").AddSubnet("apim-subnet", "10.0.2.0/24");
+        var apim = app.AddPulumiAzureApiManagement("apim", new AzureApiManagementOptions { PublisherEmail = "a@b.c", PublisherName = "p", Sku = sku });
+        apim.WithPulumiStack(app.AddPulumiStack("s", "dev"));
+        return (apim, subnet);
+    }
+
+    [Fact]
+    public void Without_networking_the_service_has_no_vnet_or_public_access_properties()
+    {
+        var (apim, _) = NewNetworkedApim(AzureApiManagementSku.Developer);
+        var program = new PulumiProgram();
+        apim.Resource.Contribute(program, "rg", "westus");
+        var props = ServiceProps(program, apim.Resource);
+        Assert.DoesNotContain("virtualNetworkType", props.Keys);
+        Assert.DoesNotContain("virtualNetworkConfiguration", props.Keys);
+        Assert.DoesNotContain("publicNetworkAccess", props.Keys);
+    }
+
+    [Fact]
+    public void WithDelegatedSubnet_defaults_to_External_and_sets_the_subnet_id()
+    {
+        var (apim, subnet) = NewNetworkedApim(AzureApiManagementSku.Developer);
+        apim.WithDelegatedSubnet(subnet);
+        var program = new PulumiProgram();
+        apim.Resource.Contribute(program, "rg", "westus");
+        var props = ServiceProps(program, apim.Resource);
+        Assert.Equal("External", props["virtualNetworkType"]);
+        var cfg = (Dictionary<string, object?>)props["virtualNetworkConfiguration"]!;
+        Assert.Equal(subnet.Resource.IdExpression, cfg["subnetResourceId"]);
+    }
+
+    [Fact]
+    public void WithVirtualNetworkType_Internal_and_WithPublicNetworkAccess_are_emitted()
+    {
+        var (apim, subnet) = NewNetworkedApim(AzureApiManagementSku.Premium);
+        apim.WithDelegatedSubnet(subnet).WithVirtualNetworkType(AzureApiManagementVirtualNetworkType.Internal).WithPublicNetworkAccess(false);
+        var program = new PulumiProgram();
+        apim.Resource.Contribute(program, "rg", "westus");
+        var props = ServiceProps(program, apim.Resource);
+        Assert.Equal("Internal", props["virtualNetworkType"]);
+        Assert.Equal("Disabled", props["publicNetworkAccess"]);
+    }
+
+    [Theory]
+    [InlineData(AzureApiManagementSku.Consumption, AzureApiManagementVirtualNetworkType.External)]
+    [InlineData(AzureApiManagementSku.Basic, AzureApiManagementVirtualNetworkType.External)]
+    [InlineData(AzureApiManagementSku.Standard, AzureApiManagementVirtualNetworkType.Internal)]
+    [InlineData(AzureApiManagementSku.StandardV2, AzureApiManagementVirtualNetworkType.Internal)]
+    public void Unsupported_sku_and_vnet_type_combinations_throw(AzureApiManagementSku sku, AzureApiManagementVirtualNetworkType type)
+    {
+        var (apim, subnet) = NewNetworkedApim(sku);
+        apim.WithDelegatedSubnet(subnet).WithVirtualNetworkType(type);
+        Assert.Throws<InvalidOperationException>(() => apim.Resource.Contribute(new PulumiProgram(), "rg", "westus"));
+    }
+
+    [Fact]
+    public void StandardV2_supports_External()
+    {
+        var (apim, subnet) = NewNetworkedApim(AzureApiManagementSku.StandardV2);
+        apim.WithDelegatedSubnet(subnet);
+        apim.Resource.Contribute(new PulumiProgram(), "rg", "westus");
+    }
+
+    [Fact]
+    public void Virtual_network_type_without_a_subnet_throws()
+    {
+        var (apim, _) = NewNetworkedApim(AzureApiManagementSku.Developer);
+        apim.WithVirtualNetworkType(AzureApiManagementVirtualNetworkType.Internal);
+        Assert.Throws<InvalidOperationException>(() => apim.Resource.Contribute(new PulumiProgram(), "rg", "westus"));
+    }
+
+    [Fact]
+    public void Networking_on_an_existing_service_throws()
+    {
+        var (apim, _) = NewNetworkedApim(AzureApiManagementSku.Developer);
+        apim.AsExisting("shared", "rg").WithPublicNetworkAccess(false);
+        Assert.Throws<InvalidOperationException>(() => apim.Resource.Contribute(new PulumiProgram(), "rg", "westus"));
+    }
+
+    [Fact]
+    public void Service_is_a_private_endpoint_target_for_the_Gateway_group()
+    {
+        var (apim, subnet) = NewNetworkedApim(AzureApiManagementSku.Developer);
+        var target = (IPulumiPrivateEndpointTarget)apim.Resource;
+        Assert.Equal("Gateway", target.PrivateLinkGroupId);
+        Assert.Equal("privatelink.azure-api.net", target.PrivateDnsZoneName);
+        Assert.Equal("${apim.id}", target.IdExpression);
+        var pe = subnet.AddPrivateEndpoint(apim);
+        Assert.Same(apim.Resource, pe.Resource.Target);
     }
 }
