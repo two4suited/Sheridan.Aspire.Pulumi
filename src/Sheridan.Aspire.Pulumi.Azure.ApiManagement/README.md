@@ -53,6 +53,8 @@ var backend = apim.AddBackend("people-backend", people);
 apim.AddApi("people-api-gw", "people").WithBackend(backend);
 ```
 
+Or in one call: `apim.AddApi("people-api-gw", "people", people)` adds the API, a backend named `people-api-gw-backend` for the resource, and routes the API to it.
+
 The resource needs an external http/https endpoint (`WithExternalHttpEndpoints()`) and must not be a Container Apps job. Routed APIs' policies are ordered after the backend they reference.
 
 During `aspire deploy` the container app is only created in the deploy step (after its image is pushed), so a backend that points at a compute resource, and the policy of any API routed to it, is created in that step too, not in the earlier provision step. The service, the APIs and their operations, and backends with a literal URL are still created in the provision step.
@@ -123,6 +125,6 @@ peSubnet.AddPrivateEndpoint(gateway);                                         //
 
 ## Not yet ported
 
-Compute-targeted `AddApi<T>`, Foundry/OpenAI/Blob backends and backend pools, policy fragments, subscriptions, Key Vault named values, Application Insights diagnostics, custom domains.
+Foundry/OpenAI/Blob backends and backend pools, policy fragments, subscriptions, Key Vault named values, Application Insights diagnostics, custom domains.
 
 Upstream status: `Aspire.Hosting.Azure.ApiManagement` is experimental and was merged after Aspire 13.6.4; track changes in [#138](https://github.com/two4suited/Sheridan.Aspire.Pulumi/issues/138).

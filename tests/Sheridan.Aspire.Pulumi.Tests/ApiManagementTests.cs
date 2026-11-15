@@ -188,6 +188,24 @@ public sealed class ApiManagementTests
     }
 
     [Fact]
+    public void AddApi_with_compute_adds_the_api_a_backend_and_routes_to_it()
+    {
+        var (apim, app) = NewApim();
+        var env = app.AddPulumiAzureContainerAppEnvironment("env");
+        var people = app.AddContainer("people-api", "img").WithHttpEndpoint(targetPort: 8080).WithExternalHttpEndpoints().WithComputeEnvironment(env);
+
+        var api = apim.AddApi("people-gw", "people", people, subscriptionRequired: false);
+
+        var backend = Assert.Single(apim.Resource.Backends);
+        Assert.Equal("people-gw-backend", backend.BackendName);
+        Assert.Same(backend, api.Resource.Backend);
+        Assert.Same(people.Resource, backend.Compute);
+        Assert.Equal("people", api.Resource.Path);
+        Assert.False(api.Resource.SubscriptionRequired);
+        Assert.Equal("https://${peopleApiApp.configuration.ingress.fqdn}", apim.Resource.ResolveBackendUrl(backend, null));
+    }
+
+    [Fact]
     public void Backend_names_stay_unique_across_overloads()
     {
         var (apim, app) = NewApim();

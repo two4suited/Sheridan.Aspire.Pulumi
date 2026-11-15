@@ -86,6 +86,23 @@ public static class AzureApiManagementExtensions
         return builder.ApplicationBuilder.AddResource(api).ExcludeFromManifest();
     }
 
+    /// <summary>
+    /// Adds an API published under <paramref name="path"/> that routes to <paramref name="compute"/> (a project or container on an
+    /// Azure Container Apps environment in the same stack). Shorthand for <c>AddBackend(name + "-backend", compute)</c>,
+    /// <c>AddApi(name, path)</c> and <c>WithBackend</c>; the backend resource is named <c>{name}-backend</c>.
+    /// </summary>
+    public static IResourceBuilder<AzureApiManagementApiResource> AddApi<T>(
+        this IResourceBuilder<AzureApiManagementResource> builder, string name, string path, IResourceBuilder<T> compute,
+        string? displayName = null, bool subscriptionRequired = true, string? apiName = null)
+        where T : IComputeResource, IResourceWithEndpoints
+    {
+        ArgumentNullException.ThrowIfNull(builder);
+        ArgumentException.ThrowIfNullOrEmpty(name);
+        ArgumentNullException.ThrowIfNull(compute);
+        var api = builder.AddApi(name, path, displayName, subscriptionRequired, apiName);
+        return api.WithBackend(builder.AddBackend($"{name}-backend", compute));
+    }
+
     /// <summary>Adds a backend service API Management can forward requests to (the equivalent of <c>AddBackend</c>).</summary>
     public static IResourceBuilder<AzureApiManagementBackendResource> AddBackend(
         this IResourceBuilder<AzureApiManagementResource> builder, string name, string url,
