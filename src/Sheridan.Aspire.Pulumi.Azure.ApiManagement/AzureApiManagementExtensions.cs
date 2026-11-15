@@ -99,6 +99,11 @@ public static class AzureApiManagementExtensions
         ArgumentNullException.ThrowIfNull(builder);
         ArgumentException.ThrowIfNullOrEmpty(name);
         ArgumentNullException.ThrowIfNull(compute);
+        // Validate the backend side first so a collision doesn't leave a half-added API behind.
+        var backendName = $"{name}-backend";
+        if (builder.Resource.Backends.Any(x => string.Equals(x.BackendName, backendName, StringComparison.OrdinalIgnoreCase)) ||
+            builder.ApplicationBuilder.Resources.Any(r => string.Equals(r.Name, backendName, StringComparison.OrdinalIgnoreCase)))
+            throw new InvalidOperationException($"A resource or backend named '{backendName}' already exists; use AddApi, AddBackend and WithBackend separately.");
         var api = builder.AddApi(name, path, displayName, subscriptionRequired, apiName);
         return api.WithBackend(builder.AddBackend($"{name}-backend", compute));
     }

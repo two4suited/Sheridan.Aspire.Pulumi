@@ -53,7 +53,7 @@ var backend = apim.AddBackend("people-backend", people);
 apim.AddApi("people-api-gw", "people").WithBackend(backend);
 ```
 
-Or in one call: `apim.AddApi("people-api-gw", "people", people)` adds the API, a backend named `people-api-gw-backend` for the resource, and routes the API to it.
+Or in one call: `apim.AddApi("people-api-gw", "people", people)` adds the API, a backend named `people-api-gw-backend` for the resource, and routes the API to it (`displayName`, `subscriptionRequired` and `apiName` pass through; the backend always uses the default `http` protocol with certificate validation on and is named from `name`, so use `AddBackend` + `WithBackend` for anything else).
 
 The resource needs an external http/https endpoint (`WithExternalHttpEndpoints()`) and must not be a Container Apps job. Routed APIs' policies are ordered after the backend they reference.
 

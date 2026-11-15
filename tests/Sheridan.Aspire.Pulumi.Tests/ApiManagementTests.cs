@@ -206,6 +206,19 @@ public sealed class ApiManagementTests
     }
 
     [Fact]
+    public void AddApi_with_compute_does_not_leave_a_half_added_api_on_name_collision()
+    {
+        var (apim, app) = NewApim();
+        var env = app.AddPulumiAzureContainerAppEnvironment("env");
+        var people = app.AddContainer("people-api", "img").WithHttpEndpoint(targetPort: 8080).WithExternalHttpEndpoints().WithComputeEnvironment(env);
+        apim.AddBackend("people-gw-backend", "https://example.com");
+
+        Assert.Throws<InvalidOperationException>(() => apim.AddApi("people-gw", "people", people));
+        Assert.Empty(apim.Resource.Apis);
+        Assert.Throws<ArgumentNullException>(() => apim.AddApi<ContainerResource>("x", "x", null!));
+    }
+
+    [Fact]
     public void Backend_names_stay_unique_across_overloads()
     {
         var (apim, app) = NewApim();
