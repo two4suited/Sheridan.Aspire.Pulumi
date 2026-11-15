@@ -200,7 +200,7 @@ public sealed class AzureSqlServerResource(string name) : PulumiAzureResource(na
             };
         }
 
-        static Dictionary<string, object?> EnvVar(string name, string value) =>
+        static Dictionary<string, object?> EnvVar(string name, string? value) =>
             new() { ["name"] = name, ["value"] = value };
     }
 
