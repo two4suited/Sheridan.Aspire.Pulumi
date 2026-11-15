@@ -10,6 +10,19 @@ after a `vX.Y.Z` tag has been published. Packages are on
 
 <!-- releases:start -->
 
+## v2.3.2
+
+_2026-11-15_ · [GitHub release](https://github.com/two4suited/Sheridan.Aspire.Pulumi/releases/tag/v2.3.2)
+
+<!-- Release notes generated using configuration in .github/release.yml at v2.3.2 -->
+
+#### What's Changed
+* Provision pass: target resources removed from the model by @two4suited in https://github.com/two4suited/Sheridan.Aspire.Pulumi/pull/239
+
+
+**Full Changelog**: https://github.com/two4suited/Sheridan.Aspire.Pulumi/compare/v2.3.1...v2.3.2
+
+
 ## v2.3.1
 
 _2026-11-15_ · [GitHub release](https://github.com/two4suited/Sheridan.Aspire.Pulumi/releases/tag/v2.3.1)
