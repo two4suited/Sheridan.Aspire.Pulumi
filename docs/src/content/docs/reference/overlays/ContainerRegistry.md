@@ -18,6 +18,8 @@ Pulumi counterpart of `Aspire.Hosting.Azure.Provisioning.ContainerRegistry`. Ove
 Other resources (purge tasks, role assignments) are reachable with `GetResource(id)` / `GetResources(type)`. The callback runs
 last in `ContributeResourcesAsync`, after all resources and outputs have been added.
 
+For an existing registry (`AsExisting` / `PublishAsExisting`) nothing is created, so `ContainerRegistryService` throws `InvalidOperationException`; other resources stay reachable with `GetResource(id)`.
+
 ## Example
 
 ```csharp

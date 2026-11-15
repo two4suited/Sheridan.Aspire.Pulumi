@@ -38,4 +38,4 @@ aspire publish   # generate the Pulumi program
 aspire deploy    # deploy it
 ```
 
-`aspire publish` writes `Pulumi.yaml` and `Pulumi.<stack>.yaml`; `aspire deploy` checks `pulumi whoami`, creates the ESC environment and stack if missing, and runs `pulumi up`. See [How it works](/Sheridan.Aspire.Pulumi/concepts/how-it-works/).
+`aspire publish` writes `Pulumi.yaml` and `Pulumi.<stack>.yaml`; `aspire deploy` checks `pulumi whoami`, creates the ESC environment and stack if missing, and runs `pulumi up` (with a local backend, `whoami` and ESC are skipped). See [How it works](/Sheridan.Aspire.Pulumi/concepts/how-it-works/).
