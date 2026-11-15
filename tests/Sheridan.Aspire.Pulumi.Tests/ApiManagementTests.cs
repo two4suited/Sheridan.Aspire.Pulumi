@@ -174,6 +174,21 @@ public sealed class ApiManagementTests
     }
 
     [Fact]
+    public void Compute_backend_url_can_be_overridden()
+    {
+        var (apim, app) = NewApim();
+        var env = app.AddPulumiAzureContainerAppEnvironment("env");
+        var people = app.AddContainer("people-api", "img").WithHttpEndpoint(targetPort: 8080).WithComputeEnvironment(env);
+
+        var backend = apim.AddBackend("people-backend", people).WithUrl("http://host.docker.internal:8080");
+        var viaAddApi = apim.AddApi("gw", "gw", people, backendUrl: "http://internal:80");
+
+        // Overridden URLs skip the external-endpoint check (people has no external endpoint).
+        Assert.Equal("http://host.docker.internal:8080", apim.Resource.ResolveBackendUrl(backend.Resource, null));
+        Assert.Equal("http://internal:80", apim.Resource.ResolveBackendUrl(viaAddApi.Resource.Backend!, null));
+    }
+
+    [Fact]
     public void Compute_backend_requires_an_http_endpoint_and_a_container_apps_environment()
     {
         var (apim, app) = NewApim();

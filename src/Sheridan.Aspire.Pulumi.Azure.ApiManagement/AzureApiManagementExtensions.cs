@@ -89,11 +89,11 @@ public static class AzureApiManagementExtensions
     /// <summary>
     /// Adds an API published under <paramref name="path"/> that routes to <paramref name="compute"/> (a project or container on an
     /// Azure Container Apps environment in the same stack). Shorthand for <c>AddBackend(name + "-backend", compute)</c>,
-    /// <c>AddApi(name, path)</c> and <c>WithBackend</c>; the backend resource is named <c>{name}-backend</c>.
+    /// <c>AddApi(name, path)</c> and <c>WithBackend</c>; the backend resource is named <c>{name}-backend</c>. <paramref name="backendUrl"/> overrides the derived backend URL (see <c>WithUrl</c>).
     /// </summary>
     public static IResourceBuilder<AzureApiManagementApiResource> AddApi<T>(
         this IResourceBuilder<AzureApiManagementResource> builder, string name, string path, IResourceBuilder<T> compute,
-        string? displayName = null, bool subscriptionRequired = true, string? apiName = null)
+        string? displayName = null, bool subscriptionRequired = true, string? apiName = null, string? backendUrl = null)
         where T : IComputeResource, IResourceWithEndpoints
     {
         ArgumentNullException.ThrowIfNull(builder);
@@ -105,7 +105,9 @@ public static class AzureApiManagementExtensions
             builder.ApplicationBuilder.Resources.Any(r => string.Equals(r.Name, backendName, StringComparison.OrdinalIgnoreCase)))
             throw new InvalidOperationException($"A resource or backend named '{backendName}' already exists; use AddApi, AddBackend and WithBackend separately.");
         var api = builder.AddApi(name, path, displayName, subscriptionRequired, apiName);
-        return api.WithBackend(builder.AddBackend($"{name}-backend", compute));
+        var backend = builder.AddBackend($"{name}-backend", compute);
+        if (backendUrl is not null) backend.WithUrl(backendUrl);
+        return api.WithBackend(backend);
     }
 
     /// <summary>Adds a backend service API Management can forward requests to (the equivalent of <c>AddBackend</c>).</summary>
@@ -134,6 +136,20 @@ public static class AzureApiManagementExtensions
         ArgumentNullException.ThrowIfNull(compute);
         return AddBackendCore(builder, name, protocol, validateCertificateChain, backendName, (resolved, parent) =>
             new AzureApiManagementBackendResource(name, resolved, null, parent) { Compute = compute.Resource });
+    }
+
+    /// <summary>
+    /// Overrides the backend URL, replacing the <c>https://&lt;ingress FQDN&gt;</c> derived from a compute resource. Use it when the
+    /// gateway cannot reach the public FQDN (an emulator, an internal-only app, a custom domain). The value is written as-is and may
+    /// contain a Pulumi expression such as <c>http://${other.outputs.host}</c>. The compute resource's endpoint and stack checks are skipped.
+    /// </summary>
+    public static IResourceBuilder<AzureApiManagementBackendResource> WithUrl(
+        this IResourceBuilder<AzureApiManagementBackendResource> builder, string url)
+    {
+        ArgumentNullException.ThrowIfNull(builder);
+        ArgumentException.ThrowIfNullOrEmpty(url);
+        builder.Resource.UrlOverride = url;
+        return builder;
     }
 
     private static IResourceBuilder<AzureApiManagementBackendResource> AddBackendCore(

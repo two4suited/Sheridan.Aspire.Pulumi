@@ -55,7 +55,9 @@ apim.AddApi("people-api-gw", "people").WithBackend(backend);
 
 Or in one call: `apim.AddApi("people-api-gw", "people", people)` adds the API, a backend named `people-api-gw-backend` for the resource, and routes the API to it (`displayName`, `subscriptionRequired` and `apiName` pass through; the backend always uses the default `http` protocol with certificate validation on and is named from `name`, so use `AddBackend` + `WithBackend` for anything else).
 
-The resource needs an external http/https endpoint (`WithExternalHttpEndpoints()`) and must not be a Container Apps job. Routed APIs' policies are ordered after the backend they reference.
+To point the gateway at an address other than the public FQDN (an emulator such as floci-az, an internal-only app, a custom domain), override the URL: `apim.AddBackend("people-backend", people).WithUrl("http://host.docker.internal:8080")`, or `apim.AddApi("people-api-gw", "people", people, backendUrl: "http://...")`. The override replaces the derived URL, is written as-is (it may contain a Pulumi expression such as `${...}`), and skips the compute resource's endpoint/stack checks.
+
+The resource needs an external http/https endpoint (unless the URL is overridden) (`WithExternalHttpEndpoints()`) and must not be a Container Apps job. Routed APIs' policies are ordered after the backend they reference.
 
 During `aspire deploy` the container app is only created in the deploy step (after its image is pushed), so a backend that points at a compute resource, and the policy of any API routed to it, is created in that step too, not in the earlier provision step. The service, the APIs and their operations, and backends with a literal URL are still created in the provision step.
 

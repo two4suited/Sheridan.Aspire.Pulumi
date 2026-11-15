@@ -11,6 +11,8 @@ public sealed class AzureApiManagementBackendResource(string name, string backen
     public string BackendName { get; } = backendName;
     /// <summary>The literal backend URL; null when the URL is resolved at deploy time from a compute resource.</summary>
     public string? Url { get; } = url;
+    /// <summary>When set, replaces the URL derived from <see cref="Compute"/> (emulators, internal addresses, custom domains).</summary>
+    internal string? UrlOverride { get; set; }
     /// <summary>The compute resource (deployed to an Azure Container Apps environment) whose ingress FQDN is the backend host.</summary>
     internal IResourceWithEndpoints? Compute { get; init; }
     /// <summary>"http" (default) or "soap".</summary>
