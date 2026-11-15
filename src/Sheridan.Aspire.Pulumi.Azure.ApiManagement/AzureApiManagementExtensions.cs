@@ -99,6 +99,7 @@ public static class AzureApiManagementExtensions
         ArgumentNullException.ThrowIfNull(builder);
         ArgumentException.ThrowIfNullOrEmpty(name);
         ArgumentNullException.ThrowIfNull(compute);
+        if (backendUrl is not null) ArgumentException.ThrowIfNullOrWhiteSpace(backendUrl);
         // Validate the backend side first so a collision doesn't leave a half-added API behind.
         var backendName = $"{name}-backend";
         if (builder.Resource.Backends.Any(x => string.Equals(x.BackendName, backendName, StringComparison.OrdinalIgnoreCase)) ||
