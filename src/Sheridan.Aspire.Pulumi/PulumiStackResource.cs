@@ -10,6 +10,18 @@ public sealed class PulumiStackResource(string name, string stackName) : Resourc
 
     public bool EscFromConfiguration { get; set; }
 
+    /// <summary>Explicit local backend URL (<c>file://...</c>) set by <c>WithLocalBackend</c>; passed to the CLI as PULUMI_BACKEND_URL.</summary>
+    public string? LocalBackendUrl { get; set; }
+
+    /// <summary>Plain (non-ESC) stack config written to <c>Pulumi.&lt;stack&gt;.yaml</c>, e.g. <c>azure-native:metadataHost</c>.</summary>
+    public Dictionary<string, string> StackConfig { get; } = [];
+
+    /// <summary>The backend URL in effect (explicit, PULUMI_BACKEND_URL, or the current login), or null when unknown.</summary>
+    public string? BackendUrl => PulumiBackend.Resolve(LocalBackendUrl);
+
+    /// <summary>True when the backend is self-managed (not Pulumi Cloud): no <c>whoami</c> check, no ESC.</summary>
+    public bool UsesLocalBackend => PulumiBackend.IsLocalUrl(BackendUrl);
+
     /// <summary>Set when the project is written; used to read stack outputs.</summary>
     public string? ProjectDirectory { get; set; }
 
@@ -33,7 +45,7 @@ public sealed class PulumiStackResource(string name, string stackName) : Resourc
 
     public string ProjectName => ProjectNameOverride ?? Name;
 
-    public string QualifiedStack => Organization is null ? StackName : $"{Organization}/{ProjectName}/{StackName}";
+    public string QualifiedStack => UsesLocalBackend || Organization is null ? StackName : $"{Organization}/{ProjectName}/{StackName}";
 
     // Imported in order; later environments override earlier ones. Each is in 'project/environment' form.
     public IReadOnlyList<string> StackEscReferences => EscEnvironments.Count > 0 ? EscEnvironments : [$"{ProjectName}/{StackName}"];

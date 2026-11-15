@@ -77,7 +77,7 @@ The package id equals the folder name under `src/`, and namespaces match the pac
 `AddPulumiStack` declares a Pulumi stack in your AppHost. There is no separate Pulumi project: the Aspire pipeline generates it.
 
 - `aspire publish` writes `Pulumi.yaml` and `Pulumi.<stack>.yaml` (which imports the ESC environment) to `<output>/<name>/pulumi/`.
-- `aspire deploy` checks `pulumi whoami`, creates the ESC environment and stack if missing, and runs `pulumi up`. State lives in Pulumi Cloud.
+- `aspire deploy` checks `pulumi whoami`, creates the ESC environment and stack if missing, and runs `pulumi up`. State lives in Pulumi Cloud, unless a local backend is configured (`WithLocalBackend(...)`, `PULUMI_BACKEND_URL` or `pulumi login file://...`), in which case `whoami` and ESC are skipped and the stack is created with `pulumi stack init`; see the [core package README](src/Sheridan.Aspire.Pulumi/README.md#local-backend-no-pulumi-cloud-no-esc).
 - `aspire destroy` (or `aspire do pulumi-destroy-<name>`) runs `pulumi destroy`.
 
 The stack name defaults to the lower-cased Aspire environment, so `aspire deploy -e prod` targets stack `prod`; pass a second argument to `AddPulumiStack` to pin it. Both stack and ESC environments can be overridden on the command line:

@@ -30,10 +30,22 @@ builder.Build().Run();
 ## Features
 
 - `PulumiStackResource`, `PulumiProgram`, `PulumiCli` and `PulumiOutputReference`: the stack, the generated program, the Pulumi CLI wrapper and cross-resource output references.
-- `AddPulumiStack(name, stack?)`, `WithOrganization`, `WithProjectName`, `WithEscEnvironment` and `DependsOnStack`.
-- Pipeline steps for `aspire publish`, `aspire deploy` and `aspire destroy` (`pulumi whoami` check, ESC/stack creation, `pulumi up`, `pulumi destroy`). State lives in Pulumi Cloud.
+- `AddPulumiStack(name, stack?)`, `WithOrganization`, `WithProjectName`, `WithEscEnvironment`, `WithLocalBackend`, `WithConfig` and `DependsOnStack`.
+- Pipeline steps for `aspire publish`, `aspire deploy` and `aspire destroy` (`pulumi whoami` check, ESC/stack creation, `pulumi up`, `pulumi destroy`). State lives in Pulumi Cloud unless a local backend is used (see below).
 - Multiple stacks: bind each resource to its stack with `WithPulumiStack(...)` and order stacks with `DependsOnStack(...)` or simply by referencing resources across them.
 - Command-line overrides: `aspire deploy -- --Pulumi:Stack=qa --Pulumi:Esc=shared/qa` (also `Pulumi__Stack` / `Pulumi__Esc` environment variables).
+
+## Local backend (no Pulumi Cloud, no ESC)
+
+`aspire deploy` / `aspire destroy` work against a self-managed Pulumi backend, e.g. for an emulator:
+
+```csharp
+builder.AddPulumiStack("my-app", "dev")
+    .WithLocalBackend("/path/to/state")                                // or omit to rely on PULUMI_BACKEND_URL / `pulumi login file://...`
+    .WithConfig("azure-native:metadataHost", "localhost:4577");        // plain stack config
+```
+
+When the backend is not Pulumi Cloud (`WithLocalBackend`, `PULUMI_BACKEND_URL`, or a current `pulumi login` to a `file://`, `s3://`, `azblob://` or `gs://` URL), the pipeline skips `pulumi whoami` and the ESC environment create/import (no `environment:` entry is written to `Pulumi.<stack>.yaml`), creates the stack with `pulumi stack select` / `pulumi stack init`, and ignores `WithOrganization`. Set `PULUMI_CONFIG_PASSPHRASE` (empty string for none) for the passphrase secrets provider. `WithLocalBackend(path)` exports the URL as `PULUMI_BACKEND_URL` for every `pulumi` call; the default is `file://~`. `WithConfig(key, value)` writes plain config under `config:` in `Pulumi.<stack>.yaml` for any backend, and an existing `encryptionsalt` is preserved when the file is regenerated.
 
 ## Run mode
 
