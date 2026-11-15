@@ -103,7 +103,18 @@ public sealed class AzureContainerAppEnvironmentResource : PulumiAzureResource, 
     /// <summary>True once <c>WithDashboard</c> was called explicitly.</summary>
     internal bool DashboardConfigured { get; set; }
 
+    /// <summary>
+    /// True when images are built into the local container runtime and tagged <c>&lt;loginServer&gt;/&lt;app&gt;:&lt;tag&gt;</c> but not pushed
+    /// (see <c>WithLocalImages</c>). Aspire's push step only tags when the registry endpoint is empty, which is how this is done.
+    /// </summary>
+    public bool LocalImages { get; set; }
+
+    /// <summary>A caller-supplied image tag used instead of the per-deploy timestamp (see <c>WithImageTag</c>).</summary>
+    public string? ImageTag { get; set; }
+
     private PulumiStackResource? _resolvedStack;
+
+    private string TagFor(PulumiStackResource stack) => ImageTag ?? stack.DeployTag;
 
     private string IdentityRef => PullIdentity?.Id ?? $"{Id}Identity";
 
@@ -124,7 +135,10 @@ public sealed class AzureContainerAppEnvironmentResource : PulumiAzureResource, 
 
     ReferenceExpression IContainerRegistry.Name => ReferenceExpression.Create($"{EnvOutput("RegistryName")}");
 
-    ReferenceExpression IContainerRegistry.Endpoint => ReferenceExpression.Create($"{EnvOutput("RegistryLoginServer")}");
+    // Empty in local-image mode so Aspire tags the image instead of pushing it (the login server goes into the image name instead).
+    ReferenceExpression IContainerRegistry.Endpoint => LocalImages
+        ? ReferenceExpression.Create($"")
+        : ReferenceExpression.Create($"{EnvOutput("RegistryLoginServer")}");
 
     ReferenceExpression? IContainerRegistry.Repository => null;
 
@@ -144,6 +158,12 @@ public sealed class AzureContainerAppEnvironmentResource : PulumiAzureResource, 
 
     private async Task LoginToRegistryAsync(PipelineStepContext ctx)
     {
+        if (LocalImages)
+        {
+            ctx.Logger.LogInformation("Local images: skipping registry login for '{Environment}'", Name);
+            return;
+        }
+
         var registry = await EnvOutput("RegistryName").GetValueAsync(ctx.CancellationToken);
         var subscription = await EnvOutput("SubscriptionId").GetValueAsync(ctx.CancellationToken);
 
@@ -176,10 +196,13 @@ public sealed class AzureContainerAppEnvironmentResource : PulumiAzureResource, 
             });
 
 #pragma warning disable ASPIREPIPELINES003
-            r.Annotations.Add(new ContainerImagePushOptionsCallbackAnnotation(c =>
+            r.Annotations.Add(new ContainerImagePushOptionsCallbackAnnotation(async c =>
             {
-                c.Options.RemoteImageName = r.Name.ToLowerInvariant();
-                c.Options.RemoteImageTag = _resolvedStack.DeployTag;
+                var imageName = r.Name.ToLowerInvariant();
+                c.Options.RemoteImageName = LocalImages
+                    ? $"{await EnvOutput("RegistryLoginServer").GetValueAsync(c.CancellationToken)}/{imageName}"
+                    : imageName;
+                c.Options.RemoteImageTag = TagFor(_resolvedStack);
             }));
 #pragma warning restore ASPIREPIPELINES003
         }
@@ -598,7 +621,7 @@ public sealed class AzureContainerAppEnvironmentResource : PulumiAzureResource, 
         var container = new Dictionary<string, object?>
         {
             ["name"] = appName,
-            ["image"] = $"${{{RegistryRef}.loginServer}}/{imageName}:{stack.DeployTag}",
+            ["image"] = $"${{{RegistryRef}.loginServer}}/{imageName}:{TagFor(stack)}",
             ["env"] = env,
         };
 

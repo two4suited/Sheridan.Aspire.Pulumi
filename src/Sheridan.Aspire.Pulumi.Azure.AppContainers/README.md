@@ -41,7 +41,14 @@ builder.Build().Run();
 - Private endpoints: the environment is an `IPulumiPrivateEndpointTarget` (group `managedEnvironments`, zone `privatelink.<location>.azurecontainerapps.io`), so `peSubnet.AddPrivateEndpoint(env)` works and sets `publicNetworkAccess: Disabled` on the environment. Azure requires a workload-profiles environment for this (the one created here is). The zone name embeds the region and is fixed when `AddPrivateEndpoint` is called, so call `WithLocation("<short region name>", e.g. westeurope)` on the environment **before** `AddPrivateEndpoint`; without it the zone is `privatelink.eastus...`, and changing `location` in stack config does not change it. For `AsExisting` environments the private endpoint is still created, but `publicNetworkAccess` is not changed and `WithLocation` must be set to the existing environment's region.
 - Container Apps jobs via `PublishAsPulumiContainerAppJob` and `PublishAsScheduledPulumiContainerAppJob`.
 - The environment's shared identity is granted data-plane roles by the data integrations (Cosmos DB, Storage, Service Bus, Key Vault, ...) automatically when an app references them.
-- Images are tagged with a per-deploy timestamp so every deploy creates a new revision.
+- Images are tagged with a per-deploy timestamp so every deploy creates a new revision. `WithImageTag("dev")` uses a stable tag instead; note that re-deploying a rebuilt image under an unchanged tag does not create a new revision, so the new code is not rolled out until the tag changes or a restart is forced.
+- `WithLocalImages()` tags the locally built image (instead of pushing it) `<loginServer>/<app>:<tag>` without pushing or running `az acr login`, for emulators (such as floci-az) that run replicas through the host Docker daemon, which uses a locally present image as-is:
+
+```csharp
+builder.AddPulumiAzureContainerAppEnvironment("aca-env")
+       .WithLocalImages()
+       .WithImageTag("dev");
+```
 
 ## Service discovery between apps
 
