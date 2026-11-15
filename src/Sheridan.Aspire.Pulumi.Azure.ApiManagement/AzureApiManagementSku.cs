@@ -27,4 +27,11 @@ public sealed class AzureApiManagementOptions
 
     /// <summary>Scale units; 0 for Consumption and 1 otherwise when not set.</summary>
     public int Capacity { get => _capacity ?? (Sku == AzureApiManagementSku.Consumption ? 0 : 1); init => _capacity = value; }
+
+    /// <summary>
+    /// Whether the service gets a system-assigned identity and a <c>principalId</c> output (default true, as in the official integration).
+    /// Set to false for emulators that do not return an identity: <c>${apim.identity.principalId}</c> cannot be made null-safe in
+    /// Pulumi YAML, so the output would fail the update when the identity is missing.
+    /// </summary>
+    public bool SystemAssignedIdentity { get; init; } = true;
 }

@@ -256,6 +256,36 @@ public sealed class ApiManagementTests
     }
 
     [Fact]
+    public void Service_has_identity_and_principalId_output_by_default()
+    {
+        var (apim, app) = NewApim();
+        apim.WithPulumiStack(app.AddPulumiStack("s", "dev"));
+        var program = new PulumiProgram();
+        apim.Resource.Contribute(program, "rg", "westus");
+
+        var props = (Dictionary<string, object?>)((Dictionary<string, object?>)program.Resources[apim.Resource.Id]!)["properties"]!;
+        Assert.Contains("identity", props.Keys);
+        Assert.Equal("${apim.identity.principalId}", program.Outputs["apimPrincipalId"]);
+        _ = apim.Resource.PrincipalId;
+    }
+
+    [Fact]
+    public void Without_system_assigned_identity_the_identity_and_principalId_output_are_omitted()
+    {
+        var app = DistributedApplication.CreateBuilder();
+        var apim = app.AddPulumiAzureApiManagement("apim", new AzureApiManagementOptions { PublisherEmail = "a@b.c", PublisherName = "p", SystemAssignedIdentity = false });
+        apim.WithPulumiStack(app.AddPulumiStack("s", "dev"));
+        var program = new PulumiProgram();
+        apim.Resource.Contribute(program, "rg", "westus");
+
+        var props = (Dictionary<string, object?>)((Dictionary<string, object?>)program.Resources[apim.Resource.Id]!)["properties"]!;
+        Assert.DoesNotContain("identity", props.Keys);
+        Assert.DoesNotContain("apimPrincipalId", program.Outputs.Keys);
+        Assert.Equal("${apim.gatewayUrl}", program.Outputs["apimGatewayUrl"]);
+        Assert.Throws<InvalidOperationException>(() => apim.Resource.PrincipalId);
+    }
+
+    [Fact]
     public void New_service_without_options_throws_at_generation()
     {
         var builder = DistributedApplication.CreateBuilder();
