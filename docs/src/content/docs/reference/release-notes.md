@@ -10,6 +10,19 @@ after a `vX.Y.Z` tag has been published. Packages are on
 
 <!-- releases:start -->
 
+## v2.3.1
+
+_2026-11-15_ · [GitHub release](https://github.com/two4suited/Sheridan.Aspire.Pulumi/releases/tag/v2.3.1)
+
+<!-- Release notes generated using configuration in .github/release.yml at v2.3.1 -->
+
+#### What's Changed
+* Clean up warnings in the Publish packages workflow by @two4suited in https://github.com/two4suited/Sheridan.Aspire.Pulumi/pull/235
+
+
+**Full Changelog**: https://github.com/two4suited/Sheridan.Aspire.Pulumi/compare/v2.3.0...v2.3.1
+
+
 ## v2.3.0
 
 _2026-11-15_ · [GitHub release](https://github.com/two4suited/Sheridan.Aspire.Pulumi/releases/tag/v2.3.0)
