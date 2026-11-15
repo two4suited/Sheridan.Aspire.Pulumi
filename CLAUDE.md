@@ -36,6 +36,7 @@ When asked to work on a GitHub issue:
 
 1. Branch off `main` (never commit to `main` directly) and implement the change, including tests under `tests/` where the affected project has them.
 2. Update the README of every package you touched (`src/<Package>/README.md`) in the same change: document new or changed `AddPulumiX` / `WithX` APIs, options, outputs and any behavior or breaking changes, with a usage snippet that matches the real extension-method signatures. For a brand-new package, create its README following the existing package READMEs as the template. If the change affects the pipeline model or package list, update the root [README.md](README.md) too.
-3. Build and run the relevant tests before opening the PR (`dotnet build` / `dotnet test`).
-4. Open a pull request with `gh pr create` that references the issue (`Closes #<n>`), summarizes what changed, and notes the README updates. Don't merge it yourself.
-5. Review the PR with an Opus subagent (`Agent` with `model: "opus"`, read-only) and address its findings before handing off.
+3. Update the hand-written docs under [docs/src/content/docs/](docs/src/content/docs) (concepts, get-started, reference/overlays) when the change alters behavior they describe: pipeline steps, prerequisites, backends/state, run mode, `ConfigureInfrastructure` roots, naming. Package READMEs alone are not enough, since the Integrations pages are generated from them but the other pages are not. Apply this to bug fixes too, not just features. Check with `npm run build` in `docs/`.
+4. Build and run the relevant tests before opening the PR (`dotnet build` / `dotnet test`).
+5. Open a pull request with `gh pr create` that references the issue (`Closes #<n>`), summarizes what changed, and notes the README updates. Don't merge it yourself.
+6. Review the PR with an Opus subagent (`Agent` with `model: "opus"`, read-only) and address its findings before handing off.

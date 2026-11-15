@@ -21,6 +21,8 @@ Other resources (Log Analytics workspace `<id>Logs`, registry, pull identity, da
 `infra.GetResource(id)` / `infra.GetResources(type)`. Container apps are only present for compute resources that target the
 environment. The callback runs last in `ContributeResourcesAsync`, after the apps/jobs have been added.
 
+For an existing environment (`AsExisting` / `PublishAsExisting`) nothing is created, so the `ContainerAppManagedEnvironment` root throws `InvalidOperationException`; other resources stay reachable with `GetResource(id)`.
+
 ## Example
 
 ```csharp

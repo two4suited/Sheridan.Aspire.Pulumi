@@ -15,6 +15,7 @@ The package id equals the folder name under `src/`, and namespaces match the pac
 
 ## What you need
 
+- The .NET 11 SDK (the packages target `net11.0`, so the AppHost must too)
 - The [Aspire CLI](https://aspire.dev)
-- The Pulumi CLI, signed in with `pulumi login`
+- The Pulumi CLI, signed in with `pulumi login` (not needed for a [local backend](/Sheridan.Aspire.Pulumi/concepts/how-it-works/#local-backend))
 - An Azure subscription

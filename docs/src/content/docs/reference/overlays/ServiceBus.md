@@ -18,6 +18,8 @@ sibling opt-in package.
 Queues, topics, subscriptions and rules are reachable through the inherited lookups (`GetResource(id)`, `GetResources(type)`),
 for example `infra.GetResources("azure-native:servicebus:Queue")`.
 
+For an existing namespace (`AsExisting` / `PublishAsExisting`) nothing is created, so `ServiceBusNamespace` throws `InvalidOperationException`; other resources stay reachable with `GetResource(id)`.
+
 ## Example
 
 Property paths are azure-native `servicebus:Namespace` input names (verified with `pulumi package get-schema azure-native`):
