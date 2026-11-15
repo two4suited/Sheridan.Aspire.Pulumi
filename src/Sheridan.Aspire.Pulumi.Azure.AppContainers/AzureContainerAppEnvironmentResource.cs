@@ -87,6 +87,9 @@ public sealed class AzureContainerAppEnvironmentResource : PulumiAzureResource, 
     /// <summary>Whether the Aspire dashboard component is added to the environment (see <c>WithDashboard</c>); default true as upstream.</summary>
     public bool DashboardEnabled { get; set; } = true;
 
+    /// <summary>Whether the AcrPull role assignment and identity-based registry auth are emitted (see <c>WithoutAcrPullRoleAssignment</c>); default true as upstream.</summary>
+    public bool AcrPullRoleAssignmentEnabled { get; set; } = true;
+
     /// <summary>True once <c>WithDashboard</c> was called explicitly.</summary>
     internal bool DashboardConfigured { get; set; }
 
@@ -300,7 +303,8 @@ public sealed class AzureContainerAppEnvironmentResource : PulumiAzureResource, 
             });
         }
 
-        program.AddRoleAssignment($"{Id}AcrPull", $"${{{IdentityRef}.principalId}}", AcrPullRoleId, $"${{{RegistryRef}.id}}");
+        if (AcrPullRoleAssignmentEnabled)
+            program.AddRoleAssignment($"{Id}AcrPull", $"${{{IdentityRef}.principalId}}", AcrPullRoleId, $"${{{RegistryRef}.id}}");
 
         if (existing)
             AddExistingLookup(program, rg);
@@ -382,7 +386,7 @@ public sealed class AzureContainerAppEnvironmentResource : PulumiAzureResource, 
         foreach (var r in ctx.Model.GetComputeResources().Where(IsTargeted))
         {
             var job = r.Annotations.OfType<PulumiContainerAppJobAnnotation>().LastOrDefault();
-            program.AddAppResource(AppId(r), await BuildContainerAppAsync(r, job, stack, rg, ctx, existing));
+            program.AddAppResource(AppId(r), await BuildContainerAppAsync(r, job, stack, rg, ctx.ExecutionContext, ctx.Logger, existing, ctx.CancellationToken));
         }
 
         Provisioning.PulumiInfrastructureExtensions.ApplyInfrastructureCallbacks(this, program);
@@ -449,7 +453,7 @@ public sealed class AzureContainerAppEnvironmentResource : PulumiAzureResource, 
         }
 
         // The app runs as the environment's user-assigned identity; DefaultAzureCredential only picks it when told its client id.
-        if (!envVars.ContainsKey("AZURE_CLIENT_ID"))
+        if (AcrPullRoleAssignmentEnabled && !envVars.ContainsKey("AZURE_CLIENT_ID"))
             env.Add(new Dictionary<string, object?> { ["name"] = "AZURE_CLIENT_ID", ["value"] = $"${{{IdentityRef}.clientId}}" });
 
         return env;
@@ -558,16 +562,19 @@ public sealed class AzureContainerAppEnvironmentResource : PulumiAzureResource, 
         static string Port(int? p) => p!.Value.ToString(CultureInfo.InvariantCulture);
     }
 
-    private async Task<Dictionary<string, object?>> BuildContainerAppAsync(
-        IResource r, PulumiContainerAppJobAnnotation? job, PulumiStackResource stack, string rg, PipelineStepContext ctx, bool existingEnvironment)
+    internal async Task<Dictionary<string, object?>> BuildContainerAppAsync(
+        IResource r, PulumiContainerAppJobAnnotation? job, PulumiStackResource stack, string rg, DistributedApplicationExecutionContext executionContext,
+        ILogger logger, bool existingEnvironment, CancellationToken cancellationToken)
     {
         var appName = ContainerAppName(r.Name, job is not null);
         var imageName = r.Name.ToLowerInvariant();
 
         var httpEndpoints = HttpEndpoints(r);
         var targetPort = IngressTargetPort(httpEndpoints);
-        var env = await BuildEnvironmentAsync(r, ctx.ExecutionContext, ctx.Logger, stack, ctx.CancellationToken);
+        var env = await BuildEnvironmentAsync(r, executionContext, logger, stack, cancellationToken);
 
+        // Without the AcrPull assignment there is no pull identity: no registries auth, no app identity, no dependsOn.
+        var pullAuth = AcrPullRoleAssignmentEnabled;
         var registries = new List<object?>
         {
             new Dictionary<string, object?>
@@ -602,8 +609,8 @@ public sealed class AzureContainerAppEnvironmentResource : PulumiAzureResource, 
             {
                 ["triggerType"] = job.CronExpression is null ? "Manual" : "Schedule",
                 ["replicaTimeout"] = 1800,
-                ["registries"] = registries,
             };
+            if (pullAuth) configuration["registries"] = registries;
             if (job.CronExpression is not null)
             {
                 configuration["scheduleTriggerConfig"] = new Dictionary<string, object?>
@@ -626,12 +633,15 @@ public sealed class AzureContainerAppEnvironmentResource : PulumiAzureResource, 
                     ["jobName"] = appName,
                     ["resourceGroupName"] = rg,
                     ["environmentId"] = $"${{{Id}.id}}",
-                    ["identity"] = identity,
                     ["configuration"] = configuration,
                     ["template"] = new Dictionary<string, object?> { ["containers"] = new List<object?> { container } },
                 },
-                ["options"] = options,
             };
+            if (pullAuth)
+            {
+                ((Dictionary<string, object?>)jobResource["properties"]!)["identity"] = identity;
+                jobResource["options"] = options;
+            }
             if (existingEnvironment) ((Dictionary<string, object?>)jobResource["properties"]!)["location"] = $"${{{Id}.location}}";
             return jobResource;
         }
@@ -639,8 +649,8 @@ public sealed class AzureContainerAppEnvironmentResource : PulumiAzureResource, 
         var appConfiguration = new Dictionary<string, object?>
         {
             ["activeRevisionsMode"] = "Single",
-            ["registries"] = registries,
         };
+        if (pullAuth) appConfiguration["registries"] = registries;
 
         if (httpEndpoints.Count > 0)
         {
@@ -661,7 +671,6 @@ public sealed class AzureContainerAppEnvironmentResource : PulumiAzureResource, 
                 ["containerAppName"] = appName,
                 ["resourceGroupName"] = rg,
                 ["managedEnvironmentId"] = $"${{{Id}.id}}",
-                ["identity"] = identity,
                 ["configuration"] = appConfiguration,
                 ["template"] = new Dictionary<string, object?>
                 {
@@ -669,8 +678,12 @@ public sealed class AzureContainerAppEnvironmentResource : PulumiAzureResource, 
                     ["scale"] = new Dictionary<string, object?> { ["minReplicas"] = 1, ["maxReplicas"] = 1 },
                 },
             },
-            ["options"] = options,
         };
+        if (pullAuth)
+        {
+            ((Dictionary<string, object?>)app["properties"]!)["identity"] = identity;
+            app["options"] = options;
+        }
 
         // An app must live in its environment's region, which may differ from the stack's.
         if (existingEnvironment) ((Dictionary<string, object?>)app["properties"]!)["location"] = $"${{{Id}.location}}";

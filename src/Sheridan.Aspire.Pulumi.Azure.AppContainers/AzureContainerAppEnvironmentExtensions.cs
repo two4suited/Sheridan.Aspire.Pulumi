@@ -102,6 +102,18 @@ public static class AzureContainerAppEnvironmentExtensions
         return builder;
     }
 
+    /// <summary>
+    /// Omits the AcrPull role assignment, the container apps' user-assigned identity and their identity-based registry auth
+    /// (and the <c>AZURE_CLIENT_ID</c> variable). For Azure emulators that don't implement <c>Microsoft.Authorization</c> role assignments.
+    /// </summary>
+    public static IResourceBuilder<AzureContainerAppEnvironmentResource> WithoutAcrPullRoleAssignment(
+        this IResourceBuilder<AzureContainerAppEnvironmentResource> builder)
+    {
+        ArgumentNullException.ThrowIfNull(builder);
+        builder.Resource.AcrPullRoleAssignmentEnabled = false;
+        return builder;
+    }
+
     /// <summary>Deploys the resource as a manually-triggered Container Apps job. Mirrors <c>PublishAsAzureContainerAppJob</c>.</summary>
     public static IResourceBuilder<T> PublishAsPulumiContainerAppJob<T>(this IResourceBuilder<T> builder) where T : IComputeResource
     {

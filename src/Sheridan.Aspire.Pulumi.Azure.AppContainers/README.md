@@ -30,6 +30,13 @@ builder.Build().Run();
 
 - Provisions the resource group, Log Analytics workspace, container registry, an AcrPull identity and the managed environment, plus a `ContainerApp` per targeted resource.
 - Customize with `WithAzureContainerRegistry`, `WithAzureLogAnalyticsWorkspace`, `WithAcrPullIdentity` and `WithDashboard`; add VNet integration with `WithDelegatedSubnet`.
+- Azure emulators (e.g. floci-az) don't implement every control-plane API. `WithDashboard(false)` skips the Aspire dashboard component (`Microsoft.App/.../dotNetComponents`), and `WithoutAcrPullRoleAssignment()` omits the AcrPull role assignment (`Microsoft.Authorization/roleAssignments`) together with the apps' user-assigned identity, identity-based `registries` auth, `dependsOn` and the `AZURE_CLIENT_ID` variable, so images are pulled without registry auth. The environment's identity is still created (and referenced by outputs) but isn't attached to the apps, so data-plane role assignments made for it by other integrations have no effect on the apps (and those integrations still emit their own `roleAssignments`, which an emulator without `Microsoft.Authorization` will reject if an app references them). Don't use it against real Azure: the apps can't pull from the private registry. It also overrides `WithAcrPullIdentity` (the supplied identity isn't attached to the apps).
+
+  ```csharp
+  builder.AddPulumiAzureContainerAppEnvironment("aca-env")
+         .WithDashboard(false)
+         .WithoutAcrPullRoleAssignment();
+  ```
 - Container Apps jobs via `PublishAsPulumiContainerAppJob` and `PublishAsScheduledPulumiContainerAppJob`.
 - The environment's shared identity is granted data-plane roles by the data integrations (Cosmos DB, Storage, Service Bus, Key Vault, ...) automatically when an app references them.
 - Images are tagged with a per-deploy timestamp so every deploy creates a new revision.
