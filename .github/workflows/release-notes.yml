@@ -87,8 +87,17 @@ jobs:
           fi
           # Merge automatically once any required checks pass (needs "Allow auto-merge" in repo settings).
           # If the PR is already mergeable (no pending/required checks), GitHub rejects --auto with
-          # "Pull request is in clean status", so fall back to merging it directly.
-          gh pr merge "$BRANCH" --auto --squash || gh pr merge "$BRANCH" --squash
+          # "Pull request is in clean status", so merge it directly in that case only.
+          # Note: PRs opened with GITHUB_TOKEN don't trigger pull_request workflows, so if a required
+          # check is ever added, use a PAT/App token here.
+          if ! OUT=$(gh pr merge "$BRANCH" --auto --squash 2>&1); then
+            if [[ "$OUT" == *"clean status"* ]]; then
+              gh pr merge "$BRANCH" --squash
+            else
+              echo "$OUT" >&2
+              exit 1
+            fi
+          fi
 
       - name: Redeploy docs after merge
         run: |
