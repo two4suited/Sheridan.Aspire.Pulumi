@@ -26,7 +26,7 @@ public sealed class AzureContainerAppEnvironmentResource : PulumiAzureResource, 
     // (default 'eastus', the generated stack's default 'location'); set WithLocation when the stack deploys elsewhere.
     string IPulumiAzureResourceWithId.IdExpression => $"${{{Id}.id}}";
     string IPulumiPrivateEndpointTarget.PrivateLinkGroupId => "managedEnvironments";
-    string IPulumiPrivateEndpointTarget.PrivateDnsZoneName => $"privatelink.{Location ?? "eastus"}.azurecontainerapps.io";
+    string IPulumiPrivateEndpointTarget.PrivateDnsZoneName => $"privatelink.{(Location ?? "eastus").Replace(" ", "").ToLowerInvariant()}.azurecontainerapps.io";
 
     /// <summary>True when a private endpoint (<c>AddPrivateEndpoint</c>) targets this environment.</summary>
     internal bool HasPrivateEndpoint(DistributedApplicationModel model) =>
