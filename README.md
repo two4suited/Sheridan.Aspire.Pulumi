@@ -28,7 +28,7 @@ builder.AddProject<Projects.MyApi>("api")
 builder.Build().Run();
 ```
 
-Then `aspire publish` to generate the Pulumi program, or `aspire deploy` to deploy it. Prerequisites: the Aspire CLI, the Pulumi CLI (`pulumi login`) and an Azure subscription.
+Then `aspire publish` to generate the Pulumi program, or `aspire deploy` to deploy it. Prerequisites: the .NET 11 SDK (packages target `net11.0`, so the AppHost must too), the Aspire CLI, the Pulumi CLI (`pulumi login`) and an Azure subscription.
 
 ## Packages
 
@@ -65,7 +65,7 @@ The package id equals the folder name under `src/`, and namespaces match the pac
 |  | [`Sheridan.Aspire.Pulumi.Azure.Foundry`](src/Sheridan.Aspire.Pulumi.Azure.Foundry) | Microsoft Foundry: projects, deployments, agents |
 | Config & security | [`Sheridan.Aspire.Pulumi.Azure.KeyVault`](src/Sheridan.Aspire.Pulumi.Azure.KeyVault) | Key Vault |
 |  | [`Sheridan.Aspire.Pulumi.Azure.AppConfiguration`](src/Sheridan.Aspire.Pulumi.Azure.AppConfiguration) | App Configuration |
-|  | [`Sheridan.Aspire.Pulumi.Azure.ApiManagement`](src/Sheridan.Aspire.Pulumi.Azure.ApiManagement) | API Management (core: APIs, backends, products, policies) |
+|  | [`Sheridan.Aspire.Pulumi.Azure.ApiManagement`](src/Sheridan.Aspire.Pulumi.Azure.ApiManagement) | API Management (core: APIs, OpenAPI import, backends, products, policies) |
 |  | [`Sheridan.Aspire.Pulumi.Azure.EntraId`](src/Sheridan.Aspire.Pulumi.Azure.EntraId) | Entra ID app registrations: scopes, app roles, API permissions and consent, federated credentials (`AddPulumiEntraId`, mirrors `Aspire.Hosting.Azure.EntraId`; preferred) |
 |  | [`Sheridan.Aspire.Pulumi.Entra`](src/Sheridan.Aspire.Pulumi.Entra) | Lower-level Azure AD app registration through the `azuread` provider (`AddPulumiAzureAdAppRegistration`); prefer `EntraId` |
 | Networking | [`Sheridan.Aspire.Pulumi.Azure.Network`](src/Sheridan.Aspire.Pulumi.Azure.Network) | VNets, subnets, private endpoints, private DNS |

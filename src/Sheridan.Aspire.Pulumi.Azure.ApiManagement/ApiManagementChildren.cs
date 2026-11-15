@@ -3,13 +3,16 @@ using Aspire.Hosting.ApplicationModel;
 namespace Sheridan.Aspire.Pulumi.Azure.ApiManagement;
 
 /// <summary>A backend service (<c>Microsoft.ApiManagement/service/backends</c>) requests can be forwarded to.</summary>
-public sealed class AzureApiManagementBackendResource(string name, string backendName, string url, AzureApiManagementResource parent)
+public sealed class AzureApiManagementBackendResource(string name, string backendName, string? url, AzureApiManagementResource parent)
     : Resource(name), IResourceWithParent<AzureApiManagementResource>
 {
     public AzureApiManagementResource Parent { get; } = parent;
     /// <summary>The physical backend identifier in API Management.</summary>
     public string BackendName { get; } = backendName;
-    public string Url { get; } = url;
+    /// <summary>The literal backend URL; null when the URL is resolved at deploy time from a compute resource.</summary>
+    public string? Url { get; } = url;
+    /// <summary>The compute resource (deployed to an Azure Container Apps environment) whose ingress FQDN is the backend host.</summary>
+    internal IResourceWithEndpoints? Compute { get; init; }
     /// <summary>"http" (default) or "soap".</summary>
     public string Protocol { get; set; } = "http";
     /// <summary>Validate the backend's TLS certificate chain and host name (on by default).</summary>
@@ -44,6 +47,44 @@ public sealed class AzureApiManagementApiResource(
     internal string? PolicyXml { get; set; }
     internal List<string> InboundStatements { get; } = [];
     internal List<AzureApiManagementOperationResource> Operations { get; } = [];
+    internal AzureApiManagementOpenApiSource? OpenApi { get; set; }
+}
+
+/// <summary>The serialization of an inline OpenAPI document.</summary>
+public enum AzureApiManagementOpenApiFormat
+{
+    Json,
+    Yaml,
+}
+
+/// <summary>Where an API's OpenAPI document comes from; resolved when the Pulumi program is generated.</summary>
+internal sealed class AzureApiManagementOpenApiSource
+{
+    private readonly Func<(string Format, string Value)> _resolve;
+    private AzureApiManagementOpenApiSource(Func<(string, string)> resolve) => _resolve = resolve;
+
+    /// <summary>The <c>format</c> and <c>value</c> properties of <c>azure-native:apimanagement:Api</c>.</summary>
+    public (string Format, string Value) Resolve() => _resolve();
+
+    public static AzureApiManagementOpenApiSource FromContent(string content, AzureApiManagementOpenApiFormat format) =>
+        new(() => (format == AzureApiManagementOpenApiFormat.Json ? "openapi+json" : "openapi", content));
+
+    public static AzureApiManagementOpenApiSource FromUrl(string url) => new(() => ("openapi-link", url));
+
+    public static AzureApiManagementOpenApiSource FromFile(string path, string appHostDirectory)
+    {
+        var full = System.IO.Path.GetFullPath(path, appHostDirectory);
+        return new(() =>
+        {
+            if (!File.Exists(full))
+                throw new FileNotFoundException($"The OpenAPI document '{full}' (from '{path}') does not exist. Build the project that generates it before publishing.", full);
+            var content = File.ReadAllText(full);
+            if (string.IsNullOrWhiteSpace(content)) throw new InvalidOperationException($"The OpenAPI document '{full}' is empty.");
+            var yaml = System.IO.Path.GetExtension(full).ToLowerInvariant() is ".yaml" or ".yml"
+                || (System.IO.Path.GetExtension(full).ToLowerInvariant() != ".json" && !content.TrimStart().StartsWith('{'));
+            return (yaml ? "openapi" : "openapi+json", content);
+        });
+    }
 }
 
 /// <summary>A product (<c>Microsoft.ApiManagement/service/products</c>) that groups APIs for consumers.</summary>

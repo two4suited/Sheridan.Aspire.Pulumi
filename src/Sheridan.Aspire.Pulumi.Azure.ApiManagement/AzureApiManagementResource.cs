@@ -1,5 +1,6 @@
 using System.Xml.Linq;
 using Aspire.Hosting.ApplicationModel;
+using Sheridan.Aspire.Pulumi.Azure.AppContainers;
 using Aspire.Hosting.Pipelines;
 using Sheridan.Aspire.Pulumi.Azure.Base;
 
@@ -10,9 +11,16 @@ namespace Sheridan.Aspire.Pulumi.Azure.ApiManagement;
 /// <c>Microsoft.ApiManagement/service</c> with a system-assigned identity, plus the APIs, operations, backends, policies,
 /// products and named values declared beneath it.
 /// </summary>
-public sealed class AzureApiManagementResource(string name, AzureApiManagementOptions options) : PulumiAzureResource(name)
+public sealed class AzureApiManagementResource(string name, AzureApiManagementOptions? options = null) : PulumiAzureResource(name)
 {
-    public AzureApiManagementOptions Options { get; } = options;
+    /// <summary>Options for a new service; null for a service that is only referenced via <c>AsExisting</c>.</summary>
+    public AzureApiManagementOptions? Options { get; } = options;
+
+    /// <summary>Name of an existing API Management service (set by <c>AsExisting</c>/<c>PublishAsExisting</c>); when set, the service itself is only looked up, never created or modified.</summary>
+    public string? ExistingServiceName { get; internal set; }
+
+    /// <summary>Resource group of the existing service (set by <c>AsExisting</c>); null means the resource group configured for this resource.</summary>
+    public string? ExistingServiceResourceGroup { get; internal set; }
 
     internal List<AzureApiManagementApiResource> Apis { get; } = [];
     internal List<AzureApiManagementBackendResource> Backends { get; } = [];
@@ -28,7 +36,10 @@ public sealed class AzureApiManagementResource(string name, AzureApiManagementOp
     public PulumiOutputReference GatewayUrl => OutputRef("GatewayUrl");
     public PulumiOutputReference NameOutput => OutputRef("Name");
     /// <summary>Principal id of the service's system-assigned identity (for role assignments on backend targets).</summary>
-    public PulumiOutputReference PrincipalId => OutputRef("PrincipalId");
+    /// <remarks>Not available for an existing service (its identity is not managed here).</remarks>
+    public PulumiOutputReference PrincipalId => ExistingServiceName is null
+        ? OutputRef("PrincipalId")
+        : throw new InvalidOperationException($"'{Name}' is an existing API Management service; its principal id is not exposed.");
 
     private static string Child(string parentId, string name)
     {
@@ -52,30 +63,93 @@ public sealed class AzureApiManagementResource(string name, AzureApiManagementOp
         catch (System.Xml.XmlException e) { throw new ArgumentException($"The policy is not well-formed XML: {e.Message}", paramName); }
     }
 
+    /// <summary>The <c>azure-native:apimanagement:Api</c> properties; an OpenAPI document adds <c>format</c>/<c>value</c> and supplies the operations.</summary>
+    internal static Dictionary<string, object?> ApiProperties(AzureApiManagementApiResource api)
+    {
+        var props = new Dictionary<string, object?>
+        {
+            ["apiId"] = api.ApiName,
+            ["path"] = api.Path,
+            ["displayName"] = api.DisplayName,
+            ["protocols"] = new List<object?> { "https" },
+            ["subscriptionRequired"] = api.SubscriptionRequired,
+        };
+        if (api.OpenApi is { } openApi)
+        {
+            var (format, value) = openApi.Resolve();
+            props["format"] = format;
+            // An interpolation opener in the document must be doubled to stay literal in Pulumi YAML. Links are left untouched.
+            props["value"] = format == "openapi-link" ? value : value.Replace("${", "$${");
+        }
+        return props;
+    }
+
+    /// <summary>Modeled operations; a routed API with neither modeled operations nor an OpenAPI document gets a wildcard proxy for every method.</summary>
+    internal static IReadOnlyList<AzureApiManagementOperationResource> EffectiveOperations(AzureApiManagementApiResource api) =>
+        api.Operations.Count > 0 || api.Backend is null || api.OpenApi is not null
+            ? api.Operations
+            : new[] { "GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS" }.Select(m =>
+                new AzureApiManagementOperationResource($"{api.Name}-{m.ToLowerInvariant()}", $"proxy-{m.ToLowerInvariant()}", m, "/*", $"Proxy {m}", api)).ToList();
+
+    /// <summary>Emits the <c>getApiManagementService</c> lookup (under the service's id, so <c>${id}.name/.id/.gatewayUrl</c> resolve as for a created service) and returns the resource group the service and its children live in.</summary>
+    internal string AddExistingLookup(PulumiProgram program, string rg)
+    {
+        if (ExistingServiceResourceGroup is null && !HasConfiguredResourceGroup)
+            throw new InvalidOperationException(
+                $"'{Name}' is an existing API Management service but no resource group is known. Pass resourceGroupName to AsExisting/PublishAsExisting, or call WithExistingResourceGroup/WithResourceGroup.");
+        rg = ExistingServiceResourceGroup ?? rg;
+        program.Variables[Id] = new Dictionary<string, object?>
+        {
+            ["fn::invoke"] = new Dictionary<string, object?>
+            {
+                ["function"] = "azure-native:apimanagement:getApiManagementService",
+                ["arguments"] = new Dictionary<string, object?> { ["resourceGroupName"] = rg, ["serviceName"] = ExistingServiceName },
+            },
+        };
+        return rg;
+    }
+
+    private PulumiStackResource? _generating;
+
     protected override Task ContributeResourcesAsync(PulumiProgram program, PipelineStepContext context, string rg, string location)
     {
-        // Named by the naming layer ({project}-{resource}-{stack}); override with WithAzureName.
-        program.AddInfraResource(Id, "azure-native:apimanagement:ApiManagementService", new Dictionary<string, object?>
+        _generating = ResolveStack(context);
+        Contribute(program, rg, location);
+        return Task.CompletedTask;
+    }
+
+    internal void Contribute(PulumiProgram program, string rg, string location)
+    {
+        if (ExistingServiceName is not null)
+            rg = AddExistingLookup(program, rg);
+        else
         {
-            ["type"] = "azure-native:apimanagement:ApiManagementService",
-            ["properties"] = new Dictionary<string, object?>
+            var options = Options ?? throw new InvalidOperationException(
+                $"'{Name}' needs AzureApiManagementOptions (publisher email and name) unless it is an existing service; pass them to AddPulumiAzureApiManagement or call AsExisting.");
+            // Named by the naming layer ({project}-{resource}-{stack}); override with WithAzureName.
+            program.AddInfraResource(Id, "azure-native:apimanagement:ApiManagementService", new Dictionary<string, object?>
             {
-                ["serviceName"] = NameFor(AzureNameKind.ApiManagementService),
-                ["resourceGroupName"] = rg,
-                ["location"] = location,
-                ["publisherEmail"] = Options.PublisherEmail,
-                ["publisherName"] = Options.PublisherName,
-                ["sku"] = new Dictionary<string, object?> { ["name"] = Options.Sku.ToString(), ["capacity"] = Options.Capacity },
-                ["identity"] = new Dictionary<string, object?> { ["type"] = "SystemAssigned" },
-                ["tags"] = new Dictionary<string, object?> { ["aspire-resource-name"] = Name },
-            },
-        });
+                ["type"] = "azure-native:apimanagement:ApiManagementService",
+                ["properties"] = new Dictionary<string, object?>
+                {
+                    ["serviceName"] = NameFor(AzureNameKind.ApiManagementService),
+                    ["resourceGroupName"] = rg,
+                    ["location"] = location,
+                    ["publisherEmail"] = options.PublisherEmail,
+                    ["publisherName"] = options.PublisherName,
+                    ["sku"] = new Dictionary<string, object?> { ["name"] = options.Sku.ToString(), ["capacity"] = options.Capacity },
+                    ["identity"] = new Dictionary<string, object?> { ["type"] = "SystemAssigned" },
+                    ["tags"] = new Dictionary<string, object?> { ["aspire-resource-name"] = Name },
+                },
+            });
+
+            program.Outputs[$"{Id}PrincipalId"] = $"${{{Id}.identity.principalId}}";
+        }
 
         var service = $"${{{Id}.name}}";
         program.Outputs[$"{Id}GatewayUrl"] = $"${{{Id}.gatewayUrl}}";
         program.Outputs[$"{Id}Name"] = service;
         program.Outputs[$"{Id}Id"] = $"${{{Id}.id}}";
-        program.Outputs[$"{Id}PrincipalId"] = $"${{{Id}.identity.principalId}}";
 
         Dictionary<string, object?> Props(Dictionary<string, object?> extra)
         {
@@ -83,14 +157,18 @@ public sealed class AzureApiManagementResource(string name, AzureApiManagementOp
             foreach (var (k, v) in extra) p[k] = v;
             return p;
         }
-        void Add(string id, string type, Dictionary<string, object?> props) =>
-            program.AddInfraResource(id, type, new Dictionary<string, object?> { ["type"] = type, ["properties"] = props });
-        void Policy(string id, string type, Dictionary<string, object?> props, string? xml)
+        void Add(string id, string type, Dictionary<string, object?> props, string? dependsOn = null)
+        {
+            var def = new Dictionary<string, object?> { ["type"] = type, ["properties"] = props };
+            if (dependsOn is not null) def["options"] = new Dictionary<string, object?> { ["dependsOn"] = new List<object?> { $"${{{dependsOn}}}" } };
+            program.AddInfraResource(id, type, def);
+        }
+        void Policy(string id, string type, Dictionary<string, object?> props, string? xml, string? dependsOn = null)
         {
             if (xml is null) return;
             props["format"] = "xml";
             props["value"] = xml;
-            Add(id, type, props);
+            Add(id, type, props, dependsOn);
         }
 
         Policy($"{Id}Policy", "azure-native:apimanagement:Policy", Props(new() { ["policyId"] = "policy" }),
@@ -109,7 +187,7 @@ public sealed class AzureApiManagementResource(string name, AzureApiManagementOp
             Add(Child(Id + "Backend", backend.Name), "azure-native:apimanagement:Backend", Props(new()
             {
                 ["backendId"] = backend.BackendName,
-                ["url"] = backend.Url,
+                ["url"] = ResolveBackendUrl(backend, _generating),
                 ["protocol"] = backend.Protocol,
                 ["tls"] = new Dictionary<string, object?>
                 {
@@ -122,25 +200,16 @@ public sealed class AzureApiManagementResource(string name, AzureApiManagementOp
         {
             var apiId = Child(Id + "Api", api.Name);
             var apiRef = $"${{{apiId}.name}}";
-            Add(apiId, "azure-native:apimanagement:Api", Props(new()
-            {
-                ["apiId"] = api.ApiName,
-                ["path"] = api.Path,
-                ["displayName"] = api.DisplayName,
-                ["protocols"] = new List<object?> { "https" },
-                ["subscriptionRequired"] = api.SubscriptionRequired,
-            }));
+            Add(apiId, "azure-native:apimanagement:Api", Props(ApiProperties(api)));
 
             var inbound = new List<string>(api.InboundStatements);
             if (api.Backend is { } b) inbound.Insert(0, $"<set-backend-service backend-id=\"{System.Security.SecurityElement.Escape(b.BackendName)}\" />");
+            // set-backend-service names the backend only by id, so order the policy after it explicitly.
             Policy($"{apiId}Policy", "azure-native:apimanagement:ApiPolicy", Props(new() { ["apiId"] = apiRef, ["policyId"] = "policy" }),
-                BuildPolicy(api.PolicyXml, inbound));
+                BuildPolicy(api.PolicyXml, inbound), api.Backend is { } routed ? Child(Id + "Backend", routed.Name) : null);
 
             // A routed API without modeled operations forwards every method and path (a wildcard proxy).
-            var operations = api.Operations.Count > 0 || api.Backend is null
-                ? api.Operations
-                : new[] { "GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS" }.Select(m =>
-                    new AzureApiManagementOperationResource($"{api.Name}-{m.ToLowerInvariant()}", $"proxy-{m.ToLowerInvariant()}", m, "/*", $"Proxy {m}", api)).ToList();
+            var operations = EffectiveOperations(api);
             foreach (var op in operations)
             {
                 var opId = Child(apiId + "Op", op.Name);
@@ -183,6 +252,32 @@ public sealed class AzureApiManagementResource(string name, AzureApiManagementOp
         }
 
         Provisioning.PulumiInfrastructureExtensions.ApplyInfrastructureCallbacks(this, program);
-        return Task.CompletedTask;
+    }
+
+    /// <summary>The backend URL as a literal or a Pulumi expression (<c>https://${app.configuration.ingress.fqdn}</c>) that also orders the backend after the app.</summary>
+    internal string ResolveBackendUrl(AzureApiManagementBackendResource backend, PulumiStackResource? generating)
+    {
+        if (backend.Compute is { } compute)
+        {
+            var env = compute.GetComputeEnvironment()
+                ?? compute.Annotations.OfType<DeploymentTargetAnnotation>().Select(a => a.ComputeEnvironment).FirstOrDefault()
+                ?? throw new InvalidOperationException(
+                    $"Backend '{backend.Name}': resource '{compute.Name}' has no compute environment. Call WithComputeEnvironment(...) with an Azure Container Apps environment.");
+            if (env is not AzureContainerAppEnvironmentResource aca)
+                throw new NotSupportedException(
+                    $"Backend '{backend.Name}': compute environment '{env.Name}' ({env.GetType().Name}) is not supported; use an Azure Container Apps environment, or pass a URL / PulumiOutputReference.");
+            if (compute.Annotations.OfType<PulumiContainerAppJobAnnotation>().Any())
+                throw new InvalidOperationException($"Backend '{backend.Name}': '{compute.Name}' is deployed as a Container Apps job, which has no ingress.");
+            var apimStack = generating ?? Stack;
+            var envStack = aca.Stack;
+            if (envStack is not null && apimStack is not null && envStack != apimStack)
+                throw new InvalidOperationException(
+                    $"Backend '{backend.Name}': '{compute.Name}' is hosted in Pulumi stack '{envStack.Name}' but API Management '{Name}' is in '{apimStack.Name}'. They must share a stack for the ingress FQDN to be referenced directly.");
+            if (!compute.GetEndpoints().Any(e => e.EndpointAnnotation.UriScheme is "http" or "https" && e.EndpointAnnotation.IsExternal))
+                throw new InvalidOperationException(
+                    $"Backend '{backend.Name}': resource '{compute.Name}' has no external http or https endpoint (an internal-only ingress is not reachable from API Management). Call WithExternalHttpEndpoints() on it.");
+            return $"https://${{{AzureContainerAppEnvironmentResource.AppId(compute.Name)}.configuration.ingress.fqdn}}";
+        }
+        return backend.Url!;
     }
 }

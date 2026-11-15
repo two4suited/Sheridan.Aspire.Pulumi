@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net10.0</TargetFramework>
+    <TargetFramework>net11.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <Description>Azure API Management provisioned by Pulumi instead of Bicep. A drop-in for AddAzureApiManagement: call AddPulumiAzureApiManagement(...), then add APIs, backends, products, named values and policies. Docs: https://github.com/two4suited/Sheridan.Aspire.Pulumi/tree/main/src/Sheridan.Aspire.Pulumi.Azure.ApiManagement#readme</Description>
@@ -21,6 +21,8 @@
     <ProjectReference Include="..\Sheridan.Aspire.Pulumi\Sheridan.Aspire.Pulumi.csproj" />
     <ProjectReference Include="..\Sheridan.Aspire.Pulumi.Azure.Base\Sheridan.Aspire.Pulumi.Azure.Base.csproj" />
     <ProjectReference Include="..\Sheridan.Aspire.Pulumi.Provisioning\Sheridan.Aspire.Pulumi.Provisioning.csproj" />
+    <!-- AddBackend(compute resource): the container app ingress FQDN. -->
+    <ProjectReference Include="..\Sheridan.Aspire.Pulumi.Azure.AppContainers\Sheridan.Aspire.Pulumi.Azure.AppContainers.csproj" />
     <!-- Only for IPulumiManagedIdentityResource (the compute environment identity that receives data-plane roles). -->
     <ProjectReference Include="..\Sheridan.Aspire.Pulumi.Azure\Sheridan.Aspire.Pulumi.Azure.csproj" />
   </ItemGroup>

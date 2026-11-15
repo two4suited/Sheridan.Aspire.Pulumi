@@ -11,8 +11,11 @@ on:
       - 'src/*/README.md'
       - '.github/workflows/docs.yml'
   pull_request:
+    # The release-notes bot PR only touches release-notes.md. Runs on bot-authored PRs sit in
+    # "approval required" and then expire as a failure, so don't trigger Docs for that file alone.
     paths:
       - 'docs/**'
+      - '!docs/src/content/docs/reference/release-notes.md'
       - 'README.md'
       - 'src/*/README.md'
   workflow_dispatch:

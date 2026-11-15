@@ -22,10 +22,52 @@ public static class AzureApiManagementExtensions
         return builder.AddResource(new AzureApiManagementResource(name, options)).ExcludeFromManifest();
     }
 
-    /// <summary>Alias of <see cref="AddPulumiAzureApiManagement"/>.</summary>
+    /// <summary>
+    /// Adds an Azure API Management service without options, for a service that already exists: follow with
+    /// <see cref="AsExisting"/>. Provisioning throws unless <c>AsExisting</c> is called.
+    /// </summary>
+    public static IResourceBuilder<AzureApiManagementResource> AddPulumiAzureApiManagement(
+        this IDistributedApplicationBuilder builder, string name)
+    {
+        ArgumentNullException.ThrowIfNull(builder);
+        ArgumentException.ThrowIfNullOrEmpty(name);
+        return builder.AddResource(new AzureApiManagementResource(name)).ExcludeFromManifest();
+    }
+
+    /// <summary>Alias of <see cref="AddPulumiAzureApiManagement(IDistributedApplicationBuilder, string, AzureApiManagementOptions)"/>.</summary>
     public static IResourceBuilder<AzureApiManagementResource> AddPulumiApiManagement(
         this IDistributedApplicationBuilder builder, string name, AzureApiManagementOptions options) =>
         builder.AddPulumiAzureApiManagement(name, options);
+
+    /// <summary>Alias of <see cref="AddPulumiAzureApiManagement(IDistributedApplicationBuilder, string)"/>.</summary>
+    public static IResourceBuilder<AzureApiManagementResource> AddPulumiApiManagement(
+        this IDistributedApplicationBuilder builder, string name) =>
+        builder.AddPulumiAzureApiManagement(name);
+
+    /// <summary>
+    /// Uses an existing API Management service instead of creating one: it is looked up by name and resource group and never
+    /// created or modified (publisher and SKU options are not needed); the APIs, backends, products, named values and
+    /// policies declared here are created beneath it. Outputs (gateway URL, name, id) resolve from the existing service. Mirrors <c>PublishAsExisting</c>.
+    /// </summary>
+    /// <param name="existingResourceName">Name of the existing API Management service.</param>
+    /// <param name="resourceGroupName">Resource group of the service; when omitted, the resource group configured for this resource (<c>WithResourceGroup</c>/<c>WithExistingResourceGroup</c>) is used.</param>
+    public static IResourceBuilder<AzureApiManagementResource> PublishAsExisting(
+        this IResourceBuilder<AzureApiManagementResource> builder, string existingResourceName, string? resourceGroupName = null)
+    {
+        ArgumentNullException.ThrowIfNull(builder);
+        ArgumentException.ThrowIfNullOrEmpty(existingResourceName);
+        if (resourceGroupName is not null) ArgumentException.ThrowIfNullOrEmpty(resourceGroupName);
+        builder.Resource.ExistingServiceName = existingResourceName;
+        builder.Resource.ExistingServiceResourceGroup = resourceGroupName;
+        // Also marks a resource group as configured so none is created just for the lookup.
+        if (resourceGroupName is not null) builder.Resource.ExistingResourceGroup = resourceGroupName;
+        return builder;
+    }
+
+    /// <summary>Alias of <see cref="PublishAsExisting"/> (this resource has no local run mode). Mirrors <c>AsExisting</c>.</summary>
+    public static IResourceBuilder<AzureApiManagementResource> AsExisting(
+        this IResourceBuilder<AzureApiManagementResource> builder, string existingResourceName, string? resourceGroupName = null) =>
+        builder.PublishAsExisting(existingResourceName, resourceGroupName);
 
     /// <summary>Adds an API published under <paramref name="path"/> (the equivalent of <c>AddApi(name, path)</c>).</summary>
     public static IResourceBuilder<AzureApiManagementApiResource> AddApi(
@@ -53,17 +95,44 @@ public static class AzureApiManagementExtensions
         ArgumentException.ThrowIfNullOrEmpty(name);
         if (!Uri.TryCreate(url, UriKind.Absolute, out var uri) || uri.Scheme is not ("http" or "https"))
             throw new ArgumentException($"'{url}' is not an absolute http(s) URL.", nameof(url));
+        return AddBackendCore(builder, name, protocol, validateCertificateChain, backendName, (resolved, parent) =>
+            new AzureApiManagementBackendResource(name, resolved, url, parent));
+    }
+
+    /// <summary>
+    /// Adds a backend whose URL is <c>https://&lt;ingress FQDN&gt;</c> of a project or container deployed to an Azure Container Apps
+    /// environment (<c>AddPulumiAzureContainerAppEnvironment</c>) in the same Pulumi stack. The FQDN is a Pulumi output of the
+    /// container app, so the backend is created after the app. The resource needs an http/https endpoint.
+    /// </summary>
+    public static IResourceBuilder<AzureApiManagementBackendResource> AddBackend<T>(
+        this IResourceBuilder<AzureApiManagementResource> builder, string name, IResourceBuilder<T> compute,
+        string protocol = "http", bool validateCertificateChain = true, string? backendName = null)
+        where T : IComputeResource, IResourceWithEndpoints
+    {
+        ArgumentNullException.ThrowIfNull(compute);
+        return AddBackendCore(builder, name, protocol, validateCertificateChain, backendName, (resolved, parent) =>
+            new AzureApiManagementBackendResource(name, resolved, null, parent) { Compute = compute.Resource });
+    }
+
+    private static IResourceBuilder<AzureApiManagementBackendResource> AddBackendCore(
+        IResourceBuilder<AzureApiManagementResource> builder, string name, string protocol, bool validateCertificateChain, string? backendName,
+        Func<string, AzureApiManagementResource, AzureApiManagementBackendResource> create)
+    {
+        ArgumentNullException.ThrowIfNull(builder);
+        ArgumentException.ThrowIfNullOrEmpty(name);
         if (protocol is not ("http" or "soap")) throw new ArgumentException("The protocol must be 'http' or 'soap'.", nameof(protocol));
         var parent = builder.Resource;
         var resolved = backendName ?? name;
         if (parent.Backends.Any(b => string.Equals(b.BackendName, resolved, StringComparison.OrdinalIgnoreCase)))
             throw new InvalidOperationException($"API Management '{parent.Name}' already has a backend named '{resolved}'.");
-        var backend = new AzureApiManagementBackendResource(name, resolved, url, parent) { Protocol = protocol, ValidateCertificateChain = validateCertificateChain };
+        var backend = create(resolved, parent);
+        backend.Protocol = protocol;
+        backend.ValidateCertificateChain = validateCertificateChain;
         parent.Backends.Add(backend);
         return builder.ApplicationBuilder.AddResource(backend).ExcludeFromManifest();
     }
 
-    /// <summary>Routes the API's requests to <paramref name="backend"/> (a <c>set-backend-service</c> inbound policy and, unless operations are modeled, a wildcard proxy for every method).</summary>
+    /// <summary>Routes the API's requests to <paramref name="backend"/> (a <c>set-backend-service</c> inbound policy and, unless operations are modeled or imported from OpenAPI, a wildcard proxy for every method).</summary>
     public static IResourceBuilder<AzureApiManagementApiResource> WithBackend(
         this IResourceBuilder<AzureApiManagementApiResource> builder, IResourceBuilder<AzureApiManagementBackendResource> backend)
     {
@@ -72,6 +141,42 @@ public static class AzureApiManagementExtensions
         if (backend.Resource.Parent != builder.Resource.Parent)
             throw new InvalidOperationException("The backend and the API must belong to the same API Management service.");
         builder.Resource.Backend = backend.Resource;
+        return builder;
+    }
+
+    /// <summary>
+    /// Imports the API's operations from an OpenAPI document on disk. The file is read when the Pulumi program is generated
+    /// (so it may be produced by a build step); a relative path is resolved against the AppHost directory. The format (JSON or YAML)
+    /// is taken from the extension, or from the content for other extensions.
+    /// </summary>
+    public static IResourceBuilder<AzureApiManagementApiResource> WithOpenApi(
+        this IResourceBuilder<AzureApiManagementApiResource> builder, string path)
+    {
+        ArgumentNullException.ThrowIfNull(builder);
+        ArgumentException.ThrowIfNullOrWhiteSpace(path);
+        builder.Resource.OpenApi = AzureApiManagementOpenApiSource.FromFile(path, builder.ApplicationBuilder.AppHostDirectory);
+        return builder;
+    }
+
+    /// <summary>Imports the API's operations from an OpenAPI document that API Management downloads from <paramref name="url"/> (<c>openapi-link</c>).</summary>
+    public static IResourceBuilder<AzureApiManagementApiResource> WithOpenApi(
+        this IResourceBuilder<AzureApiManagementApiResource> builder, Uri url)
+    {
+        ArgumentNullException.ThrowIfNull(builder);
+        ArgumentNullException.ThrowIfNull(url);
+        if (!url.IsAbsoluteUri || url.Scheme is not ("http" or "https"))
+            throw new ArgumentException($"'{url}' is not an absolute http(s) URL.", nameof(url));
+        builder.Resource.OpenApi = AzureApiManagementOpenApiSource.FromUrl(url.AbsoluteUri);
+        return builder;
+    }
+
+    /// <summary>Imports the API's operations from inline OpenAPI document content.</summary>
+    public static IResourceBuilder<AzureApiManagementApiResource> WithOpenApi(
+        this IResourceBuilder<AzureApiManagementApiResource> builder, string content, AzureApiManagementOpenApiFormat format)
+    {
+        ArgumentNullException.ThrowIfNull(builder);
+        ArgumentException.ThrowIfNullOrWhiteSpace(content);
+        builder.Resource.OpenApi = AzureApiManagementOpenApiSource.FromContent(content, format);
         return builder;
     }
 

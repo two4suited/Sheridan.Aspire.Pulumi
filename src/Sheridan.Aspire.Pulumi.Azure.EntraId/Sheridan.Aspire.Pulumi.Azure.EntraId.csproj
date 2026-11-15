@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net10.0</TargetFramework>
+    <TargetFramework>net11.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <Description>Entra ID application registrations with the same API as the official Aspire.Hosting.Azure.EntraId package, provisioned by Pulumi. Part of Sheridan.Aspire.Pulumi, which provisions Aspire resources with Pulumi instead of Bicep. Usage and docs: https://github.com/two4suited/Sheridan.Aspire.Pulumi/tree/main/src/Sheridan.Aspire.Pulumi.Azure.EntraId#readme</Description>
