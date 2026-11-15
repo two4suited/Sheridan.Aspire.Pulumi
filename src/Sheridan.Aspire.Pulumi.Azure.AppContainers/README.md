@@ -37,6 +37,8 @@ builder.Build().Run();
          .WithDashboard(false)
          .WithoutAcrPullRoleAssignment();
   ```
+
+- Private endpoints: the environment is an `IPulumiPrivateEndpointTarget` (group `managedEnvironments`, zone `privatelink.<location>.azurecontainerapps.io`), so `peSubnet.AddPrivateEndpoint(env)` works and sets `publicNetworkAccess: Disabled` on the environment. Azure requires a workload-profiles environment for this (the one created here is). The zone name embeds the region, taken from `WithLocation` (default `eastus`, the stack's default `location`); call `WithLocation` on the environment if the stack deploys elsewhere. Not applied to `AsExisting` environments.
 - Container Apps jobs via `PublishAsPulumiContainerAppJob` and `PublishAsScheduledPulumiContainerAppJob`.
 - The environment's shared identity is granted data-plane roles by the data integrations (Cosmos DB, Storage, Service Bus, Key Vault, ...) automatically when an app references them.
 - Images are tagged with a per-deploy timestamp so every deploy creates a new revision.
