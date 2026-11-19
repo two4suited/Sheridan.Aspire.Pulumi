@@ -21,7 +21,7 @@ var appSvc = builder.AddPulumiAzureAppServiceEnvironment("appsvc")
     .WithSku("P1V3", "Premium")
     .WithDashboard(false);
 
-builder.AddProject<Projects.MyApi>("api")
+builder.AddDotnetProject("api", "../MyApi/MyApi.csproj")
     .WithExternalHttpEndpoints()
     .WithComputeEnvironment(appSvc);
 

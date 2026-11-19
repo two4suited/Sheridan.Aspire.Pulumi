@@ -23,7 +23,7 @@ var sql = builder.AddPulumiSql("sql")
     .WithFirewallRule("office", "203.0.113.0", "203.0.113.255");
 var db = sql.AddDatabase("appdb");
 
-builder.AddProject<Projects.MyApi>("api")
+builder.AddDotnetProject("api", "../MyApi/MyApi.csproj")
     .WithComputeEnvironment(acaEnv)
     .WithReference(db);
 

@@ -53,7 +53,6 @@ public sealed class PulumiKubernetesWorkloadResource(string name, IResource targ
 /// persistent volumes and load balancers added to it are emitted as pulumi-kubernetes resources too.
 /// </para>
 /// </summary>
-#pragma warning disable ASPIRECOMPUTE002
 public sealed partial class AzureKubernetesEnvironmentResource : PulumiAzureResource, IComputeEnvironmentResource, IContainerRegistry, IPulumiManagedIdentityResource
 {
     internal const string AcrPullRoleId = "7f951dda-4ed3-4680-a7ca-43fe172d538d";

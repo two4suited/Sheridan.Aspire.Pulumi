@@ -23,7 +23,7 @@ var search = builder.AddPulumiSearch("search")
     .WithSku("standard")   // Pulumi addition
     .ConfigureInfrastructure(infra => infra.SearchService.Set("replicaCount", 3));
 
-builder.AddProject<Projects.MyApi>("api")
+builder.AddDotnetProject("api", "../MyApi/MyApi.csproj")
     .WithComputeEnvironment(acaEnv)
     .WithReference(search);
 

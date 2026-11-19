@@ -23,7 +23,7 @@ var kusto = builder.AddPulumiKustoCluster("kusto");
 var telemetry = kusto.AddReadWriteDatabase("telemetry")
     .WithCreationScript(".create table T (A:string)");
 
-builder.AddProject<Projects.MyApi>("api")
+builder.AddDotnetProject("api", "../MyApi/MyApi.csproj")
     .WithComputeEnvironment(acaEnv)
     .WithReference(telemetry);   // ConnectionStrings__telemetry
 

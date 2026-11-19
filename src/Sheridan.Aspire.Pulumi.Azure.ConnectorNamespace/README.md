@@ -24,7 +24,7 @@ var office = connectors.AddConnection("office", "office365")
 connectors.AddMcpServerConfig("mcp", new() { Description = "Mail tools" })
     .WithConnector("office-tools", office, new() { Operations = [new() { Name = "SendEmail" }] });
 
-builder.AddProject<Projects.MyApi>("api")
+builder.AddDotnetProject("api", "../MyApi/MyApi.csproj")
     .WithReference(office);   // {name}__connectorGatewayName / {name}__connectionName
 
 builder.Build().Run();

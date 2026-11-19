@@ -31,7 +31,7 @@ public sealed class AzureServiceBusEmulatorResource(AzureServiceBusResource inne
 public static class AzureServiceBusEmulatorExtensions
 {
     internal const string EmulatorImage = "azure-messaging/servicebus-emulator";
-    internal const string EmulatorTag = "2.0.0";
+    internal const string EmulatorTag = "2.0.1";
     private const string SqlServerEndpointName = "tcp";
     private const string SqlServerConflictMessage = "The Azure Service Bus emulator cannot use both an existing SQL Server resource and a customized built-in SQL Server resource. Remove either the 'WithSqlServer(sqlServer)' call or the 'WithSqlServer(configureSqlServer)' call.";
 

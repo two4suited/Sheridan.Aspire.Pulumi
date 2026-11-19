@@ -24,7 +24,7 @@ aks.AddNodePool("gpu", "Standard_NC4as_T4_v3", 0, 2);
 
 var data = aks.AddPersistentVolume("data").WithCapacity("20Gi");
 
-var api = builder.AddProject<Projects.MyApi>("api")
+var api = builder.AddDotnetProject("api", "../MyApi/MyApi.csproj")
     .WithExternalHttpEndpoints()
     .WithPersistentVolume(data, "/data", env: "DATA_PATH");
 

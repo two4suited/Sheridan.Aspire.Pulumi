@@ -23,7 +23,7 @@ var pubsub = builder.AddPulumiWebPubSub("pubsub");
 pubsub.AddHub("notifications")
     .AddEventHandler("https://example.com/api/{event}", "*", ["connected"]);
 
-builder.AddProject<Projects.MyApi>("api")
+builder.AddDotnetProject("api", "../MyApi/MyApi.csproj")
     .WithReference(pubsub)
     .WithComputeEnvironment(acaEnv);
 

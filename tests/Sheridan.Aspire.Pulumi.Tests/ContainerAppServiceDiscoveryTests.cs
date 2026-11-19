@@ -12,20 +12,8 @@ namespace Sheridan.Aspire.Pulumi.Tests;
 /// </summary>
 public sealed class ContainerAppServiceDiscoveryTests
 {
-    private sealed class CatalogProject : IProjectMetadata
-    {
-        public string ProjectPath => Path.Combine(Path.GetTempPath(), "sheridan-tests-no-such-dir", "Catalog.Api.csproj");
-
-        // Empty launch settings keep AddProject from reading the (non-existent) project file.
-        public LaunchSettings? LaunchSettings => new();
-    }
-
-    private sealed class WebProject : IProjectMetadata
-    {
-        public string ProjectPath => Path.Combine(Path.GetTempPath(), "sheridan-tests-no-such-dir", "Web.csproj");
-
-        public LaunchSettings? LaunchSettings => new();
-    }
+    private static readonly string CatalogPath = TestProjects.Create("Catalog.Api.csproj");
+    private static readonly string WebPath = TestProjects.Create("Web.csproj");
 
     private static IDistributedApplicationBuilder PublishBuilder()
     {
@@ -59,8 +47,8 @@ public sealed class ContainerAppServiceDiscoveryTests
     {
         var builder = PublishBuilder();
         var env = builder.AddPulumiAzureContainerAppEnvironment("aca-env");
-        var catalog = Target(builder.AddProject<CatalogProject>("catalog-api").WithHttpEndpoint().WithHttpsEndpoint(), env);
-        var web = Target(builder.AddProject<WebProject>("web").WithReference(catalog), env);
+        var catalog = Target(builder.AddDotnetProject("catalog-api", CatalogPath).WithHttpEndpoint().WithHttpsEndpoint(), env);
+        var web = Target(builder.AddDotnetProject("web", WebPath).WithReference(catalog), env);
 
         var vars = await EnvAsync(builder, env, web.Resource);
 
@@ -75,8 +63,8 @@ public sealed class ContainerAppServiceDiscoveryTests
     {
         var builder = PublishBuilder();
         var env = builder.AddPulumiAzureContainerAppEnvironment("aca-env");
-        var catalog = Target(builder.AddProject<CatalogProject>("catalog-api").WithHttpEndpoint().WithHttpsEndpoint().WithExternalHttpEndpoints(), env);
-        var web = Target(builder.AddProject<WebProject>("web").WithReference(catalog), env);
+        var catalog = Target(builder.AddDotnetProject("catalog-api", CatalogPath).WithHttpEndpoint().WithHttpsEndpoint().WithExternalHttpEndpoints(), env);
+        var web = Target(builder.AddDotnetProject("web", WebPath).WithReference(catalog), env);
 
         var vars = await EnvAsync(builder, env, web.Resource);
 
@@ -154,7 +142,7 @@ public sealed class ContainerAppServiceDiscoveryTests
     {
         var builder = PublishBuilder();
         var env = builder.AddPulumiAzureContainerAppEnvironment("aca-env");
-        var catalog = Target(builder.AddProject<CatalogProject>("catalog-api").WithHttpEndpoint().WithHttpsEndpoint(), env);
+        var catalog = Target(builder.AddDotnetProject("catalog-api", CatalogPath).WithHttpEndpoint().WithHttpsEndpoint(), env);
         var https = catalog.GetEndpoint("https");
         catalog.WithEnvironment("HTTP_PORTS", catalog.GetEndpoint("http").Property(EndpointProperty.TargetPort))
             .WithEnvironment("HTTPS_PORTS", https.Property(EndpointProperty.TargetPort));

@@ -23,7 +23,7 @@ var postgres = builder.AddPulumiPostgreSQL("postgres")
     .RunAsContainer();   // local Postgres for `aspire run`
 var db = postgres.AddDatabase("appdb");
 
-builder.AddProject<Projects.MyApi>("api")
+builder.AddDotnetProject("api", "../MyApi/MyApi.csproj")
     .WithComputeEnvironment(acaEnv)
     .WithReference(db);
 

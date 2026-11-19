@@ -20,13 +20,15 @@ var acaEnv = builder.AddPulumiAzureContainerAppEnvironment("aca-env");
 var cosmos = builder.AddPulumiCosmosDB("cosmos");
 cosmos.AddCosmosDatabase("appdb").AddContainer("items", "/id");
 
-builder.AddProject<Projects.MyApi>("api")
+builder.AddDotnetProject("api", "../MyApi/MyApi.csproj")
     .WithExternalHttpEndpoints()
     .WithComputeEnvironment(acaEnv)
     .WithReference(cosmos);
 
 builder.Build().Run();
 ```
+
+`AddDotnetProject` comes from the `Aspire.Hosting.Dotnet` package (Aspire 17) and replaces the now-obsolete `AddProject<Projects.X>`; the path is relative to the AppHost project.
 
 Then `aspire publish` to generate the Pulumi program, or `aspire deploy` to deploy it. Prerequisites: the .NET 11 SDK (packages target `net11.0`, so the AppHost must too), the Aspire CLI, the Pulumi CLI (`pulumi login`) and an Azure subscription.
 

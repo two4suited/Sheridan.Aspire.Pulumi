@@ -45,7 +45,7 @@ Instead of a literal URL, point a backend at a project or container deployed to 
 
 ```csharp
 var acaEnv = builder.AddPulumiAzureContainerAppEnvironment("env");
-var people = builder.AddProject<Projects.People_Api>("people-api")
+var people = builder.AddDotnetProject("people-api", "../People.Api/People.Api.csproj")
     .WithExternalHttpEndpoints()
     .WithComputeEnvironment(acaEnv);
 
@@ -129,4 +129,4 @@ peSubnet.AddPrivateEndpoint(gateway);                                         //
 
 Foundry/OpenAI/Blob backends and backend pools, policy fragments, subscriptions, Key Vault named values, Application Insights diagnostics, custom domains.
 
-Upstream status: `Aspire.Hosting.Azure.ApiManagement` is experimental and was merged after Aspire 13.6.4; track changes in [#138](https://github.com/two4suited/Sheridan.Aspire.Pulumi/issues/138).
+Upstream status: `Aspire.Hosting.Azure.ApiManagement` is experimental and first shipped upstream in Aspire 17.0.0 as `17.0.0-preview.1`, so it is still a preview package; track changes in [#138](https://github.com/two4suited/Sheridan.Aspire.Pulumi/issues/138).

@@ -21,7 +21,7 @@ var cache = builder.AddPulumiAzureRedis("cache").RunAsContainer();
 var managed = builder.AddPulumiAzureManagedRedis("managed")
     .WithAccessKeyAuthentication();   // or pass an AddPulumiAzureKeyVault resource
 
-builder.AddProject<Projects.MyApi>("api")
+builder.AddDotnetProject("api", "../MyApi/MyApi.csproj")
     .WithReference(cache);   // ConnectionStrings__cache
 
 builder.Build().Run();

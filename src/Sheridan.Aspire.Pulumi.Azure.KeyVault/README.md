@@ -22,7 +22,7 @@ var acaEnv = builder.AddPulumiAzureContainerAppEnvironment("aca-env");   // Sher
 var vault = builder.AddPulumiAzureKeyVault("vault")
     .AddSecret("api-key", builder.AddParameter("api-key", secret: true));
 
-builder.AddProject<Projects.MyApi>("api")
+builder.AddDotnetProject("api", "../MyApi/MyApi.csproj")
     .WithComputeEnvironment(acaEnv)
     .WithRoleAssignments(vault, AzureKeyVaultRole.KeyVaultSecretsUser)   // default is Key Vault Administrator, as upstream
     .WithReference(vault);

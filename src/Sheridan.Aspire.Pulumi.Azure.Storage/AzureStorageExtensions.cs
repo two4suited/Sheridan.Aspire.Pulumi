@@ -134,7 +134,7 @@ public static class AzureStorageExtensions
         // The default arguments come from Azurite's Dockerfile and have to be repeated to be able to add --skipApiVersionCheck;
         // --disableProductStyleUrl makes the emulator use path-style URLs rather than ones with the account name in the host name.
         var emulatorBuilder = builder.ApplicationBuilder.AddResource(emulator)
-            .WithImage("azure-storage/azurite", "3.35.0")
+            .WithImage("azure-storage/azurite", "3.37.0")
             .WithImageRegistry("mcr.microsoft.com")
             .WithHttpEndpoint(targetPort: 10000, name: "blob")
             .WithHttpEndpoint(targetPort: 10001, name: "queue")

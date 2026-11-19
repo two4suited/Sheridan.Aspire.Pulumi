@@ -25,7 +25,7 @@ var blobs = storage.AddBlobs("blobs");
 blobs.AddBlobContainer("uploads");
 storage.AddQueues("queues").AddQueue("jobs");
 
-builder.AddProject<Projects.MyApi>("api")
+builder.AddDotnetProject("api", "../MyApi/MyApi.csproj")
     .WithComputeEnvironment(acaEnv)
     .WithReference(blobs);
 
@@ -45,7 +45,7 @@ builder.Build().Run();
 var lake = storage.AddDataLake("lake");                       // enables the account's hierarchical namespace
 var raw  = storage.AddDataLakeFileSystem("raw", "raw-zone");  // fileSystemName defaults to the resource name
 
-builder.AddProject<Projects.Etl>("etl")
+builder.AddDotnetProject("etl", "../Etl/Etl.csproj")
     .WithReference(raw)   // Endpoint=<dfs endpoint>;FileSystemName=raw-zone
     .WithRoleAssignments(storage, AzureStorageRole.StorageBlobDataOwner);
 ```
@@ -69,7 +69,7 @@ var storage = builder.AddPulumiStorage("storage")
 
 `configureContainer` receives an `IResourceBuilder<AzureStorageEmulatorResource>` with:
 
-- `WithDataVolume(name?, isReadOnly)` / `WithDataBindMount(path?, isReadOnly)`: persist `/data` between runs (default bind-mount path `.azurite/{storage name}`).
+- `WithDataVolume(name?, isReadOnly)` / `WithDataBindMount(path?, isReadOnly)`: persist `/data` between runs (default bind-mount path `.azurite/{storage name}`). Use one or the other: Aspire 17 throws if a volume and a bind mount target the same path.
 - `WithBlobPort(port)` / `WithQueuePort(port)` / `WithTablePort(port)`: fixed host ports (random otherwise).
 - `WithApiVersionCheck(enable = true)`: remove `--skipApiVersionCheck` so Azurite validates the requested API version. Note this differs from the official integration, whose implementation adds the flag when `enable` is `true`, contradicting its documentation.
 
