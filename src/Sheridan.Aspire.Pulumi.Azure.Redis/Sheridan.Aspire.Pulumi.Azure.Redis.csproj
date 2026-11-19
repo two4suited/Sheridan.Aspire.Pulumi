@@ -10,9 +10,9 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Aspire.Hosting" Version="13.6.4" />
+    <PackageReference Include="Aspire.Hosting" Version="17.0.0" />
     <!-- RunAsContainer reuses the stock Redis container resource. -->
-    <PackageReference Include="Aspire.Hosting.Redis" Version="13.6.4" />
+    <PackageReference Include="Aspire.Hosting.Redis" Version="17.0.0" />
   </ItemGroup>
 
   <ItemGroup>

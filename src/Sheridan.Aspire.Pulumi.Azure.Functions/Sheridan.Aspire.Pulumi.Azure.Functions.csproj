@@ -10,9 +10,9 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Aspire.Hosting" Version="13.6.4" />
+    <PackageReference Include="Aspire.Hosting" Version="17.0.0" />
     <!-- Only for AzureFunctionsAnnotation, the marker Aspire uses to recognise a project as an Azure Functions app. -->
-    <PackageReference Include="Aspire.Hosting.Azure" Version="13.6.4" />
+    <PackageReference Include="Aspire.Hosting.Azure" Version="17.0.0" />
   </ItemGroup>
 
   <ItemGroup>

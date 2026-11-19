@@ -29,7 +29,7 @@ public sealed class StorageEmulatorTests
         var image = emulator.Annotations.OfType<ContainerImageAnnotation>().Single();
         Assert.Equal("mcr.microsoft.com", image.Registry);
         Assert.Equal("azure-storage/azurite", image.Image);
-        Assert.Equal("3.35.0", image.Tag);
+        Assert.Equal("3.37.0", image.Tag);
     }
 
     [Fact]
@@ -57,8 +57,7 @@ public sealed class StorageEmulatorTests
         var builder = DistributedApplication.CreateBuilder();
         var storage = builder.AddPulumiStorage("storage").RunAsEmulator(c => c
             .WithBlobPort(11000).WithQueuePort(11001).WithTablePort(11002)
-            .WithDataVolume("azurite-data")
-            .WithDataBindMount("custom"));
+            .WithDataVolume("azurite-data"));
         var emulator = storage.Resource.Emulator!;
 
         var endpoints = emulator.Annotations.OfType<EndpointAnnotation>().ToDictionary(e => e.Name);
@@ -69,18 +68,24 @@ public sealed class StorageEmulatorTests
 
         var mounts = emulator.Annotations.OfType<ContainerMountAnnotation>().ToList();
         Assert.Contains(mounts, m => m.Type == ContainerMountType.Volume && m.Source == "azurite-data" && m.Target == "/data");
-        Assert.Contains(mounts, m => m.Type == ContainerMountType.BindMount && m.Target == "/data");
+
+        // Aspire 17 rejects a bind mount and a volume on the same target, so a bind mount gets its own emulator.
+        var bound = builder.AddPulumiStorage("bound").RunAsEmulator(c => c.WithDataBindMount("custom"));
+        Assert.Contains(bound.Resource.Emulator!.Annotations.OfType<ContainerMountAnnotation>(),
+            m => m.Type == ContainerMountType.BindMount && m.Target == "/data");
     }
 
     [Fact]
     public void Default_data_mount_names_follow_the_storage_resource_name()
     {
         var builder = DistributedApplication.CreateBuilder();
-        var storage = builder.AddPulumiStorage("files").RunAsEmulator(c => c.WithDataVolume().WithDataBindMount());
-        var mounts = storage.Resource.Emulator!.Annotations.OfType<ContainerMountAnnotation>().ToList();
+        var volumes = builder.AddPulumiStorage("files").RunAsEmulator(c => c.WithDataVolume());
+        var binds = builder.AddPulumiStorage("filesbind").RunAsEmulator(c => c.WithDataBindMount());
+        var volumeMounts = volumes.Resource.Emulator!.Annotations.OfType<ContainerMountAnnotation>().ToList();
+        var bindMounts = binds.Resource.Emulator!.Annotations.OfType<ContainerMountAnnotation>().ToList();
 
-        Assert.EndsWith("-files-data", mounts.Single(m => m.Type == ContainerMountType.Volume).Source);
-        Assert.EndsWith(".azurite/files", mounts.Single(m => m.Type == ContainerMountType.BindMount).Source!.Replace('\\', '/'));
+        Assert.EndsWith("-files-data", volumeMounts.Single(m => m.Type == ContainerMountType.Volume).Source);
+        Assert.EndsWith(".azurite/filesbind", bindMounts.Single(m => m.Type == ContainerMountType.BindMount).Source!.Replace('\\', '/'));
     }
 
     [Fact]
