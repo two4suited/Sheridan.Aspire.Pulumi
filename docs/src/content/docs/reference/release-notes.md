@@ -10,6 +10,19 @@ after a `vX.Y.Z` tag has been published. Packages are on
 
 <!-- releases:start -->
 
+## v3.0.0
+
+_2026-11-19_ · [GitHub release](https://github.com/two4suited/Sheridan.Aspire.Pulumi/releases/tag/v3.0.0)
+
+<!-- Release notes generated using configuration in .github/release.yml at v3.0.0 -->
+
+#### What's Changed
+* Upgrade to Aspire 17.0.0 by @two4suited in https://github.com/two4suited/Sheridan.Aspire.Pulumi/pull/244
+
+
+**Full Changelog**: https://github.com/two4suited/Sheridan.Aspire.Pulumi/compare/v2.3.2...v3.0.0
+
+
 ## v2.3.2
 
 _2026-11-15_ · [GitHub release](https://github.com/two4suited/Sheridan.Aspire.Pulumi/releases/tag/v2.3.2)
