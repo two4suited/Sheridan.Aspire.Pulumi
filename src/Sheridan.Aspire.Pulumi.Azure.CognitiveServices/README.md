@@ -22,7 +22,7 @@ var acaEnv = builder.AddPulumiAzureContainerAppEnvironment("aca-env");   // Sher
 var openai = builder.AddPulumiOpenAI("openai");
 var chat = openai.AddDeployment("chat", "gpt-4o", "2024-08-06");
 
-builder.AddProject<Projects.MyApi>("api")
+builder.AddDotnetProject("api", "../MyApi/MyApi.csproj")
     .WithComputeEnvironment(acaEnv)
     .WithReference(chat);   // Endpoint=<endpoint>;Deployment=chat
 

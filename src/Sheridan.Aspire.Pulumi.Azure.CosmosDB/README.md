@@ -23,7 +23,7 @@ var cosmos = builder.AddPulumiCosmosDB("cosmos")
     .RunAsEmulator();   // local emulator for `aspire run`; real account on publish/deploy
 cosmos.AddCosmosDatabase("appdb").AddContainer("items", "/id");
 
-builder.AddProject<Projects.MyApi>("api")
+builder.AddDotnetProject("api", "../MyApi/MyApi.csproj")
     .WithComputeEnvironment(acaEnv)
     .WithReference(cosmos);
 

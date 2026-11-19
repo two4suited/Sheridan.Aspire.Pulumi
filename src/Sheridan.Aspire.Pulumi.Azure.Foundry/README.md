@@ -27,7 +27,7 @@ var codeInterpreter = project.AddCodeInterpreterTool("code");
 project.AddPromptAgent("helper", chat, "You are a helpful assistant.")
     .WithTool(codeInterpreter);
 
-builder.AddProject<Projects.MyApi>("api")
+builder.AddDotnetProject("api", "../MyApi/MyApi.csproj")
     .WithComputeEnvironment(acaEnv)
     .WithReference(chat);
 

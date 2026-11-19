@@ -24,7 +24,7 @@ var signalr = builder.AddPulumiSignalR("signalr")
     .ConfigureInfrastructure(infra =>
         infra.SignalRService.Set("cors.allowedOrigins", new[] { "https://example.com" }));
 
-builder.AddProject<Projects.MyApi>("api")
+builder.AddDotnetProject("api", "../MyApi/MyApi.csproj")
     .WithReference(signalr)
     .WithComputeEnvironment(acaEnv);
 

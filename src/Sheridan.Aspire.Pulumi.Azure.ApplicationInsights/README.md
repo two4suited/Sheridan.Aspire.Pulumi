@@ -21,7 +21,7 @@ var logs = builder.AddPulumiLogAnalyticsWorkspace("logs");   // Sheridan.Aspire.
 var insights = builder.AddPulumiApplicationInsights("appinsights")
     .WithLogAnalyticsWorkspace(logs);
 
-builder.AddProject<Projects.MyApi>("api")
+builder.AddDotnetProject("api", "../MyApi/MyApi.csproj")
     .WithReference(insights);   // ConnectionStrings__appinsights
 
 builder.Build().Run();

@@ -23,7 +23,7 @@ var eventHubs = builder.AddPulumiEventHubs("events");
 var hub = eventHubs.AddHub("telemetry");
 hub.AddConsumerGroup("processor");
 
-builder.AddProject<Projects.MyApi>("api")
+builder.AddDotnetProject("api", "../MyApi/MyApi.csproj")
     .WithComputeEnvironment(acaEnv)
     .WithReference(eventHubs);
 

@@ -23,7 +23,7 @@ var sb = builder.AddPulumiServiceBus("messaging");
 sb.AddServiceBusQueue("orders").WithProperties(q => q.MaxDeliveryCount = 5);
 sb.AddServiceBusTopic("events").AddServiceBusSubscription("audit");
 
-builder.AddProject<Projects.MyApi>("api")
+builder.AddDotnetProject("api", "../MyApi/MyApi.csproj")
     .WithReference(sb)
     .WithComputeEnvironment(acaEnv);
 

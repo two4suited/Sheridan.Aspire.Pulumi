@@ -22,7 +22,7 @@ builder.AddPulumiStack("my-app", "dev").WithOrganization("my-org");
 var acaEnv = builder.AddPulumiAzureContainerAppEnvironment("aca-env");   // Sheridan.Aspire.Pulumi.Azure.AppContainers
 var cosmos = builder.AddPulumiCosmosDB("cosmos");   // grants the environment identity data access automatically
 
-builder.AddProject<Projects.MyApi>("api")
+builder.AddDotnetProject("api", "../MyApi/MyApi.csproj")
     .WithComputeEnvironment(acaEnv)
     .WithReference(cosmos);
 

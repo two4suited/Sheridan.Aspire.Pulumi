@@ -45,7 +45,7 @@ Instead of a literal URL, point a backend at a project or container deployed to 
 
 ```csharp
 var acaEnv = builder.AddPulumiAzureContainerAppEnvironment("env");
-var people = builder.AddProject<Projects.People_Api>("people-api")
+var people = builder.AddDotnetProject("people-api", "../People.Api/People.Api.csproj")
     .WithExternalHttpEndpoints()
     .WithComputeEnvironment(acaEnv);
 

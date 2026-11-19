@@ -20,7 +20,7 @@ builder.AddPulumiStack("my-app", "dev").WithOrganization("my-org");
 var sandboxes = builder.AddPulumiSandboxGroup("sandboxes")
     .WithSystemAssignedIdentity();
 
-var api = builder.AddProject<Projects.MyApi>("api")
+var api = builder.AddDotnetProject("api", "../MyApi/MyApi.csproj")
     .WithExternalHttpEndpoints()
     .PublishAsAzureSandbox(new AzureSandboxOptions
     {

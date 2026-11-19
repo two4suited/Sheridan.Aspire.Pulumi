@@ -9,19 +9,14 @@ namespace Sheridan.Aspire.Pulumi.Tests;
 /// <summary>WithoutAcrPullRoleAssignment (issue #212): no pull identity, registry auth or role assignment, for emulators without Microsoft.Authorization.</summary>
 public sealed class AcrPullOptOutTests
 {
-    private sealed class ApiProject : IProjectMetadata
-    {
-        public string ProjectPath => Path.Combine(Path.GetTempPath(), "sheridan-tests-no-such-dir", "Api.csproj");
-
-        public LaunchSettings? LaunchSettings => new();
-    }
+    private static readonly string ApiPath = TestProjects.Create("Api.csproj");
 
     private static async Task<(Dictionary<string, object?> App, Dictionary<string, string?> Env)> BuildAsync(bool optOut, bool job)
     {
         var builder = DistributedApplication.CreateBuilder(["--publisher", "manifest", "--output-path", Path.GetTempPath()]);
         var env = builder.AddPulumiAzureContainerAppEnvironment("aca-env");
         if (optOut) env.WithoutAcrPullRoleAssignment();
-        var api = builder.AddProject<ApiProject>("api").WithHttpEndpoint();
+        var api = builder.AddDotnetProject("api", ApiPath).WithHttpEndpoint();
         var stack = new PulumiStackResource("stack", "dev");
         var app = await env.Resource.BuildContainerAppAsync(
             api.Resource, job ? new PulumiContainerAppJobAnnotation(null) : null, stack, "rg", builder.ExecutionContext, NullLogger.Instance, false, CancellationToken.None);

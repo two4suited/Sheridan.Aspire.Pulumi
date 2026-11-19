@@ -25,7 +25,7 @@ var blobs = storage.AddBlobs("blobs");
 blobs.AddBlobContainer("uploads");
 storage.AddQueues("queues").AddQueue("jobs");
 
-builder.AddProject<Projects.MyApi>("api")
+builder.AddDotnetProject("api", "../MyApi/MyApi.csproj")
     .WithComputeEnvironment(acaEnv)
     .WithReference(blobs);
 
@@ -45,7 +45,7 @@ builder.Build().Run();
 var lake = storage.AddDataLake("lake");                       // enables the account's hierarchical namespace
 var raw  = storage.AddDataLakeFileSystem("raw", "raw-zone");  // fileSystemName defaults to the resource name
 
-builder.AddProject<Projects.Etl>("etl")
+builder.AddDotnetProject("etl", "../Etl/Etl.csproj")
     .WithReference(raw)   // Endpoint=<dfs endpoint>;FileSystemName=raw-zone
     .WithRoleAssignments(storage, AzureStorageRole.StorageBlobDataOwner);
 ```

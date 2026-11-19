@@ -22,7 +22,7 @@ var acaEnv = builder.AddPulumiAzureContainerAppEnvironment("aca-env");   // Sher
 var appConfig = builder.AddPulumiAppConfiguration("appconfig")
     .RunAsEmulator();   // local emulator container (run mode only)
 
-builder.AddProject<Projects.MyApi>("api")
+builder.AddDotnetProject("api", "../MyApi/MyApi.csproj")
     .WithComputeEnvironment(acaEnv)
     .WithRoleAssignments(appConfig, AzureAppConfigurationRole.AppConfigurationDataReader)   // default is Data Owner
     .WithReference(appConfig);

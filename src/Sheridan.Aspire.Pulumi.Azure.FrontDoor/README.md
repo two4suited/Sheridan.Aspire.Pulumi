@@ -18,7 +18,7 @@ var builder = DistributedApplication.CreateBuilder(args);
 builder.AddPulumiStack("my-app", "dev").WithOrganization("my-org");
 
 var acaEnv = builder.AddPulumiAzureContainerAppEnvironment("aca-env");   // Sheridan.Aspire.Pulumi.Azure.AppContainers
-var api = builder.AddProject<Projects.MyApi>("api")
+var api = builder.AddDotnetProject("api", "../MyApi/MyApi.csproj")
     .WithExternalHttpEndpoints()
     .WithComputeEnvironment(acaEnv);
 

@@ -1,5 +1,6 @@
 using Aspire.Hosting;
 using Aspire.Hosting.ApplicationModel;
+using Aspire.Hosting.Dotnet;
 using Sheridan.Aspire.Pulumi;
 using Sheridan.Aspire.Pulumi.Azure;
 
@@ -298,7 +299,8 @@ public static class EntraIdResourceExtensions
         ArgumentException.ThrowIfNullOrEmpty(connectionName);
         ArgumentException.ThrowIfNullOrEmpty(downstreamApisConfigKey);
         var app = source.Resource;
-        var isDotNet = builder.Resource is ProjectResource;
+        // AddProject creates a ProjectResource; its replacement AddDotnetProject creates a DotnetProjectResource.
+        var isDotNet = builder.Resource is ProjectResource or DotnetProjectResource;
         var prefix = isDotNet ? connectionName : app.Name.ToUpperInvariant().Replace('-', '_');
         var sep = isDotNet ? "__" : "_";
         return builder.WithEnvironment(ctx =>

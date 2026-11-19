@@ -22,7 +22,7 @@ var entra = builder.AddPulumiEntraId("entra")
     .WithRedirectUris("https://localhost:5001/signin-oidc")
     .WithIdTokenIssuance();
 
-builder.AddProject<Projects.MyWeb>("web")
+builder.AddDotnetProject("web", "../MyWeb/MyWeb.csproj")
     .WithReference(entra);
 
 builder.Build().Run();
@@ -35,7 +35,7 @@ builder.Build().Run();
 - `WithDisplayName` pins the display name instead of `{app}-{resource}-{stack}`; `WithTags`, `WithDescription` and `WithServiceManagementReference` set metadata.
 - `AddPulumiExistingEntraApplication(name, tenantId, clientId)` / `AsExistingApplication(...)` reference a registration that already exists; nothing is provisioned.
   Calls that only make sense for a provisioned registration (redirect URIs, owners, ID-token issuance, roles, permissions, consent, federation, metadata, `ConfigureInfrastructure`) throw `InvalidOperationException` on an existing application, in either call order. Consumer-side metadata (`WithScope`, `WithApplicationIdUri("api://...")`, `WithFederatedManagedIdentityCredential`) stays allowed.
-- `WithReference(entra)` injects configuration as environment variables: Microsoft.Identity.Web names for .NET projects, an uppercase resource-name prefix for other resources.
+- `WithReference(entra)` injects configuration as environment variables: Microsoft.Identity.Web names for .NET projects (both `AddDotnetProject` and the obsolete `AddProject<T>`), an uppercase resource-name prefix for other resources.
 
 ### Exposing an API
 

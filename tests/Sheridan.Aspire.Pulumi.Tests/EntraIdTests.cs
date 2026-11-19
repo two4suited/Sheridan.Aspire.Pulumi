@@ -187,6 +187,16 @@ public sealed class EntraIdTests
     }
 
     [Fact]
+    public async Task WithReference_treats_AddDotnetProject_resources_as_dotnet_projects()
+    {
+        var b = NewBuilder();
+        var web = b.AddPulumiEntraId("web").WithPulumiStack(b.AddPulumiStack("s", "dev")).WithScope("S", "d");
+        var env = await EnvironmentVariablesAsync(b.AddDotnetProject("webapp", TestProjects.Create("EntraWeb.csproj")), x => x.WithReference(web));
+        Assert.Contains("AzureAd__ClientId", env.Keys);
+        Assert.Equal("S", env["AzureAd__Scopes"]);
+    }
+
+    [Fact]
     public async Task WithReference_on_non_dotnet_resources_only_injects_prefixed_basics()
     {
         var b = NewBuilder();

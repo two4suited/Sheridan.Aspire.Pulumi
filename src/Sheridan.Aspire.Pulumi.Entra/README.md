@@ -26,7 +26,7 @@ var appRegistration = builder.AddPulumiAzureAdAppRegistration("app-registration"
     .WithPulumiStack(entraStack)
     .WithDisplayName("My API");
 
-builder.AddProject<Projects.MyApi>("api")
+builder.AddDotnetProject("api", "../MyApi/MyApi.csproj")
     .WithEnvironment("AzureAd__ClientId", appRegistration.Resource.ClientId);
 
 builder.Build().Run();

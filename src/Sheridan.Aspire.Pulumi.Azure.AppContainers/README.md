@@ -19,7 +19,7 @@ builder.AddPulumiStack("my-app", "dev").WithOrganization("my-org");
 
 var acaEnv = builder.AddPulumiAzureContainerAppEnvironment("aca-env");   // Sheridan.Aspire.Pulumi.Azure.AppContainers
 
-builder.AddProject<Projects.MyApi>("api")
+builder.AddDotnetProject("api", "../MyApi/MyApi.csproj")
     .WithExternalHttpEndpoints()
     .WithComputeEnvironment(acaEnv);
 
@@ -55,10 +55,10 @@ builder.AddPulumiAzureContainerAppEnvironment("aca-env")
 `WithReference` to another resource deployed to the same environment sets the service-discovery variables on the caller, as the official Container Apps publisher does, so `https+http://catalog-api` resolves at runtime:
 
 ```csharp
-var catalog = builder.AddProject<Projects.Catalog_Api>("catalog-api")
+var catalog = builder.AddDotnetProject("catalog-api", "../Catalog.Api/Catalog.Api.csproj")
     .WithComputeEnvironment(acaEnv);
 
-builder.AddProject<Projects.Web>("web")
+builder.AddDotnetProject("web", "../Web/Web.csproj")
     .WithExternalHttpEndpoints()
     .WithReference(catalog)              // services__catalog-api__http__0 and services__catalog-api__https__0
     .WithComputeEnvironment(acaEnv);

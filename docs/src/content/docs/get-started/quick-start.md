@@ -23,13 +23,15 @@ var acaEnv = builder.AddPulumiAzureContainerAppEnvironment("aca-env");
 var cosmos = builder.AddPulumiCosmosDB("cosmos");
 cosmos.AddCosmosDatabase("appdb").AddContainer("items", "/id");
 
-builder.AddProject<Projects.MyApi>("api")
+builder.AddDotnetProject("api", "../MyApi/MyApi.csproj")
     .WithExternalHttpEndpoints()
     .WithComputeEnvironment(acaEnv)
     .WithReference(cosmos);
 
 builder.Build().Run();
 ```
+
+`AddDotnetProject` comes from the `Aspire.Hosting.Dotnet` package (Aspire 17) and replaces the now-obsolete `AddProject<Projects.X>`; the path is relative to the AppHost project.
 
 ## Publish or deploy
 
