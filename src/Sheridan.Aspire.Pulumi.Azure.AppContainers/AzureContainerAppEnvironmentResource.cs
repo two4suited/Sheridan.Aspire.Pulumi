@@ -16,7 +16,6 @@ namespace Sheridan.Aspire.Pulumi.Azure.AppContainers;
 /// identity (with AcrPull), consumption workload profile, Aspire dashboard and managed environment. Compute resources
 /// that target it are built, pushed to the registry and deployed as container apps (or container jobs).
 /// </summary>
-#pragma warning disable ASPIRECOMPUTE002
 public sealed class AzureContainerAppEnvironmentResource : PulumiAzureResource, IComputeEnvironmentResource, IContainerRegistry, IPulumiManagedIdentityResource, IPulumiPrivateEndpointTarget
 {
     private const string AcrLoginTag = "acr-login";

@@ -6,7 +6,7 @@
     <Nullable>enable</Nullable>
     <IsPackable>false</IsPackable>
     <IsTestProject>true</IsTestProject>
-    <NoWarn>$(NoWarn);OPENAI001;OPENAICUA001;AAIP001;ASPIREPIPELINES001;ASPIREPIPELINES004</NoWarn>
+    <NoWarn>$(NoWarn);OPENAI001;OPENAICUA001;AAIP001</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>

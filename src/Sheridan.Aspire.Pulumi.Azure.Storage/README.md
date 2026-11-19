@@ -69,7 +69,7 @@ var storage = builder.AddPulumiStorage("storage")
 
 `configureContainer` receives an `IResourceBuilder<AzureStorageEmulatorResource>` with:
 
-- `WithDataVolume(name?, isReadOnly)` / `WithDataBindMount(path?, isReadOnly)`: persist `/data` between runs (default bind-mount path `.azurite/{storage name}`).
+- `WithDataVolume(name?, isReadOnly)` / `WithDataBindMount(path?, isReadOnly)`: persist `/data` between runs (default bind-mount path `.azurite/{storage name}`). Use one or the other: Aspire 17 throws if a volume and a bind mount target the same path.
 - `WithBlobPort(port)` / `WithQueuePort(port)` / `WithTablePort(port)`: fixed host ports (random otherwise).
 - `WithApiVersionCheck(enable = true)`: remove `--skipApiVersionCheck` so Azurite validates the requested API version. Note this differs from the official integration, whose implementation adds the flag when `enable` is `true`, contradicting its documentation.
 

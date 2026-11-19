@@ -17,7 +17,6 @@ namespace Sheridan.Aspire.Pulumi.Azure.Sandboxes;
 /// pushed to the registry and then deployed (disk image, sandbox, lifecycle policy, ports) through the Azure Dev Compute data
 /// plane by a pipeline step that runs after the stack has deployed (the data plane is not an ARM API, so Pulumi cannot manage it).
 /// </summary>
-#pragma warning disable ASPIRECOMPUTE002
 public sealed class AzureSandboxGroupResource : PulumiAzureResource, IComputeEnvironmentResource, IContainerRegistry
 {
     // https://learn.microsoft.com/azure/role-based-access-control/built-in-roles#container-apps-sandboxgroup-data-owner

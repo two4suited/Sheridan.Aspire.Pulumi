@@ -6,7 +6,6 @@
     <Nullable>enable</Nullable>
     <Description>Azure API Management provisioned by Pulumi instead of Bicep. A drop-in for AddAzureApiManagement: call AddPulumiAzureApiManagement(...), then add APIs, backends, products, named values and policies. Docs: https://github.com/two4suited/Sheridan.Aspire.Pulumi/tree/main/src/Sheridan.Aspire.Pulumi.Azure.ApiManagement#readme</Description>
     <RootNamespace>Sheridan.Aspire.Pulumi.Azure.ApiManagement</RootNamespace>
-    <NoWarn>$(NoWarn);ASPIREPIPELINES001;ASPIREPIPELINES004</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>

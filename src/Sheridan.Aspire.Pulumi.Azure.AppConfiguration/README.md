@@ -33,7 +33,7 @@ builder.Build().Run();
 ## Features
 
 - Outputs: `appConfigEndpoint`, `name`, `id`.
-- Emulator options: `WithDataVolume`, `WithDataBindMount`, `WithHostPort`, `WithAnonymousAccess`.
+- Emulator options: `WithDataVolume` or `WithDataBindMount` (use one, not both: Aspire 17 throws when both target the same path), `WithHostPort`, `WithAnonymousAccess`.
 - `PublishAsExisting` / `AsExisting`, and `ConfigureInfrastructure` on the `AppConfigurationStore` root. Alias: `AddPulumiAzureAppConfiguration`.
 
 ## Notes
