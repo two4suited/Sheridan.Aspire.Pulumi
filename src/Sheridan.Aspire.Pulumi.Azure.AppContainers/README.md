@@ -39,6 +39,17 @@ builder.Build().Run();
   ```
 
 - Private endpoints: the environment is an `IPulumiPrivateEndpointTarget` (group `managedEnvironments`, zone `privatelink.<location>.azurecontainerapps.io`), so `peSubnet.AddPrivateEndpoint(env)` works and sets `publicNetworkAccess: Disabled` on the environment. Azure requires a workload-profiles environment for this (the one created here is). The zone name embeds the region and is fixed when `AddPrivateEndpoint` is called, so call `WithLocation("<short region name>", e.g. westeurope)` on the environment **before** `AddPrivateEndpoint`; without it the zone is `privatelink.eastus...`, and changing `location` in stack config does not change it. For `AsExisting` environments the private endpoint is still created, but `publicNetworkAccess` is not changed and `WithLocation` must be set to the existing environment's region.
+- Scale settings per compute resource, the Pulumi counterpart of `PublishAsAzureContainerApp((infra, app) => app.Template.Scale...)`. They are emitted into the `azure-native:app:ContainerApp` `template.scale` (the default is a single fixed replica). Ignored for resources published as jobs:
+
+  ```csharp
+  builder.AddCSharpApp("api", "Api/Api.csproj")
+         .WithExternalHttpEndpoints()
+         .WithPulumiContainerAppScale(minReplicas: 1, maxReplicas: 10, cooldownPeriod: 30)
+         .WithPulumiHttpScaleRule("http-concurrency", concurrentRequests: 10)
+         .WithPulumiCpuScaleRule("cpu", utilizationPercentage: 70);
+  ```
+
+  `WithPulumiMemoryScaleRule` and `WithPulumiCustomScaleRule(name, kedaType, metadata, useEnvironmentIdentity)` (queues and other KEDA scalers; the identity option authenticates with the environment's shared identity) are also available, and `PublishAsPulumiContainerApp(scale => ...)` exposes the full `PulumiContainerAppScale` (including `PollingInterval`). `MaxReplicas` defaults to 1, or 10 once a rule is added. Scale to zero (`minReplicas: 0`) needs an HTTP or event-driven rule; CPU and memory rules cannot scale to zero.
 - Container Apps jobs via `PublishAsPulumiContainerAppJob` and `PublishAsScheduledPulumiContainerAppJob`.
 - The environment's shared identity is granted data-plane roles by the data integrations (Cosmos DB, Storage, Service Bus, Key Vault, ...) automatically when an app references them.
 - Images are tagged with a per-deploy timestamp so every deploy creates a new revision. `WithImageTag("dev")` uses a stable tag instead; note that re-deploying a rebuilt image under an unchanged tag does not create a new revision, so the new code is not rolled out until the tag changes or a restart is forced.
