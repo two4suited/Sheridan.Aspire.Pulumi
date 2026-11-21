@@ -153,4 +153,49 @@ public static class AzureContainerAppEnvironmentExtensions
         ArgumentException.ThrowIfNullOrWhiteSpace(cronExpression);
         return builder.WithAnnotation(new PulumiContainerAppJobAnnotation(cronExpression), ResourceAnnotationMutationBehavior.Replace);
     }
+
+    /// <summary>
+    /// Customizes the scale settings (replicas, cooldown, scale rules) of the container app emitted for the compute resource. Pulumi counterpart of
+    /// <c>PublishAsAzureContainerApp((infra, app) =&gt; app.Template.Scale...)</c>. Ignored for resources published as jobs.
+    /// </summary>
+    public static IResourceBuilder<T> PublishAsPulumiContainerApp<T>(this IResourceBuilder<T> builder, Action<PulumiContainerAppScale> configureScale)
+        where T : IComputeResource
+    {
+        ArgumentNullException.ThrowIfNull(builder);
+        ArgumentNullException.ThrowIfNull(configureScale);
+        var scale = builder.Resource.Annotations.OfType<PulumiContainerAppScaleAnnotation>().LastOrDefault()?.Scale;
+        if (scale is null)
+        {
+            scale = new PulumiContainerAppScale();
+            builder.WithAnnotation(new PulumiContainerAppScaleAnnotation(scale), ResourceAnnotationMutationBehavior.Replace);
+        }
+        configureScale(scale);
+        return builder;
+    }
+
+    /// <summary>Sets the container app's minimum and maximum replica counts and optional cooldown period (seconds).</summary>
+    public static IResourceBuilder<T> WithPulumiContainerAppScale<T>(this IResourceBuilder<T> builder, int minReplicas, int maxReplicas, int? cooldownPeriod = null)
+        where T : IComputeResource =>
+        builder.PublishAsPulumiContainerApp(s => { s.MinReplicas = minReplicas; s.MaxReplicas = maxReplicas; s.CooldownPeriod = cooldownPeriod; });
+
+    /// <summary>Adds an HTTP concurrency scale rule to the container app.</summary>
+    public static IResourceBuilder<T> WithPulumiHttpScaleRule<T>(this IResourceBuilder<T> builder, string name, int concurrentRequests)
+        where T : IComputeResource =>
+        builder.PublishAsPulumiContainerApp(s => s.AddHttpRule(name, concurrentRequests));
+
+    /// <summary>Adds a CPU utilization (percent) scale rule to the container app.</summary>
+    public static IResourceBuilder<T> WithPulumiCpuScaleRule<T>(this IResourceBuilder<T> builder, string name, int utilizationPercentage)
+        where T : IComputeResource =>
+        builder.PublishAsPulumiContainerApp(s => s.AddCpuRule(name, utilizationPercentage));
+
+    /// <summary>Adds a memory utilization (percent) scale rule to the container app.</summary>
+    public static IResourceBuilder<T> WithPulumiMemoryScaleRule<T>(this IResourceBuilder<T> builder, string name, int utilizationPercentage)
+        where T : IComputeResource =>
+        builder.PublishAsPulumiContainerApp(s => s.AddMemoryRule(name, utilizationPercentage));
+
+    /// <summary>Adds a custom KEDA scale rule (e.g. queue length) to the container app.</summary>
+    public static IResourceBuilder<T> WithPulumiCustomScaleRule<T>(this IResourceBuilder<T> builder, string name, string type,
+        IReadOnlyDictionary<string, string> metadata, IReadOnlyDictionary<string, string>? auth = null)
+        where T : IComputeResource =>
+        builder.PublishAsPulumiContainerApp(s => s.AddCustomRule(name, type, metadata, auth));
 }
