@@ -708,7 +708,7 @@ public sealed class AzureContainerAppEnvironmentResource : PulumiAzureResource, 
                 ["template"] = new Dictionary<string, object?>
                 {
                     ["containers"] = new List<object?> { container },
-                    ["scale"] = r.Annotations.OfType<PulumiContainerAppScaleAnnotation>().LastOrDefault()?.Scale.ToProgram()
+                    ["scale"] = r.Annotations.OfType<PulumiContainerAppScaleAnnotation>().LastOrDefault()?.Scale.ToProgram(pullAuth ? $"${{{IdentityRef}.id}}" : null)
                         ?? new Dictionary<string, object?> { ["minReplicas"] = 1, ["maxReplicas"] = 1 },
                 },
             },

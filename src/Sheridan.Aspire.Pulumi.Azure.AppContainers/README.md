@@ -44,12 +44,12 @@ builder.Build().Run();
   ```csharp
   builder.AddCSharpApp("api", "Api/Api.csproj")
          .WithExternalHttpEndpoints()
-         .WithPulumiContainerAppScale(minReplicas: 0, maxReplicas: 10, cooldownPeriod: 30)
+         .WithPulumiContainerAppScale(minReplicas: 1, maxReplicas: 10, cooldownPeriod: 30)
          .WithPulumiHttpScaleRule("http-concurrency", concurrentRequests: 10)
          .WithPulumiCpuScaleRule("cpu", utilizationPercentage: 70);
   ```
 
-  `WithPulumiMemoryScaleRule` and `WithPulumiCustomScaleRule(name, kedaType, metadata, auth)` (queues and other KEDA scalers) are also available, and `PublishAsPulumiContainerApp(scale => ...)` exposes the full `PulumiContainerAppScale` (including `PollingInterval`).
+  `WithPulumiMemoryScaleRule` and `WithPulumiCustomScaleRule(name, kedaType, metadata, useEnvironmentIdentity)` (queues and other KEDA scalers; the identity option authenticates with the environment's shared identity) are also available, and `PublishAsPulumiContainerApp(scale => ...)` exposes the full `PulumiContainerAppScale` (including `PollingInterval`). `MaxReplicas` defaults to 1, or 10 once a rule is added. Scale to zero (`minReplicas: 0`) needs an HTTP or event-driven rule; CPU and memory rules cannot scale to zero.
 - Container Apps jobs via `PublishAsPulumiContainerAppJob` and `PublishAsScheduledPulumiContainerAppJob`.
 - The environment's shared identity is granted data-plane roles by the data integrations (Cosmos DB, Storage, Service Bus, Key Vault, ...) automatically when an app references them.
 - Images are tagged with a per-deploy timestamp so every deploy creates a new revision. `WithImageTag("dev")` uses a stable tag instead; note that re-deploying a rebuilt image under an unchanged tag does not create a new revision, so the new code is not rolled out until the tag changes or a restart is forced.

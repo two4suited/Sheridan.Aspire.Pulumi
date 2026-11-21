@@ -39,7 +39,7 @@ public sealed class ContainerAppScaleTests
             .WithPulumiContainerAppScale(0, 10, cooldownPeriod: 30)
             .WithPulumiHttpScaleRule("http-concurrency", 10)
             .WithPulumiCpuScaleRule("cpu", 70)
-            .WithPulumiCustomScaleRule("queue", "azure-queue", new Dictionary<string, string> { ["queueName"] = "q" }, new Dictionary<string, string> { ["connection"] = "conn" }));
+            .WithPulumiCustomScaleRule("queue", "azure-queue", new Dictionary<string, string> { ["queueName"] = "q" }, useEnvironmentIdentity: true));
 
         Assert.Equal(0, scale["minReplicas"]);
         Assert.Equal(10, scale["maxReplicas"]);
@@ -51,8 +51,17 @@ public sealed class ContainerAppScaleTests
         var cpu = (Dictionary<string, object?>)rules[1]["custom"]!;
         Assert.Equal("cpu", cpu["type"]);
         Assert.Equal("70", ((Dictionary<string, object?>)cpu["metadata"]!)["value"]);
-        var auth = (List<object?>)((Dictionary<string, object?>)rules[2]["custom"]!)["auth"]!;
-        Assert.Equal("conn", ((Dictionary<string, object?>)auth[0]!)["secretRef"]);
+        Assert.Equal("Utilization", ((Dictionary<string, object?>)cpu["metadata"]!)["type"]);
+        Assert.StartsWith("${", (string)((Dictionary<string, object?>)rules[2]["custom"]!)["identity"]!);
+    }
+
+    [Fact]
+    public async Task Rules_raise_the_default_max_and_cooldown_is_kept()
+    {
+        var scale = await ScaleAsync(api => api.PublishAsPulumiContainerApp(s => s.CooldownPeriod = 60).WithPulumiContainerAppScale(0, 5).WithPulumiMemoryScaleRule("mem", 80));
+        Assert.Equal(60, scale["cooldownPeriod"]);
+        var s2 = await ScaleAsync(api => api.WithPulumiHttpScaleRule("h", 5));
+        Assert.Equal(10, s2["maxReplicas"]);
     }
 
     [Fact]

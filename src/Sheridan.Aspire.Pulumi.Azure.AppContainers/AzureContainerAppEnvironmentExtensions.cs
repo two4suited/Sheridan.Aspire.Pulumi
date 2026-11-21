@@ -176,7 +176,7 @@ public static class AzureContainerAppEnvironmentExtensions
     /// <summary>Sets the container app's minimum and maximum replica counts and optional cooldown period (seconds).</summary>
     public static IResourceBuilder<T> WithPulumiContainerAppScale<T>(this IResourceBuilder<T> builder, int minReplicas, int maxReplicas, int? cooldownPeriod = null)
         where T : IComputeResource =>
-        builder.PublishAsPulumiContainerApp(s => { s.MinReplicas = minReplicas; s.MaxReplicas = maxReplicas; s.CooldownPeriod = cooldownPeriod; });
+        builder.PublishAsPulumiContainerApp(s => { s.MinReplicas = minReplicas; s.MaxReplicas = maxReplicas; if (cooldownPeriod is not null) s.CooldownPeriod = cooldownPeriod; });
 
     /// <summary>Adds an HTTP concurrency scale rule to the container app.</summary>
     public static IResourceBuilder<T> WithPulumiHttpScaleRule<T>(this IResourceBuilder<T> builder, string name, int concurrentRequests)
@@ -193,9 +193,9 @@ public static class AzureContainerAppEnvironmentExtensions
         where T : IComputeResource =>
         builder.PublishAsPulumiContainerApp(s => s.AddMemoryRule(name, utilizationPercentage));
 
-    /// <summary>Adds a custom KEDA scale rule (e.g. queue length) to the container app.</summary>
+    /// <summary>Adds a custom KEDA scale rule (e.g. queue length) to the container app, optionally authenticating with the environment's shared identity.</summary>
     public static IResourceBuilder<T> WithPulumiCustomScaleRule<T>(this IResourceBuilder<T> builder, string name, string type,
-        IReadOnlyDictionary<string, string> metadata, IReadOnlyDictionary<string, string>? auth = null)
+        IReadOnlyDictionary<string, string> metadata, bool useEnvironmentIdentity = false)
         where T : IComputeResource =>
-        builder.PublishAsPulumiContainerApp(s => s.AddCustomRule(name, type, metadata, auth));
+        builder.PublishAsPulumiContainerApp(s => s.AddCustomRule(name, type, metadata, useEnvironmentIdentity));
 }

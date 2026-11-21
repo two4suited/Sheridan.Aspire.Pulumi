@@ -14,8 +14,8 @@ public sealed class PulumiContainerAppScale
     /// <summary>Minimum replica count (0 allows scale to zero). Defaults to 1.</summary>
     public int MinReplicas { get; set; } = 1;
 
-    /// <summary>Maximum replica count. Defaults to 1.</summary>
-    public int MaxReplicas { get; set; } = 1;
+    /// <summary>Maximum replica count. Defaults to 1, or 10 (the Azure default) when scale rules are added.</summary>
+    public int? MaxReplicas { get; set; }
 
     /// <summary>Seconds to wait before scaling back down to the minimum. Unset keeps the Azure default (300).</summary>
     public int? CooldownPeriod { get; set; }
@@ -25,7 +25,7 @@ public sealed class PulumiContainerAppScale
 
     /// <summary>Scales on the number of concurrent HTTP requests per replica.</summary>
     public PulumiContainerAppScale AddHttpRule(string name, int concurrentRequests) =>
-        Add(name, "http", new Dictionary<string, object?> { ["metadata"] = new Dictionary<string, object?> { ["concurrentRequests"] = Str(concurrentRequests) } });
+        concurrentRequests < 1 ? throw new ArgumentOutOfRangeException(nameof(concurrentRequests)) : Add(name, "http", new Dictionary<string, object?> { ["metadata"] = new Dictionary<string, object?> { ["concurrentRequests"] = Str(concurrentRequests) } });
 
     /// <summary>Scales on average CPU utilization (percent) per replica.</summary>
     public PulumiContainerAppScale AddCpuRule(string name, int utilizationPercentage) => AddResourceRule(name, "cpu", utilizationPercentage);
@@ -37,19 +37,18 @@ public sealed class PulumiContainerAppScale
     /// <param name="name">Rule name.</param>
     /// <param name="type">KEDA scaler type.</param>
     /// <param name="metadata">Scaler metadata.</param>
-    /// <param name="auth">Optional authentication entries: trigger parameter → container app secret reference (<c>secretRef</c>).</param>
-    public PulumiContainerAppScale AddCustomRule(string name, string type, IReadOnlyDictionary<string, string> metadata, IReadOnlyDictionary<string, string>? auth = null)
+    /// <param name="useEnvironmentIdentity">Authenticate the scaler with the environment's shared user-assigned identity (needs the AcrPull/identity setup, i.e. not <c>WithoutAcrPullRoleAssignment</c>); the identity must hold the data-plane role the scaler needs.</param>
+    public PulumiContainerAppScale AddCustomRule(string name, string type, IReadOnlyDictionary<string, string> metadata, bool useEnvironmentIdentity = false)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(type);
         ArgumentNullException.ThrowIfNull(metadata);
         var custom = new Dictionary<string, object?> { ["type"] = type, ["metadata"] = metadata.ToDictionary(kv => kv.Key, kv => (object?)kv.Value) };
-        if (auth is { Count: > 0 })
-            custom["auth"] = auth.Select(kv => (object?)new Dictionary<string, object?> { ["triggerParameter"] = kv.Key, ["secretRef"] = kv.Value }).ToList();
+        if (useEnvironmentIdentity) custom["identity"] = IdentityToken;
         return Add(name, "custom", custom);
     }
 
     private PulumiContainerAppScale AddResourceRule(string name, string type, int utilization) =>
-        Add(name, "custom", new Dictionary<string, object?>
+        utilization is < 1 or > 100 ? throw new ArgumentOutOfRangeException(nameof(utilization)) : Add(name, "custom", new Dictionary<string, object?>
         {
             ["type"] = type,
             ["metadata"] = new Dictionary<string, object?> { ["type"] = "Utilization", ["value"] = Str(utilization) },
@@ -63,16 +62,30 @@ public sealed class PulumiContainerAppScale
         return this;
     }
 
+    internal const string IdentityToken = "<environment-identity>";
+
     private static string Str(int v) => v.ToString(CultureInfo.InvariantCulture);
 
-    internal Dictionary<string, object?> ToProgram()
+    internal Dictionary<string, object?> ToProgram(string? identityRef)
     {
+        var max = MaxReplicas ?? (Rules.Count > 0 ? Math.Max(10, MinReplicas) : Math.Max(1, MinReplicas));
         if (MinReplicas < 0) throw new InvalidOperationException("MinReplicas must be >= 0.");
-        if (MaxReplicas < 1 || MaxReplicas < MinReplicas) throw new InvalidOperationException("MaxReplicas must be >= 1 and >= MinReplicas.");
-        var scale = new Dictionary<string, object?> { ["minReplicas"] = MinReplicas, ["maxReplicas"] = MaxReplicas };
+        if (max < 1 || max > 1000 || max < MinReplicas) throw new InvalidOperationException("MaxReplicas must be between 1 and 1000 and >= MinReplicas.");
+        if (CooldownPeriod < 0 || PollingInterval < 0) throw new InvalidOperationException("CooldownPeriod and PollingInterval must be >= 0.");
+        var scale = new Dictionary<string, object?> { ["minReplicas"] = MinReplicas, ["maxReplicas"] = max };
         if (CooldownPeriod is { } c) scale["cooldownPeriod"] = c;
         if (PollingInterval is { } p) scale["pollingInterval"] = p;
-        if (Rules.Count > 0) scale["rules"] = Rules.Cast<object?>().ToList();
+        if (Rules.Count > 0)
+        {
+            foreach (var rule in Rules)
+            foreach (var body in rule.Values.OfType<Dictionary<string, object?>>())
+            {
+                if (!body.TryGetValue("identity", out var id) || !Equals(id, IdentityToken)) continue;
+                if (identityRef is null) throw new InvalidOperationException($"Scale rule '{rule["name"]}' uses the environment identity, which is unavailable with WithoutAcrPullRoleAssignment.");
+                body["identity"] = identityRef;
+            }
+            scale["rules"] = Rules.Cast<object?>().ToList();
+        }
         return scale;
     }
 }
