@@ -10,6 +10,19 @@ after a `vX.Y.Z` tag has been published. Packages are on
 
 <!-- releases:start -->
 
+## v3.1.0
+
+_2026-11-21_ · [GitHub release](https://github.com/two4suited/Sheridan.Aspire.Pulumi/releases/tag/v3.1.0)
+
+<!-- Release notes generated using configuration in .github/release.yml at v3.1.0 -->
+
+#### What's Changed
+* Support Container App scale settings and rules by @two4suited in https://github.com/two4suited/Sheridan.Aspire.Pulumi/pull/247
+
+
+**Full Changelog**: https://github.com/two4suited/Sheridan.Aspire.Pulumi/compare/v3.0.0...v3.1.0
+
+
 ## v3.0.0
 
 _2026-11-19_ · [GitHub release](https://github.com/two4suited/Sheridan.Aspire.Pulumi/releases/tag/v3.0.0)
