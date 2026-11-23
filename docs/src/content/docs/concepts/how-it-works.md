@@ -39,4 +39,4 @@ With a non-Pulumi-Cloud backend (`WithLocalBackend`, `PULUMI_BACKEND_URL`, or a 
 
 ## Run mode
 
-When the AppHost runs locally (`aspire start` / F5), deploy-only resources with no local counterpart (the stack, resource groups, container registry, Container Apps environment, AKS and network resources) are hidden from the dashboard. They stay in the model for `aspire publish` / `aspire deploy`; call `HideInRunMode()` to hide your own.
+When the AppHost runs locally (`aspire start` / F5), deploy-only resources with no local counterpart (the stack, resource groups, container registry, Container Apps environment, Entra ID registrations, AKS and network resources) are hidden from the dashboard. They stay in the model for `aspire publish` / `aspire deploy`; call `HideInRunMode()` to hide your own.

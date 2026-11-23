@@ -287,9 +287,10 @@ public static class EntraIdResourceExtensions
     /// resource-name prefix with a single underscore separator and only the basic settings.
     /// <para>
     /// When the AppHost runs locally a provisioned registration does not exist yet, so its tenant and client IDs are read from the
-    /// AppHost configuration (user secrets, environment variables) section named after the connection (<c>AzureAd:TenantId</c>,
-    /// <c>AzureAd:ClientId</c>) and injected when present; otherwise they are left out and nothing throws. Registrations that
-    /// reference an existing application inject their fixed IDs.
+    /// AppHost configuration (user secrets, environment variables) as <c>Entra:{resource}:TenantId</c> / <c>Entra:{resource}:ClientId</c>
+    /// (or <c>AzureAd:TenantId</c> / <c>AzureAd:ClientId</c>, named after the connection, when the AppHost has a single provisioned
+    /// registration) and injected when present; otherwise they are left out and nothing throws. Registrations that reference an
+    /// existing application inject their fixed IDs.
     /// </para>
     /// </summary>
     public static IResourceBuilder<TDestination> WithReference<TDestination>(
@@ -309,7 +310,6 @@ public static class EntraIdResourceExtensions
         var isDotNet = builder.Resource is ProjectResource or DotnetProjectResource;
         var prefix = isDotNet ? connectionName : app.Name.ToUpperInvariant().Replace('-', '_');
         var sep = isDotNet ? "__" : "_";
-        var configuration = builder.ApplicationBuilder.Configuration;
         // Locally there is no Pulumi stack to read outputs from: a provisioned registration only has values the developer supplies.
         return builder.WithEnvironment(ctx =>
         {
@@ -318,8 +318,8 @@ public static class EntraIdResourceExtensions
             ctx.EnvironmentVariables[$"{prefix}{sep}Instance"] = app.Instance;
             if (runMode)
             {
-                if (configuration[$"{connectionName}:TenantId"] is { Length: > 0 } tenantId) ctx.EnvironmentVariables[$"{prefix}{sep}TenantId"] = tenantId;
-                if (configuration[$"{connectionName}:ClientId"] is { Length: > 0 } clientId) ctx.EnvironmentVariables[$"{prefix}{sep}ClientId"] = clientId;
+                if (RunModeSetting(builder.ApplicationBuilder, app, connectionName, "TenantId") is { } tenantId) ctx.EnvironmentVariables[$"{prefix}{sep}TenantId"] = tenantId;
+                if (RunModeSetting(builder.ApplicationBuilder, app, connectionName, "ClientId") is { } clientId) ctx.EnvironmentVariables[$"{prefix}{sep}ClientId"] = clientId;
             }
             else
             {
@@ -348,6 +348,18 @@ public static class EntraIdResourceExtensions
                 ctx.EnvironmentVariables[$"{appOnly}__RequestAppToken"] = "true";
             }
         });
+    }
+
+    /// <summary>
+    /// A tenant or client ID supplied for local runs: <c>Entra:{resource}:{name}</c>, or, when the AppHost has a single provisioned
+    /// registration, <c>{connectionName}:{name}</c> (<c>AzureAd:ClientId</c> by default). Null when neither is set.
+    /// </summary>
+    private static string? RunModeSetting(IDistributedApplicationBuilder appBuilder, EntraIdApplicationResource app, string connectionName, string name)
+    {
+        var configuration = appBuilder.Configuration;
+        if (configuration[$"Entra:{app.Name}:{name}"] is { Length: > 0 } specific) return specific;
+        var provisioned = appBuilder.Resources.OfType<EntraIdApplicationResource>().Count(r => !r.IsExistingApplication);
+        return provisioned == 1 && configuration[$"{connectionName}:{name}"] is { Length: > 0 } shared ? shared : null;
     }
 
     private static void RejectOnExisting(IResourceBuilder<EntraIdApplicationResource> builder, string method)

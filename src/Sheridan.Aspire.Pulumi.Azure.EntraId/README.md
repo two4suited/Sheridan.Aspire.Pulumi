@@ -61,14 +61,14 @@ api.PublishWithFederatedManagedIdentityCredential(workerIdentity);      // secre
 
 ### Running locally
 
-`aspire run` does not provision anything, so `AddPulumiEntraId` resources are hidden from the dashboard and `WithReference(entra)` no longer throws. The registration only exists after a deploy; to sign in locally, supply its values in the AppHost configuration (user secrets or environment variables), and they are injected as `AzureAd__TenantId` / `AzureAd__ClientId`:
+Running the AppHost locally (`aspire start` / F5) provisions nothing, so `AddPulumiEntraId` resources are hidden from the dashboard and `WithReference(entra)` no longer throws. The registration only exists after a deploy; to sign in locally, supply its values in the AppHost configuration (user secrets or environment variables) and they are injected as `AzureAd__TenantId` / `AzureAd__ClientId` (or the prefixed names for non-.NET resources):
 
 ```bash
-dotnet user-secrets set AzureAd:TenantId <tenant-id>
-dotnet user-secrets set AzureAd:ClientId <client-id>
+dotnet user-secrets set Entra:web:TenantId <tenant-id>
+dotnet user-secrets set Entra:web:ClientId <client-id>
 ```
 
-The section is named after the connection (`WithReference(entra, "Entra")` reads `Entra:TenantId`). When nothing is configured only `Instance` and the scopes are injected, and `DownstreamApis` entries for provisioned APIs are skipped until they are deployed. Existing registrations (`AddPulumiExistingEntraApplication`) always inject their fixed IDs.
+The key is `Entra:{resource name}:TenantId|ClientId`. When the AppHost has a single provisioned registration, `AzureAd:TenantId` / `AzureAd:ClientId` (the connection name, as set with `WithReference(entra, "Entra")`) also work. Without values, `Instance`, scopes, `ManagedIdentityClientId` and `DownstreamApis` entries that do not depend on a deployed client ID are still injected; entries for provisioned APIs using the default `api://{clientId}` identifier URI are skipped. Existing registrations (`AddPulumiExistingEntraApplication`) always inject their fixed IDs.
 
 ### Notes
 
