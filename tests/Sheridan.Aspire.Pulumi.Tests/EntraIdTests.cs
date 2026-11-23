@@ -48,6 +48,54 @@ public sealed class EntraIdTests
     }
 
     [Fact]
+    public void Endpoint_redirect_uris_use_the_environment_default_domain()
+    {
+        var b = NewBuilder();
+        var aca = b.AddPulumiAzureContainerAppEnvironment("aca");
+        var web = b.AddContainer("web-frontend", "img").WithHttpEndpoint(targetPort: 8080).WithExternalHttpEndpoints().WithComputeEnvironment(aca);
+        var entra = b.AddPulumiEntraId("web").WithRedirectUris("https://localhost:5001/cb")
+            .WithRedirectUris(web.GetEndpoint("http"), "/signin-oidc", "signout-callback-oidc");
+        var bare = b.AddPulumiEntraId("bare").WithRedirectUris(web.GetEndpoint("http"));
+        var p = new PulumiProgram();
+        entra.Resource.Build(p, "proj", "dev", b.Resources);
+
+        var webProps = (Dictionary<string, object?>)Props(p, "webApp")["web"]!;
+        var uris = ((List<object?>)webProps["redirectUris"]!).Cast<string>().ToList();
+        Assert.Equal(3, uris.Count);
+        Assert.Equal("https://localhost:5001/cb", uris[0]);
+        Assert.StartsWith("https://web-frontend.${", uris[1], StringComparison.Ordinal);
+        Assert.EndsWith(".defaultDomain}/signin-oidc", uris[1], StringComparison.Ordinal);
+        Assert.EndsWith("/signout-callback-oidc", uris[2], StringComparison.Ordinal);
+        Assert.DoesNotContain("webRedirectUris", p.Resources.Keys);
+        Assert.DoesNotContain(".internal.", uris[1], StringComparison.Ordinal);
+
+        var bp = new PulumiProgram();
+        bare.Resource.Build(bp, "proj", "dev", b.Resources);
+        Assert.EndsWith(".defaultDomain}", (string)((List<object?>)((Dictionary<string, object?>)Props(bp, "bareApp")["web"]!)["redirectUris"]!)[0]!, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Endpoint_redirect_uris_reject_internal_only_and_unsupported_targets()
+    {
+        var b = NewBuilder();
+        var aca = b.AddPulumiAzureContainerAppEnvironment("aca");
+        var internalOnly = b.AddContainer("internal-app", "img").WithHttpEndpoint(targetPort: 80).WithComputeEnvironment(aca);
+        var e1 = b.AddPulumiEntraId("e1").WithRedirectUris(internalOnly.GetEndpoint("http"), "/cb");
+        Assert.Throws<InvalidOperationException>(() => e1.Resource.Build(new PulumiProgram(), "proj", "dev", b.Resources));
+    }
+
+    [Fact]
+    public void Endpoint_redirect_uris_need_a_supported_compute_environment_and_a_new_registration()
+    {
+        var b = NewBuilder();
+        var orphan = b.AddContainer("orphan", "img").WithHttpEndpoint(targetPort: 80);
+        var entra = b.AddPulumiEntraId("web").WithRedirectUris(orphan.GetEndpoint("http"), "/cb");
+        Assert.Throws<InvalidOperationException>(() => entra.Resource.Build(new PulumiProgram(), "proj", "dev", b.Resources));
+        Assert.Throws<InvalidOperationException>(() =>
+            b.AddPulumiExistingEntraApplication("e", Tenant, Client).WithRedirectUris(orphan.GetEndpoint("http"), "/cb"));
+    }
+
+    [Fact]
     public void Scope_and_role_ids_are_stable_and_distinct()
     {
         var b = NewBuilder();

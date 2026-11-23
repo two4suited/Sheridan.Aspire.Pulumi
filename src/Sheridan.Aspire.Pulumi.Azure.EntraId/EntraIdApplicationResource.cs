@@ -2,6 +2,7 @@ using Aspire.Hosting.ApplicationModel;
 using Aspire.Hosting.Pipelines;
 using Sheridan.Aspire.Pulumi;
 using Sheridan.Aspire.Pulumi.Azure;
+using Sheridan.Aspire.Pulumi.Azure.AppContainers;
 using Sheridan.Aspire.Pulumi.Provisioning;
 
 namespace Sheridan.Aspire.Pulumi.Azure.EntraId;
@@ -29,6 +30,9 @@ public sealed class EntraIdApplicationResource(string name) : Resource(name), IP
     public bool EnableIdTokenIssuance { get; set; }
 
     public List<string> RedirectUris { get; } = [];
+
+    /// <summary>Redirect URIs whose host is a compute resource's deployed address, resolved when the program is generated.</summary>
+    public List<(EndpointReference Endpoint, string[] Paths)> EndpointRedirectUris { get; } = [];
     public List<string> ApplicationOwners { get; } = [];
     public List<string> ServicePrincipalOwners { get; } = [];
 
@@ -94,7 +98,7 @@ public sealed class EntraIdApplicationResource(string name) : Resource(name), IP
 
     /// <summary>The first setting that only applies to a provisioned registration, or null. Used to reject converting a configured resource to an existing one.</summary>
     internal string? FirstRegistrationOnlySetting() =>
-        RedirectUris.Count > 0 ? "redirect URIs"
+        RedirectUris.Count > 0 || EndpointRedirectUris.Count > 0 ? "redirect URIs"
         : ApplicationOwners.Count > 0 || ServicePrincipalOwners.Count > 0 ? "owners"
         : EnableIdTokenIssuance ? "ID token issuance"
         : UseDefaultApplicationIdUri ? "an application ID URI"
@@ -143,6 +147,33 @@ public sealed class EntraIdApplicationResource(string name) : Resource(name), IP
         return ApplicationIdUri is { } u ? $"{u.TrimEnd('/')}/{scopeName}" : DefaultUri($"/{scopeName}");
     }
 
+    /// <summary>
+    /// The deployed host name of a container app as a Pulumi expression: <c>{app}.${environment.defaultDomain}</c>, an output of the Container Apps
+    /// environment (the same value the app's own environment variables get), so it does not depend on the app being created first.
+    /// </summary>
+    private string ResolveHostExpression(EndpointReference endpoint, IEnumerable<IResource>? model)
+    {
+        var resource = endpoint.Resource;
+        var env = resource.GetComputeEnvironment()
+            ?? resource.Annotations.OfType<DeploymentTargetAnnotation>().Select(a => a.ComputeEnvironment).FirstOrDefault();
+        if (env is null)
+        {
+            var candidates = (model ?? []).OfType<IComputeEnvironmentResource>().ToList();
+            if (candidates.Count == 1) env = candidates[0];
+        }
+        if (env is null)
+            throw new InvalidOperationException($"'{Name}': the redirect URI endpoint belongs to '{resource.Name}', which has no compute environment. Call WithComputeEnvironment(...) with an Azure Container Apps environment.");
+        if (env is not AzureContainerAppEnvironmentResource aca)
+            throw new NotSupportedException($"'{Name}': compute environment '{env.Name}' ({env.GetType().Name}) is not supported for endpoint redirect URIs; use Azure Container Apps, or pass the URI as a string.");
+        if (aca.Stack is not null && Stack is not null && aca.Stack != Stack)
+            throw new InvalidOperationException($"'{Name}' is in Pulumi stack '{Stack.Name}' but '{aca.Name}' is in '{aca.Stack.Name}'; they must share a stack for the host name to be referenced.");
+        if (resource is not IResourceWithEndpoints withEndpoints || !withEndpoints.GetEndpoints().Any(e => e.EndpointAnnotation.UriScheme is "http" or "https" && e.EndpointAnnotation.IsExternal))
+            throw new InvalidOperationException($"'{Name}': '{resource.Name}' has no external http or https endpoint, so it has no public address to sign in on. Call WithExternalHttpEndpoints() on it.");
+        if (!aca.TryGetEndpointHost(endpoint, out var host) || host is null)
+            throw new InvalidOperationException($"'{Name}': endpoint '{endpoint.EndpointName}' of '{resource.Name}' is not an http(s) endpoint deployed to '{aca.Name}' (jobs and other compute environments are not supported).");
+        return host;
+    }
+
     /// <summary>Pulumi expression for the client ID, only valid inside the program that creates this registration.</summary>
     internal string ClientIdExpression => IsExistingApplication ? ExistingClientId! : $"${{{Id}App.clientId}}";
 
@@ -157,12 +188,12 @@ public sealed class EntraIdApplicationResource(string name) : Resource(name), IP
         }
 
         var stack = Stack ?? ctx.Model.Resources.OfType<PulumiStackResource>().SingleOrDefault();
-        Build(program, stack?.ProjectName, stack?.StackName);
+        Build(program, stack?.ProjectName, stack?.StackName, ctx.Model.Resources);
         this.ApplyInfrastructureCallbacks(program);
         return Task.CompletedTask;
     }
 
-    internal void Build(PulumiProgram program, string? projectName, string? stackName)
+    internal void Build(PulumiProgram program, string? projectName, string? stackName, IEnumerable<IResource>? model = null)
     {
         var displayName = DisplayName ?? PulumiEntraNaming.DisplayName(projectName, Name, stackName);
 
@@ -170,7 +201,14 @@ public sealed class EntraIdApplicationResource(string name) : Resource(name), IP
         {
             ["implicitGrant"] = new Dictionary<string, object?> { ["idTokenIssuanceEnabled"] = EnableIdTokenIssuance },
         };
-        if (RedirectUris.Count > 0) web["redirectUris"] = Strings(RedirectUris);
+        var redirectUris = new List<string>(RedirectUris);
+        foreach (var (endpoint, paths) in EndpointRedirectUris)
+        {
+            var host = ResolveHostExpression(endpoint, model);
+            if (paths.Length == 0) redirectUris.Add($"https://{host}");
+            foreach (var path in paths) redirectUris.Add($"https://{host}{(path.StartsWith('/') ? path : "/" + path)}");
+        }
+        if (redirectUris.Count > 0) web["redirectUris"] = Strings(redirectUris);
         if (HomePageUrl is not null) web["homepageUrl"] = HomePageUrl;
         if (LogoutUrl is not null) web["logoutUrl"] = LogoutUrl;
 

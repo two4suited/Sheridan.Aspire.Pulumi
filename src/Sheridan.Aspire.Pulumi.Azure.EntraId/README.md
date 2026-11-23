@@ -31,6 +31,13 @@ builder.Build().Run();
 ## Features
 
 - `WithSignInAudience`, `WithRedirectUris`, `WithIdTokenIssuance` and `WithInstance` configure the registration.
+- `WithRedirectUris(endpoint, "/signin-oidc", ...)` builds the redirect URIs from a frontend's deployed address, as in the official package:
+
+  ```csharp
+  entra.WithRedirectUris(webFrontend.GetEndpoint("https"), "/signin-oidc", "/signout-callback-oidc");
+  ```
+
+  The host is `{app}.{defaultDomain}`, read from the Container Apps environment's `defaultDomain` output (the value the app's own environment variables get), so it follows the frontend without a manual step and without a dependency on the app itself. The frontend must be a container app (not a job) with an external http(s) endpoint in the same Pulumi stack; App Service is not supported (pass the URI as a string). Unlike upstream, nothing follows the local address when running locally: add `https://localhost:<port>/...` with the string overload. String and endpoint URIs on one registration are combined.
 - `WithApplicationOwners`, `WithServicePrincipalOwners` and `WithOwners` add owners by object id.
 - `WithDisplayName` pins the display name instead of `{app}-{resource}-{stack}`; `WithTags`, `WithDescription` and `WithServiceManagementReference` set metadata.
 - `AddPulumiExistingEntraApplication(name, tenantId, clientId)` / `AsExistingApplication(...)` reference a registration that already exists; nothing is provisioned.
