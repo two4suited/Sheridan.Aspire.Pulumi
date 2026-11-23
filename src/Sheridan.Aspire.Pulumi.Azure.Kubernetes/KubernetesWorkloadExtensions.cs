@@ -1,3 +1,4 @@
+using Sheridan.Aspire.Pulumi;
 using Aspire.Hosting.ApplicationModel;
 using Sheridan.Aspire.Pulumi.Azure.Kubernetes;
 using Sheridan.Aspire.Pulumi.Azure.Network;
@@ -12,7 +13,7 @@ namespace Aspire.Hosting;
 public static class AzureKubernetesIngressExtensions
 {
     private static IResourceBuilder<T> Register<T>(IResourceBuilder<AzureKubernetesEnvironmentResource> aks, T resource, string icon) where T : Resource =>
-        aks.ApplicationBuilder.AddResource(resource).WithParentRelationship(aks).WithIconName(icon).ExcludeFromManifest();
+        aks.ApplicationBuilder.AddResource(resource).WithParentRelationship(aks).WithIconName(icon).ExcludeFromManifest().HideInRunMode();
 
     /// <summary>Adds an Ingress. Mirrors <c>AddIngress</c>.</summary>
     public static IResourceBuilder<KubernetesIngressResource> AddIngress(this IResourceBuilder<AzureKubernetesEnvironmentResource> builder, string name)
@@ -374,7 +375,7 @@ public static class PulumiCertManagerExtensions
         ArgumentException.ThrowIfNullOrEmpty(name);
         var issuer = new CertManagerIssuerResource(name, builder.Resource);
         builder.Resource.Issuers.Add(issuer);
-        return builder.ApplicationBuilder.AddResource(issuer).WithParentRelationship(builder).WithIconName("ContactCard").ExcludeFromManifest();
+        return builder.ApplicationBuilder.AddResource(issuer).WithParentRelationship(builder).WithIconName("ContactCard").ExcludeFromManifest().HideInRunMode();
     }
 
     public static IResourceBuilder<CertManagerIssuerResource> WithLetsEncryptProduction(this IResourceBuilder<CertManagerIssuerResource> builder, string email) =>

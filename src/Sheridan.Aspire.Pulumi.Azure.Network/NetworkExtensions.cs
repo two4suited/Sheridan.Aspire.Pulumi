@@ -20,7 +20,7 @@ public static class NetworkExtensions
     /// <summary>Adds a virtual network provisioned by Pulumi (AddAzureVirtualNetwork).</summary>
     public static IResourceBuilder<PulumiVirtualNetworkResource> AddPulumiVirtualNetwork(
         this IDistributedApplicationBuilder builder, string name, string? addressPrefix = null) =>
-        builder.AddResource(new PulumiVirtualNetworkResource(name, addressPrefix ?? DefaultAddressPrefix)).ExcludeFromManifest();
+        builder.AddResource(new PulumiVirtualNetworkResource(name, addressPrefix ?? DefaultAddressPrefix)).ExcludeFromManifest().HideInRunMode();
 
     /// <summary>Adds a subnet to the virtual network. <paramref name="subnetName"/> defaults to <paramref name="name"/>.</summary>
     public static IResourceBuilder<PulumiSubnetResource> AddSubnet(
@@ -34,7 +34,7 @@ public static class NetworkExtensions
         builder.Resource.Subnets.Add(subnet);
         return builder.ApplicationBuilder.AddResource(subnet)
             .WithParentRelationship(builder)
-            .ExcludeFromManifest();
+            .ExcludeFromManifest().HideInRunMode();
     }
 
     /// <summary>Delegates the subnet to an Azure service (e.g. 'Microsoft.App/environments'); <paramref name="name"/> defaults to the service name.</summary>
@@ -102,7 +102,7 @@ public static class NetworkExtensions
                 Stack = subnet.Parent.Stack,
                 Location = subnet.Parent.Location,
             };
-            builder.ApplicationBuilder.AddResource(nsg).WithParentRelationship(builder).ExcludeFromManifest();
+            builder.ApplicationBuilder.AddResource(nsg).WithParentRelationship(builder).ExcludeFromManifest().HideInRunMode();
             subnet.NetworkSecurityGroup = nsg;
         }
 
@@ -131,7 +131,7 @@ public static class NetworkExtensions
 
     public static IResourceBuilder<PulumiNetworkSecurityGroupResource> AddPulumiNetworkSecurityGroup(
         this IDistributedApplicationBuilder builder, string name) =>
-        builder.AddResource(new PulumiNetworkSecurityGroupResource(name)).ExcludeFromManifest();
+        builder.AddResource(new PulumiNetworkSecurityGroupResource(name)).ExcludeFromManifest().HideInRunMode();
 
     public static IResourceBuilder<PulumiNetworkSecurityGroupResource> WithSecurityRule(
         this IResourceBuilder<PulumiNetworkSecurityGroupResource> builder, AzureSecurityRule rule)
@@ -142,11 +142,11 @@ public static class NetworkExtensions
 
     public static IResourceBuilder<PulumiPublicIPAddressResource> AddPulumiPublicIPAddress(
         this IDistributedApplicationBuilder builder, string name) =>
-        builder.AddResource(new PulumiPublicIPAddressResource(name)).ExcludeFromManifest();
+        builder.AddResource(new PulumiPublicIPAddressResource(name)).ExcludeFromManifest().HideInRunMode();
 
     public static IResourceBuilder<PulumiNatGatewayResource> AddPulumiNatGateway(
         this IDistributedApplicationBuilder builder, string name) =>
-        builder.AddResource(new PulumiNatGatewayResource(name)).ExcludeFromManifest();
+        builder.AddResource(new PulumiNatGatewayResource(name)).ExcludeFromManifest().HideInRunMode();
 
     public static IResourceBuilder<PulumiNatGatewayResource> WithPublicIPAddress(
         this IResourceBuilder<PulumiNatGatewayResource> builder, IResourceBuilder<PulumiPublicIPAddressResource> publicIPAddress)
@@ -173,7 +173,7 @@ public static class NetworkExtensions
             Stack = virtualNetwork.Stack,
             Location = virtualNetwork.Location,
         };
-        return builder.AddResource(zone).ExcludeFromManifest();
+        return builder.AddResource(zone).ExcludeFromManifest().HideInRunMode();
     }
 
     /// <summary>Adds a private endpoint for the target in the subnet, plus the linked private DNS zone it registers in.</summary>
@@ -192,7 +192,7 @@ public static class NetworkExtensions
             endpoint.AdditionalDnsZones.Add(app.GetOrCreatePrivateDnsZone(extra, subnet.Resource.Parent).Resource);
         return app.AddResource(endpoint)
             .WithParentRelationship(subnet)
-            .ExcludeFromManifest();
+            .ExcludeFromManifest().HideInRunMode();
     }
 
     /// <summary>
@@ -201,13 +201,13 @@ public static class NetworkExtensions
     /// </summary>
     public static IResourceBuilder<PulumiPrivateLinkTargetResource> AddPulumiPrivateLinkTarget(
         this IDistributedApplicationBuilder builder, string name, string resourceIdExpression, string privateLinkGroupId, string privateDnsZoneName) =>
-        builder.AddResource(new PulumiPrivateLinkTargetResource(name, resourceIdExpression, privateLinkGroupId, privateDnsZoneName)).ExcludeFromManifest();
+        builder.AddResource(new PulumiPrivateLinkTargetResource(name, resourceIdExpression, privateLinkGroupId, privateDnsZoneName)).ExcludeFromManifest().HideInRunMode();
 
     // ---- Network security perimeter --------------------------------------------------------------------------------------
 
     public static IResourceBuilder<PulumiNetworkSecurityPerimeterResource> AddPulumiNetworkSecurityPerimeter(
         this IDistributedApplicationBuilder builder, string name) =>
-        builder.AddResource(new PulumiNetworkSecurityPerimeterResource(name)).ExcludeFromManifest();
+        builder.AddResource(new PulumiNetworkSecurityPerimeterResource(name)).ExcludeFromManifest().HideInRunMode();
 
     public static IResourceBuilder<PulumiNetworkSecurityPerimeterResource> WithAccessRule(
         this IResourceBuilder<PulumiNetworkSecurityPerimeterResource> builder, AzureNspAccessRule rule)
