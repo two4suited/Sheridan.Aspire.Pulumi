@@ -10,6 +10,21 @@ after a `vX.Y.Z` tag has been published. Packages are on
 
 <!-- releases:start -->
 
+## v3.2.0
+
+_2026-11-23_ · [GitHub release](https://github.com/two4suited/Sheridan.Aspire.Pulumi/releases/tag/v3.2.0)
+
+<!-- Release notes generated using configuration in .github/release.yml at v3.2.0 -->
+
+#### What's Changed
+* Hide Kubernetes and Network resources in run mode by @two4suited in https://github.com/two4suited/Sheridan.Aspire.Pulumi/pull/252
+* EntraId: support run mode (local runs) without deploying first by @two4suited in https://github.com/two4suited/Sheridan.Aspire.Pulumi/pull/253
+* EntraId: WithRedirectUris accepts an EndpointReference by @two4suited in https://github.com/two4suited/Sheridan.Aspire.Pulumi/pull/254
+
+
+**Full Changelog**: https://github.com/two4suited/Sheridan.Aspire.Pulumi/compare/v3.1.0...v3.2.0
+
+
 ## v3.1.0
 
 _2026-11-21_ · [GitHub release](https://github.com/two4suited/Sheridan.Aspire.Pulumi/releases/tag/v3.1.0)
