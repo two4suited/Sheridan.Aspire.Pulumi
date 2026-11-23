@@ -206,12 +206,74 @@ public sealed class EntraIdTests
         Assert.DoesNotContain(env.Keys, k => k.Contains("Scopes", StringComparison.Ordinal));
     }
 
-    private static async Task<Dictionary<string, object>> EnvironmentVariablesAsync<T>(IResourceBuilder<T> rb, Func<IResourceBuilder<T>, IResourceBuilder<T>> configure)
+    [Fact]
+    public async Task Run_mode_WithReference_does_not_throw_and_reads_ids_from_configuration()
+    {
+        var b = DistributedApplication.CreateBuilder(new DistributedApplicationOptions { Args = [] });
+        var api = b.AddPulumiEntraId("orders-api").WithScope("Orders.Read", "Read");
+        var explicitApi = b.AddPulumiEntraId("billing-api").WithApplicationIdUri("api://billing").WithScope("Pay", "Pay");
+        var existingApi = b.AddPulumiExistingEntraApplication("ex-api", Guid.NewGuid().ToString(), Client).WithScope("Read", "Read");
+        var web = b.AddPulumiEntraId("web").WithApiPermissions(api, "Orders.Read").WithApiPermissions(explicitApi, "Pay")
+            .WithApiPermissions(existingApi, "Read").WithScope("S", "d").WithFederatedManagedIdentityCredential(Client); // never bound to a stack
+
+        var bare = await EnvironmentVariablesAsync(b.AddResource(new ProjectResource("bare")), x => x.WithReference(web), DistributedApplicationOperation.Run);
+        Assert.Equal("https://login.microsoftonline.com/", bare["AzureAd__Instance"]);
+        Assert.DoesNotContain("AzureAd__TenantId", bare.Keys);
+        Assert.DoesNotContain("AzureAd__ClientId", bare.Keys);
+        Assert.Equal("S", bare["AzureAd__Scopes"]);
+        Assert.Equal(Client, bare["ManagedIdentityClientId"]);
+        Assert.DoesNotContain(bare.Keys, k => k.StartsWith("DownstreamApis__orders-api", StringComparison.Ordinal)); // no client ID until deployed
+        Assert.Equal("api://billing/Pay", bare["DownstreamApis__billing-api__Scopes__0"]);
+        Assert.Equal($"api://{Client}/Read", ((ReferenceExpression)bare["DownstreamApis__ex-api__Scopes__0"]).ValueExpression);
+
+        // Several provisioned registrations: the shared AzureAd section is ambiguous, only per-registration keys apply.
+        b.Configuration["AzureAd:ClientId"] = "shared";
+        Assert.DoesNotContain("AzureAd__ClientId", await EnvironmentVariablesAsync(b.AddResource(new ProjectResource("amb")), x => x.WithReference(web), DistributedApplicationOperation.Run));
+        b.Configuration["Entra:web:TenantId"] = Tenant;
+        b.Configuration["Entra:web:ClientId"] = Client;
+        var configured = await EnvironmentVariablesAsync(b.AddResource(new ProjectResource("configured")), x => x.WithReference(web), DistributedApplicationOperation.Run);
+        Assert.Equal(Tenant, configured["AzureAd__TenantId"]);
+        Assert.Equal(Client, configured["AzureAd__ClientId"]);
+
+        var custom = await EnvironmentVariablesAsync(b.AddResource(new ProjectResource("custom")), x => x.WithReference(web, "Entra"), DistributedApplicationOperation.Run);
+        Assert.Equal(Client, custom["Entra__ClientId"]);
+        var container = await EnvironmentVariablesAsync(b.AddContainer("c", "img"), x => x.WithReference(web), DistributedApplicationOperation.Run);
+        Assert.Equal(Client, container["WEB_ClientId"]);
+        Assert.Equal(Tenant, container["WEB_TenantId"]);
+    }
+
+    [Fact]
+    public async Task Run_mode_single_registration_reads_the_connection_section_and_existing_ids_are_fixed()
+    {
+        var b = DistributedApplication.CreateBuilder(new DistributedApplicationOptions { Args = [] });
+        var web = b.AddPulumiEntraId("web");
+        b.Configuration["AzureAd:ClientId"] = Client;
+        var env = await EnvironmentVariablesAsync(b.AddResource(new ProjectResource("p")), x => x.WithReference(web), DistributedApplicationOperation.Run);
+        Assert.Equal(Client, env["AzureAd__ClientId"]);
+
+        var existing = b.AddPulumiExistingEntraApplication("ex", Guid.NewGuid().ToString(), Guid.NewGuid().ToString());
+        var fixedEnv = await EnvironmentVariablesAsync(b.AddResource(new ProjectResource("fixed")), x => x.WithReference(existing), DistributedApplicationOperation.Run);
+        Assert.Equal(existing.Resource.ExistingClientId, fixedEnv["AzureAd__ClientId"]);
+    }
+
+    [Fact]
+    public void Entra_registrations_are_hidden_in_run_mode_only()
+    {
+        static bool Hidden(IResource r) => r.TryGetLastAnnotation<ResourceSnapshotAnnotation>(out var a) && a.InitialSnapshot.IsHidden;
+        var run = DistributedApplication.CreateBuilder(new DistributedApplicationOptions { Args = [] });
+        Assert.True(Hidden(run.AddPulumiEntraId("web").Resource));
+        Assert.True(Hidden(run.AddPulumiExistingEntraApplication("ex", Tenant, Client).Resource));
+        var publish = DistributedApplication.CreateBuilder(new DistributedApplicationOptions { Args = ["--operation", "publish", "--output-path", Path.GetTempPath()] });
+        Assert.False(Hidden(publish.AddPulumiEntraId("web").Resource));
+    }
+
+    private static async Task<Dictionary<string, object>> EnvironmentVariablesAsync<T>(IResourceBuilder<T> rb, Func<IResourceBuilder<T>, IResourceBuilder<T>> configure,
+        DistributedApplicationOperation operation = DistributedApplicationOperation.Publish)
         where T : IResourceWithEnvironment
     {
         configure(rb);
         var env = new Dictionary<string, object>();
-        var ctx = new EnvironmentCallbackContext(new DistributedApplicationExecutionContext(DistributedApplicationOperation.Publish), env);
+        var ctx = new EnvironmentCallbackContext(new DistributedApplicationExecutionContext(operation), env);
         foreach (var a in rb.Resource.Annotations.OfType<EnvironmentCallbackAnnotation>()) await a.Callback(ctx);
         return env;
     }
