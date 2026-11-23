@@ -37,6 +37,7 @@ identities (`PublishWithAppRoleAssignment`), existing-reference guards, consumer
 - `WithRedirectUris`, `WithApplicationOwners`, `WithServicePrincipalOwners`, `WithOwners` and `WithIdTokenIssuance` now throw
   `InvalidOperationException` on existing applications (they used to do nothing), and `AsExistingApplication` throws if such settings were applied first.
 - `WithReference` now takes optional connection / downstream-API key names and injects more variables for .NET projects.
+- In run mode `WithReference` reads `Entra:{resource}:TenantId` / `ClientId` (or the `{connection}` section when there is one provisioned registration) from AppHost configuration instead of throwing, and the registration is hidden from the dashboard; the registration itself is still only created by a deploy (issue #250).
 - The Entra project now references `Sheridan.Aspire.Pulumi.Provisioning` and `Sheridan.Aspire.Pulumi.Azure`.
 - The schema property is `requiredResourceAccesses` (the issue text had `requiredResourceAccess`).
 

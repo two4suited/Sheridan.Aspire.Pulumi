@@ -66,6 +66,17 @@ api.PublishWithFederatedManagedIdentityCredential(workerIdentity);      // secre
 
 `WithReference` on a .NET project also injects `AzureAd__Scopes` (when the registration exposes scopes), `DownstreamApis__{api}__Scopes__{n}` plus a `{api}AppOnly` entry for APIs it has permissions on, and `ManagedIdentityClientId` (config-only `WithFederatedManagedIdentityCredential(clientId)`). `WithReference(entra, connectionName, downstreamApisConfigKey)` changes the root keys.
 
+### Running locally
+
+Running the AppHost locally (`aspire start` / F5) provisions nothing, so `AddPulumiEntraId` resources are hidden from the dashboard and `WithReference(entra)` no longer throws. The registration only exists after a deploy; to sign in locally, supply its values in the AppHost configuration (user secrets or environment variables) and they are injected as `AzureAd__TenantId` / `AzureAd__ClientId` (or the prefixed names for non-.NET resources):
+
+```bash
+dotnet user-secrets set Entra:web:TenantId <tenant-id>
+dotnet user-secrets set Entra:web:ClientId <client-id>
+```
+
+The key is `Entra:{resource name}:TenantId|ClientId`. When the AppHost has a single provisioned registration, `AzureAd:TenantId` / `AzureAd:ClientId` (the connection name, as set with `WithReference(entra, "Entra")`) also work. Without values, `Instance`, scopes, `ManagedIdentityClientId` and `DownstreamApis` entries that do not depend on a deployed client ID are still injected; entries for provisioned APIs using the default `api://{clientId}` identifier URI are skipped. Existing registrations (`AddPulumiExistingEntraApplication`) always inject their fixed IDs.
+
 ### Notes
 
 - Removing an enabled scope or role is rejected by Graph: set `IsEnabled = false`, deploy, then remove it. Removing `PublishWithAppRoleAssignment` or `WithAdminConsent` does not revoke an existing grant.

@@ -15,7 +15,7 @@ public static class EntraIdResourceExtensions
     {
         ArgumentNullException.ThrowIfNull(builder);
         ArgumentException.ThrowIfNullOrEmpty(name);
-        return builder.AddResource(new EntraIdApplicationResource(name)).ExcludeFromManifest();
+        return builder.AddResource(new EntraIdApplicationResource(name)).ExcludeFromManifest().HideInRunMode();
     }
 
     /// <summary>References an existing registration; nothing is provisioned. Mirrors <c>AddExistingEntraApplication</c>.</summary>
@@ -302,6 +302,13 @@ public static class EntraIdResourceExtensions
     /// <c>AzureAd__Scopes</c> for registrations that expose scopes, <c>ManagedIdentityClientId</c> for federated credentials and
     /// <c>DownstreamApis__{api}__Scopes__{n}</c> for APIs the registration has permissions on); other resources get an uppercase
     /// resource-name prefix with a single underscore separator and only the basic settings.
+    /// <para>
+    /// When the AppHost runs locally a provisioned registration does not exist yet, so its tenant and client IDs are read from the
+    /// AppHost configuration (user secrets, environment variables) as <c>Entra:{resource}:TenantId</c> / <c>Entra:{resource}:ClientId</c>
+    /// (or <c>AzureAd:TenantId</c> / <c>AzureAd:ClientId</c>, named after the connection, when the AppHost has a single provisioned
+    /// registration) and injected when present; otherwise they are left out and nothing throws. Registrations that reference an
+    /// existing application inject their fixed IDs.
+    /// </para>
     /// </summary>
     public static IResourceBuilder<TDestination> WithReference<TDestination>(
         this IResourceBuilder<TDestination> builder, IResourceBuilder<EntraIdApplicationResource> source)
@@ -320,11 +327,22 @@ public static class EntraIdResourceExtensions
         var isDotNet = builder.Resource is ProjectResource or DotnetProjectResource;
         var prefix = isDotNet ? connectionName : app.Name.ToUpperInvariant().Replace('-', '_');
         var sep = isDotNet ? "__" : "_";
+        // Locally there is no Pulumi stack to read outputs from: a provisioned registration only has values the developer supplies.
         return builder.WithEnvironment(ctx =>
         {
+            var isRunMode = ctx.ExecutionContext.IsRunMode;
+            var runMode = isRunMode && !app.IsExistingApplication;
             ctx.EnvironmentVariables[$"{prefix}{sep}Instance"] = app.Instance;
-            ctx.EnvironmentVariables[$"{prefix}{sep}TenantId"] = app.TenantIdValue;
-            ctx.EnvironmentVariables[$"{prefix}{sep}ClientId"] = app.ClientIdValue;
+            if (runMode)
+            {
+                if (RunModeSetting(builder.ApplicationBuilder, app, connectionName, "TenantId") is { } tenantId) ctx.EnvironmentVariables[$"{prefix}{sep}TenantId"] = tenantId;
+                if (RunModeSetting(builder.ApplicationBuilder, app, connectionName, "ClientId") is { } clientId) ctx.EnvironmentVariables[$"{prefix}{sep}ClientId"] = clientId;
+            }
+            else
+            {
+                ctx.EnvironmentVariables[$"{prefix}{sep}TenantId"] = app.TenantIdValue;
+                ctx.EnvironmentVariables[$"{prefix}{sep}ClientId"] = app.ClientIdValue;
+            }
             if (!isDotNet) return;
 
             if (app.Scopes.Count > 0)
@@ -335,6 +353,8 @@ public static class EntraIdResourceExtensions
             foreach (var req in app.ApiPermissions)
             {
                 if (req.Modeled is not { } api) continue;
+                // A provisioned API has no client ID (and so no scope URI) until it is deployed.
+                if (isRunMode && !api.IsExistingApplication && api.ApplicationIdUri is null) continue;
                 var root = $"{downstreamApisConfigKey}__{api.Name}";
                 var delegated = req.Permissions.Where(p => p.Type == EntraIdApiPermissionType.Delegated).ToList();
                 for (var i = 0; i < delegated.Count; i++)
@@ -345,6 +365,18 @@ public static class EntraIdResourceExtensions
                 ctx.EnvironmentVariables[$"{appOnly}__RequestAppToken"] = "true";
             }
         });
+    }
+
+    /// <summary>
+    /// A tenant or client ID supplied for local runs: <c>Entra:{resource}:{name}</c>, or, when the AppHost has a single provisioned
+    /// registration, <c>{connectionName}:{name}</c> (<c>AzureAd:ClientId</c> by default). Null when neither is set.
+    /// </summary>
+    private static string? RunModeSetting(IDistributedApplicationBuilder appBuilder, EntraIdApplicationResource app, string connectionName, string name)
+    {
+        var configuration = appBuilder.Configuration;
+        if (configuration[$"Entra:{app.Name}:{name}"] is { Length: > 0 } specific) return specific;
+        var provisioned = appBuilder.Resources.OfType<EntraIdApplicationResource>().Count(r => !r.IsExistingApplication);
+        return provisioned == 1 && configuration[$"{connectionName}:{name}"] is { Length: > 0 } shared ? shared : null;
     }
 
     private static void RejectOnExisting(IResourceBuilder<EntraIdApplicationResource> builder, string method)
