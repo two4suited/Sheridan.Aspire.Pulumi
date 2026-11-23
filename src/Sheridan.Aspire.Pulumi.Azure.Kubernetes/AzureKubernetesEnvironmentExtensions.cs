@@ -1,3 +1,4 @@
+using Sheridan.Aspire.Pulumi;
 using System.Text.RegularExpressions;
 using Aspire.Hosting.ApplicationModel;
 using Sheridan.Aspire.Pulumi.Azure.ContainerRegistry;
@@ -16,7 +17,7 @@ public static partial class AzureKubernetesEnvironmentExtensions
     {
         ArgumentNullException.ThrowIfNull(builder);
         ArgumentException.ThrowIfNullOrEmpty(name);
-        return builder.AddResource(new AzureKubernetesEnvironmentResource(name)).ExcludeFromManifest();
+        return builder.AddResource(new AzureKubernetesEnvironmentResource(name)).ExcludeFromManifest().HideInRunMode();
     }
 
     /// <summary>Alias for <see cref="AddPulumiAzureKubernetesEnvironment"/>.</summary>
@@ -70,7 +71,7 @@ public static partial class AzureKubernetesEnvironmentExtensions
         ValidatePool(vmSize, minCount, maxCount);
         var pool = new AksNodePoolResource(name, new AksNodePoolConfig(name, vmSize, minCount, maxCount, AksNodePoolMode.User), builder.Resource);
         builder.Resource.NodePools.Add(pool);
-        return builder.ApplicationBuilder.AddResource(pool).WithParentRelationship(builder).ExcludeFromManifest();
+        return builder.ApplicationBuilder.AddResource(pool).WithParentRelationship(builder).ExcludeFromManifest().HideInRunMode();
     }
 
     /// <summary>
