@@ -48,6 +48,39 @@ public sealed class EntraIdTests
     }
 
     [Fact]
+    public void Endpoint_redirect_uris_resolve_the_container_app_fqdn_in_a_separate_resource()
+    {
+        var b = NewBuilder();
+        var aca = b.AddPulumiAzureContainerAppEnvironment("aca");
+        var web = b.AddContainer("web-frontend", "img").WithHttpEndpoint(targetPort: 8080).WithExternalHttpEndpoints().WithComputeEnvironment(aca);
+        var entra = b.AddPulumiEntraId("web").WithRedirectUris("https://localhost:5001/cb")
+            .WithRedirectUris(web.GetEndpoint("http"), "/signin-oidc", "signout-callback-oidc");
+        var p = new PulumiProgram();
+        entra.Resource.Build(p, "proj", "dev", b.Resources);
+
+        var redirect = Props(p, "webRedirectUris");
+        Assert.Equal("${webApp.id}", redirect["applicationId"]);
+        Assert.Equal("Web", redirect["type"]);
+        Assert.Equal(
+            ["https://localhost:5001/cb", "https://${webFrontendApp.configuration.ingress.fqdn}/signin-oidc", "https://${webFrontendApp.configuration.ingress.fqdn}/signout-callback-oidc"],
+            ((List<object?>)redirect["redirectUris"]!).Cast<string>());
+        Assert.False(((Dictionary<string, object?>)Props(p, "webApp")["web"]!).ContainsKey("redirectUris"));
+        var options = (Dictionary<string, object?>)((Dictionary<string, object?>)p.Resources["webApp"]!)["options"]!;
+        Assert.Contains("web.redirectUris", (List<object?>)options["ignoreChanges"]!);
+    }
+
+    [Fact]
+    public void Endpoint_redirect_uris_need_a_supported_compute_environment_and_a_new_registration()
+    {
+        var b = NewBuilder();
+        var orphan = b.AddContainer("orphan", "img").WithHttpEndpoint(targetPort: 80);
+        var entra = b.AddPulumiEntraId("web").WithRedirectUris(orphan.GetEndpoint("http"), "/cb");
+        Assert.Throws<InvalidOperationException>(() => entra.Resource.Build(new PulumiProgram(), "proj", "dev", b.Resources));
+        Assert.Throws<InvalidOperationException>(() =>
+            b.AddPulumiExistingEntraApplication("e", Tenant, Client).WithRedirectUris(orphan.GetEndpoint("http"), "/cb"));
+    }
+
+    [Fact]
     public void Scope_and_role_ids_are_stable_and_distinct()
     {
         var b = NewBuilder();

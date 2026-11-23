@@ -70,6 +70,23 @@ public static class EntraIdResourceExtensions
         return builder;
     }
 
+    /// <summary>
+    /// Adds redirect URIs on the host of <paramref name="endpoint"/>'s resource (<c>https://{host}{path}</c> for each path; the bare host when none
+    /// are given). The host is the deployed container app FQDN or App Service host name, resolved when the program is generated, so it follows the
+    /// frontend and needs no manual step. Mirrors the endpoint overload of <c>WithRedirectUris</c>. The frontend must be deployed by the same Pulumi
+    /// stack as this registration. Locally nothing is provisioned, so register local URIs in the portal or with the string overload.
+    /// </summary>
+    public static IResourceBuilder<EntraIdApplicationResource> WithRedirectUris(
+        this IResourceBuilder<EntraIdApplicationResource> builder, EndpointReference endpoint, params string[] paths)
+    {
+        RejectOnExisting(builder, "WithRedirectUris");
+        ArgumentNullException.ThrowIfNull(endpoint);
+        ArgumentNullException.ThrowIfNull(paths);
+        foreach (var path in paths) ArgumentException.ThrowIfNullOrEmpty(path);
+        builder.Resource.EndpointRedirectUris.Add((endpoint, paths));
+        return builder;
+    }
+
     /// <summary>Adds object IDs as owners of the application registration.</summary>
     public static IResourceBuilder<EntraIdApplicationResource> WithApplicationOwners(
         this IResourceBuilder<EntraIdApplicationResource> builder, params string[] ownerObjectIds)
