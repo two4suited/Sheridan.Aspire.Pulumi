@@ -15,7 +15,7 @@ public static class EntraIdResourceExtensions
     {
         ArgumentNullException.ThrowIfNull(builder);
         ArgumentException.ThrowIfNullOrEmpty(name);
-        return builder.AddResource(new EntraIdApplicationResource(name)).ExcludeFromManifest();
+        return builder.AddResource(new EntraIdApplicationResource(name)).ExcludeFromManifest().HideInRunMode();
     }
 
     /// <summary>References an existing registration; nothing is provisioned. Mirrors <c>AddExistingEntraApplication</c>.</summary>
@@ -285,6 +285,12 @@ public static class EntraIdResourceExtensions
     /// <c>AzureAd__Scopes</c> for registrations that expose scopes, <c>ManagedIdentityClientId</c> for federated credentials and
     /// <c>DownstreamApis__{api}__Scopes__{n}</c> for APIs the registration has permissions on); other resources get an uppercase
     /// resource-name prefix with a single underscore separator and only the basic settings.
+    /// <para>
+    /// When the AppHost runs locally a provisioned registration does not exist yet, so its tenant and client IDs are read from the
+    /// AppHost configuration (user secrets, environment variables) section named after the connection (<c>AzureAd:TenantId</c>,
+    /// <c>AzureAd:ClientId</c>) and injected when present; otherwise they are left out and nothing throws. Registrations that
+    /// reference an existing application inject their fixed IDs.
+    /// </para>
     /// </summary>
     public static IResourceBuilder<TDestination> WithReference<TDestination>(
         this IResourceBuilder<TDestination> builder, IResourceBuilder<EntraIdApplicationResource> source)
@@ -303,11 +309,23 @@ public static class EntraIdResourceExtensions
         var isDotNet = builder.Resource is ProjectResource or DotnetProjectResource;
         var prefix = isDotNet ? connectionName : app.Name.ToUpperInvariant().Replace('-', '_');
         var sep = isDotNet ? "__" : "_";
+        var configuration = builder.ApplicationBuilder.Configuration;
+        // Locally there is no Pulumi stack to read outputs from: a provisioned registration only has values the developer supplies.
         return builder.WithEnvironment(ctx =>
         {
+            var isRunMode = ctx.ExecutionContext.IsRunMode;
+            var runMode = isRunMode && !app.IsExistingApplication;
             ctx.EnvironmentVariables[$"{prefix}{sep}Instance"] = app.Instance;
-            ctx.EnvironmentVariables[$"{prefix}{sep}TenantId"] = app.TenantIdValue;
-            ctx.EnvironmentVariables[$"{prefix}{sep}ClientId"] = app.ClientIdValue;
+            if (runMode)
+            {
+                if (configuration[$"{connectionName}:TenantId"] is { Length: > 0 } tenantId) ctx.EnvironmentVariables[$"{prefix}{sep}TenantId"] = tenantId;
+                if (configuration[$"{connectionName}:ClientId"] is { Length: > 0 } clientId) ctx.EnvironmentVariables[$"{prefix}{sep}ClientId"] = clientId;
+            }
+            else
+            {
+                ctx.EnvironmentVariables[$"{prefix}{sep}TenantId"] = app.TenantIdValue;
+                ctx.EnvironmentVariables[$"{prefix}{sep}ClientId"] = app.ClientIdValue;
+            }
             if (!isDotNet) return;
 
             if (app.Scopes.Count > 0)
@@ -318,6 +336,8 @@ public static class EntraIdResourceExtensions
             foreach (var req in app.ApiPermissions)
             {
                 if (req.Modeled is not { } api) continue;
+                // A provisioned API has no client ID (and so no scope URI) until it is deployed.
+                if (isRunMode && !api.IsExistingApplication && api.ApplicationIdUri is null) continue;
                 var root = $"{downstreamApisConfigKey}__{api.Name}";
                 var delegated = req.Permissions.Where(p => p.Type == EntraIdApiPermissionType.Delegated).ToList();
                 for (var i = 0; i < delegated.Count; i++)

@@ -59,6 +59,17 @@ api.PublishWithFederatedManagedIdentityCredential(workerIdentity);      // secre
 
 `WithReference` on a .NET project also injects `AzureAd__Scopes` (when the registration exposes scopes), `DownstreamApis__{api}__Scopes__{n}` plus a `{api}AppOnly` entry for APIs it has permissions on, and `ManagedIdentityClientId` (config-only `WithFederatedManagedIdentityCredential(clientId)`). `WithReference(entra, connectionName, downstreamApisConfigKey)` changes the root keys.
 
+### Running locally
+
+`aspire run` does not provision anything, so `AddPulumiEntraId` resources are hidden from the dashboard and `WithReference(entra)` no longer throws. The registration only exists after a deploy; to sign in locally, supply its values in the AppHost configuration (user secrets or environment variables), and they are injected as `AzureAd__TenantId` / `AzureAd__ClientId`:
+
+```bash
+dotnet user-secrets set AzureAd:TenantId <tenant-id>
+dotnet user-secrets set AzureAd:ClientId <client-id>
+```
+
+The section is named after the connection (`WithReference(entra, "Entra")` reads `Entra:TenantId`). When nothing is configured only `Instance` and the scopes are injected, and `DownstreamApis` entries for provisioned APIs are skipped until they are deployed. Existing registrations (`AddPulumiExistingEntraApplication`) always inject their fixed IDs.
+
 ### Notes
 
 - Removing an enabled scope or role is rejected by Graph: set `IsEnabled = false`, deploy, then remove it. Removing `PublishWithAppRoleAssignment` or `WithAdminConsent` does not revoke an existing grant.
