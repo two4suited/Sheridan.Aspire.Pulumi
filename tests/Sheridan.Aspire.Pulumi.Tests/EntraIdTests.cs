@@ -48,25 +48,40 @@ public sealed class EntraIdTests
     }
 
     [Fact]
-    public void Endpoint_redirect_uris_resolve_the_container_app_fqdn_in_a_separate_resource()
+    public void Endpoint_redirect_uris_use_the_environment_default_domain()
     {
         var b = NewBuilder();
         var aca = b.AddPulumiAzureContainerAppEnvironment("aca");
         var web = b.AddContainer("web-frontend", "img").WithHttpEndpoint(targetPort: 8080).WithExternalHttpEndpoints().WithComputeEnvironment(aca);
         var entra = b.AddPulumiEntraId("web").WithRedirectUris("https://localhost:5001/cb")
             .WithRedirectUris(web.GetEndpoint("http"), "/signin-oidc", "signout-callback-oidc");
+        var bare = b.AddPulumiEntraId("bare").WithRedirectUris(web.GetEndpoint("http"));
         var p = new PulumiProgram();
         entra.Resource.Build(p, "proj", "dev", b.Resources);
 
-        var redirect = Props(p, "webRedirectUris");
-        Assert.Equal("${webApp.id}", redirect["applicationId"]);
-        Assert.Equal("Web", redirect["type"]);
-        Assert.Equal(
-            ["https://localhost:5001/cb", "https://${webFrontendApp.configuration.ingress.fqdn}/signin-oidc", "https://${webFrontendApp.configuration.ingress.fqdn}/signout-callback-oidc"],
-            ((List<object?>)redirect["redirectUris"]!).Cast<string>());
-        Assert.False(((Dictionary<string, object?>)Props(p, "webApp")["web"]!).ContainsKey("redirectUris"));
-        var options = (Dictionary<string, object?>)((Dictionary<string, object?>)p.Resources["webApp"]!)["options"]!;
-        Assert.Contains("web.redirectUris", (List<object?>)options["ignoreChanges"]!);
+        var webProps = (Dictionary<string, object?>)Props(p, "webApp")["web"]!;
+        var uris = ((List<object?>)webProps["redirectUris"]!).Cast<string>().ToList();
+        Assert.Equal(3, uris.Count);
+        Assert.Equal("https://localhost:5001/cb", uris[0]);
+        Assert.StartsWith("https://web-frontend.${", uris[1], StringComparison.Ordinal);
+        Assert.EndsWith(".defaultDomain}/signin-oidc", uris[1], StringComparison.Ordinal);
+        Assert.EndsWith("/signout-callback-oidc", uris[2], StringComparison.Ordinal);
+        Assert.DoesNotContain("webRedirectUris", p.Resources.Keys);
+        Assert.DoesNotContain(".internal.", uris[1], StringComparison.Ordinal);
+
+        var bp = new PulumiProgram();
+        bare.Resource.Build(bp, "proj", "dev", b.Resources);
+        Assert.EndsWith(".defaultDomain}", (string)((List<object?>)((Dictionary<string, object?>)Props(bp, "bareApp")["web"]!)["redirectUris"]!)[0]!, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Endpoint_redirect_uris_reject_internal_only_and_unsupported_targets()
+    {
+        var b = NewBuilder();
+        var aca = b.AddPulumiAzureContainerAppEnvironment("aca");
+        var internalOnly = b.AddContainer("internal-app", "img").WithHttpEndpoint(targetPort: 80).WithComputeEnvironment(aca);
+        var e1 = b.AddPulumiEntraId("e1").WithRedirectUris(internalOnly.GetEndpoint("http"), "/cb");
+        Assert.Throws<InvalidOperationException>(() => e1.Resource.Build(new PulumiProgram(), "proj", "dev", b.Resources));
     }
 
     [Fact]

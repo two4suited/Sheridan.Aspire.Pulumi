@@ -552,12 +552,16 @@ public sealed class AzureContainerAppEnvironmentResource : PulumiAzureResource, 
     /// <c>{app}.{defaultDomain}</c> for external. Other endpoints are addressed by app name and port. False when the endpoint is not
     /// one this environment deploys (another compute environment, a job, an unknown endpoint), leaving it to its own value provider.
     /// </summary>
-    internal bool TryGetEndpointValue(EndpointReferenceExpression reference, out string? value)
+    /// <summary>The Pulumi expression of the host (<c>{app}.${environment.defaultDomain}</c>) an http(s) endpoint of a container app in this environment is served on; false for anything else (a job, a missing endpoint). The caller has established that the resource is deployed to this environment.</summary>
+    public bool TryGetEndpointHost(EndpointReference endpoint, out string? host) =>
+        TryGetEndpointValue(endpoint.Property(EndpointProperty.Host), out host, assumeTargeted: true);
+
+    internal bool TryGetEndpointValue(EndpointReferenceExpression reference, out string? value, bool assumeTargeted = false)
     {
         value = null;
         var endpoint = reference.Endpoint;
         var target = endpoint.Resource;
-        if (!IsTargeted(target) || !endpoint.Exists || target.Annotations.OfType<PulumiContainerAppJobAnnotation>().Any()) return false;
+        if (!(assumeTargeted || IsTargeted(target)) || !endpoint.Exists || target.Annotations.OfType<PulumiContainerAppJobAnnotation>().Any()) return false;
 
         var annotation = endpoint.EndpointAnnotation;
         var host = ContainerAppName(target.Name);

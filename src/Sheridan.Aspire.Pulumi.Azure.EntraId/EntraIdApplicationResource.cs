@@ -3,8 +3,6 @@ using Aspire.Hosting.Pipelines;
 using Sheridan.Aspire.Pulumi;
 using Sheridan.Aspire.Pulumi.Azure;
 using Sheridan.Aspire.Pulumi.Azure.AppContainers;
-using Sheridan.Aspire.Pulumi.Azure.AppService;
-using Sheridan.Aspire.Pulumi.Azure.Base;
 using Sheridan.Aspire.Pulumi.Provisioning;
 
 namespace Sheridan.Aspire.Pulumi.Azure.EntraId;
@@ -149,7 +147,10 @@ public sealed class EntraIdApplicationResource(string name) : Resource(name), IP
         return ApplicationIdUri is { } u ? $"{u.TrimEnd('/')}/{scopeName}" : DefaultUri($"/{scopeName}");
     }
 
-    /// <summary>The deployed hostname of a compute resource as a Pulumi expression (container app ingress FQDN or App Service default host name).</summary>
+    /// <summary>
+    /// The deployed host name of a container app as a Pulumi expression: <c>{app}.${environment.defaultDomain}</c>, an output of the Container Apps
+    /// environment (the same value the app's own environment variables get), so it does not depend on the app being created first.
+    /// </summary>
     private string ResolveHostExpression(EndpointReference endpoint, IEnumerable<IResource>? model)
     {
         var resource = endpoint.Resource;
@@ -161,22 +162,15 @@ public sealed class EntraIdApplicationResource(string name) : Resource(name), IP
             if (candidates.Count == 1) env = candidates[0];
         }
         if (env is null)
-            throw new InvalidOperationException($"'{Name}': the redirect URI endpoint belongs to '{resource.Name}', which has no compute environment. Call WithComputeEnvironment(...) with an Azure Container Apps or App Service environment.");
-
-        var key = PulumiAzureProgramExtensions.ToPulumiId(resource.Name);
-        string host;
-        PulumiStackResource? envStack;
-        switch (env)
-        {
-            case AzureContainerAppEnvironmentResource aca:
-                host = $"${{{key}App.configuration.ingress.fqdn}}"; envStack = aca.Stack; break;
-            case AzureAppServiceEnvironmentResource appService:
-                host = $"${{{key}Site.defaultHostName}}"; envStack = appService.Stack; break;
-            default:
-                throw new NotSupportedException($"'{Name}': compute environment '{env.Name}' ({env.GetType().Name}) is not supported for redirect URIs; use Azure Container Apps or App Service, or pass the URI as a string.");
-        }
-        if (envStack is not null && Stack is not null && envStack != Stack)
-            throw new InvalidOperationException($"'{Name}' is in Pulumi stack '{Stack.Name}' but '{resource.Name}' is hosted in '{envStack.Name}'; they must share a stack for the host name to be referenced.");
+            throw new InvalidOperationException($"'{Name}': the redirect URI endpoint belongs to '{resource.Name}', which has no compute environment. Call WithComputeEnvironment(...) with an Azure Container Apps environment.");
+        if (env is not AzureContainerAppEnvironmentResource aca)
+            throw new NotSupportedException($"'{Name}': compute environment '{env.Name}' ({env.GetType().Name}) is not supported for endpoint redirect URIs; use Azure Container Apps, or pass the URI as a string.");
+        if (aca.Stack is not null && Stack is not null && aca.Stack != Stack)
+            throw new InvalidOperationException($"'{Name}' is in Pulumi stack '{Stack.Name}' but '{aca.Name}' is in '{aca.Stack.Name}'; they must share a stack for the host name to be referenced.");
+        if (resource is not IResourceWithEndpoints withEndpoints || !withEndpoints.GetEndpoints().Any(e => e.EndpointAnnotation.UriScheme is "http" or "https" && e.EndpointAnnotation.IsExternal))
+            throw new InvalidOperationException($"'{Name}': '{resource.Name}' has no external http or https endpoint, so it has no public address to sign in on. Call WithExternalHttpEndpoints() on it.");
+        if (!aca.TryGetEndpointHost(endpoint, out var host) || host is null)
+            throw new InvalidOperationException($"'{Name}': endpoint '{endpoint.EndpointName}' of '{resource.Name}' is not an http(s) endpoint deployed to '{aca.Name}' (jobs and other compute environments are not supported).");
         return host;
     }
 
@@ -207,18 +201,14 @@ public sealed class EntraIdApplicationResource(string name) : Resource(name), IP
         {
             ["implicitGrant"] = new Dictionary<string, object?> { ["idTokenIssuanceEnabled"] = EnableIdTokenIssuance },
         };
-        // Endpoint-based URIs embed the frontend's address, which only exists once the frontend does, while the frontend needs this
-        // registration's client ID: a separate ApplicationRedirectUris resource (ordered after the frontend) breaks the cycle. It is
-        // authoritative for the web redirect URIs, so the application leaves them out and ignores drift.
-        var redirectUris = new List<object?>(RedirectUris);
+        var redirectUris = new List<string>(RedirectUris);
         foreach (var (endpoint, paths) in EndpointRedirectUris)
         {
             var host = ResolveHostExpression(endpoint, model);
             if (paths.Length == 0) redirectUris.Add($"https://{host}");
             foreach (var path in paths) redirectUris.Add($"https://{host}{(path.StartsWith('/') ? path : "/" + path)}");
         }
-        var separateRedirectUris = EndpointRedirectUris.Count > 0;
-        if (RedirectUris.Count > 0 && !separateRedirectUris) web["redirectUris"] = Strings(RedirectUris);
+        if (redirectUris.Count > 0) web["redirectUris"] = Strings(redirectUris);
         if (HomePageUrl is not null) web["homepageUrl"] = HomePageUrl;
         if (LogoutUrl is not null) web["logoutUrl"] = LogoutUrl;
 
@@ -280,25 +270,11 @@ public sealed class EntraIdApplicationResource(string name) : Resource(name), IP
         };
         // The default identifier URI embeds the client ID, which only exists after the application does, so it is set by a
         // separate resource; the application must then ignore drift on identifierUris.
-        var ignore = new List<object?>();
-        if (UseDefaultApplicationIdUri && ApplicationIdUri is null) ignore.Add("identifierUris");
-        if (separateRedirectUris) ignore.Add("web.redirectUris");
-        if (ignore.Count > 0) appDef["options"] = new Dictionary<string, object?> { ["ignoreChanges"] = ignore };
-        program.Resources[$"{Id}App"] = appDef;
-
-        if (separateRedirectUris)
+        if (UseDefaultApplicationIdUri && ApplicationIdUri is null)
         {
-            program.Resources[$"{Id}RedirectUris"] = new Dictionary<string, object?>
-            {
-                ["type"] = "azuread:index/applicationRedirectUris:ApplicationRedirectUris",
-                ["properties"] = new Dictionary<string, object?>
-                {
-                    ["applicationId"] = $"${{{Id}App.id}}",
-                    ["type"] = "Web",
-                    ["redirectUris"] = redirectUris,
-                },
-            };
+            appDef["options"] = new Dictionary<string, object?> { ["ignoreChanges"] = new List<object?> { "identifierUris" } };
         }
+        program.Resources[$"{Id}App"] = appDef;
 
         if (UseDefaultApplicationIdUri && ApplicationIdUri is null)
         {

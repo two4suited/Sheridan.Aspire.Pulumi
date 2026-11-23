@@ -38,6 +38,7 @@ identities (`PublishWithAppRoleAssignment`), existing-reference guards, consumer
   `InvalidOperationException` on existing applications (they used to do nothing), and `AsExistingApplication` throws if such settings were applied first.
 - `WithReference` now takes optional connection / downstream-API key names and injects more variables for .NET projects.
 - In run mode `WithReference` reads `Entra:{resource}:TenantId` / `ClientId` (or the `{connection}` section when there is one provisioned registration) from AppHost configuration instead of throwing, and the registration is hidden from the dashboard; the registration itself is still only created by a deploy (issue #250).
+- `WithRedirectUris(EndpointReference, paths)` resolves the container app host from the Container Apps environment's `defaultDomain` output (rather than the app's ingress FQDN, which would need a separate `ApplicationRedirectUris` resource ordered after the app to avoid a cycle with the client ID injected into it). Container Apps only; no local-address following (issue #251).
 - The Entra project now references `Sheridan.Aspire.Pulumi.Provisioning` and `Sheridan.Aspire.Pulumi.Azure`.
 - The schema property is `requiredResourceAccesses` (the issue text had `requiredResourceAccess`).
 

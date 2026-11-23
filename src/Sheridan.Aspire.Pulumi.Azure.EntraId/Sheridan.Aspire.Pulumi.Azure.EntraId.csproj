@@ -21,10 +21,8 @@
     <ProjectReference Include="..\Sheridan.Aspire.Pulumi.Provisioning\Sheridan.Aspire.Pulumi.Provisioning.csproj" />
     <!-- Only for IPulumiManagedIdentityResource (federated credentials / app-role assignments for managed identities). -->
     <ProjectReference Include="..\Sheridan.Aspire.Pulumi.Azure\Sheridan.Aspire.Pulumi.Azure.csproj" />
-    <!-- Only to resolve the hostname of a compute resource for endpoint-based redirect URIs. -->
-    <ProjectReference Include="..\Sheridan.Aspire.Pulumi.Azure.Base\Sheridan.Aspire.Pulumi.Azure.Base.csproj" />
+    <!-- Only to resolve the host of a container app for endpoint-based redirect URIs. -->
     <ProjectReference Include="..\Sheridan.Aspire.Pulumi.Azure.AppContainers\Sheridan.Aspire.Pulumi.Azure.AppContainers.csproj" />
-    <ProjectReference Include="..\Sheridan.Aspire.Pulumi.Azure.AppService\Sheridan.Aspire.Pulumi.Azure.AppService.csproj" />
   </ItemGroup>
 
 </Project>
